@@ -33,6 +33,15 @@ To use package `once`, you need the following tools installed:
 
 If you have `bb` installed, you can use the following tasks:
 
+- **Clone the package**:
+  ```bash
+  git clone https://github.com/amiorin/once
+  ```
+- **Edit the options of the package**:
+  ```bash
+  edit src/clj/io/github/amiorin/once/options.clj
+  edit bb.edn
+  ```
 - **Create Everything**:
   ```bash
   bb once create
