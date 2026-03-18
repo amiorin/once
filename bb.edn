@@ -1,0 +1,23 @@
+{:deps {io.github.amiorin/once {:local/root "."}}
+ :tasks
+ {:requires ([io.github.amiorin.once.package :as package]
+             [io.github.amiorin.once.options :as options]
+             [io.github.amiorin.once.tools :as tools])
+  help {:doc "the workflow help"
+        :override-builtin true
+        :task (println "Usage: bb <step|cmd>+ -- [raw-command]
+
+See:
+* https://bigconfig.it/packages/intro/
+* https://bigconfig.it/api/workflow/")}
+  tidy {:doc "tidy clojure files"
+        :task (do (shell "clojure-lsp clean-ns")
+                  (shell "clojure-lsp format"))}
+  tofu {:doc "bb tofu render tofu:init lock tofu:apply:-auto-approve"
+        :task (tools/tofu* *command-line-args* (package/once-opts options/defaults))}
+  ansible {:doc "bb ansible render -- ansible-playbook main.yml"
+           :task (tools/ansible* *command-line-args* (package/once-opts options/defaults))}
+  ansible-local {:doc "bb ansible render -- ansible-playbook main.yml"
+                 :task (tools/ansible-local* *command-line-args* (package/once-opts options/defaults))}
+  once {:doc "bb once create"
+        :task (package/once* *command-line-args* options/defaults)}}}

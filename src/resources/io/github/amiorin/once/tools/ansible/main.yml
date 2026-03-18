@@ -1,0 +1,21 @@
+---
+- name: Managed Server Configuration
+  hosts: all
+  tasks:
+    - name: Install docker
+      ansible.builtin.shell: >-
+        curl -fsSL https://get.docker.com -o install-docker.sh
+        && sudo sh install-docker.sh
+        && rm install-docker.sh
+      args:
+        creates: /usr/bin/docker
+      register: docker_install_result
+      until: docker_install_result.rc == 0
+      retries: 10
+      delay: 10
+    - name: Install ONCE
+      ansible.builtin.script: install-once.sh
+      args:
+        creates: /usr/local/bin/once
+      retries: 10
+      delay: 10

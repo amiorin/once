@@ -1,0 +1,108 @@
+(ns io.github.amiorin.once.package
+  (:require
+   [babashka.fs :as fs]
+   [babashka.process :as p]
+   [big-config :as bc]
+   [big-config.core :as core]
+   [big-config.run :as run]
+   [big-config.step-fns :as step-fns]
+   [big-config.utils :refer [debug]]
+   [big-config.workflow :as workflow]
+   [cheshire.core :as json]
+   [com.rpl.specter :as s]
+   [io.github.amiorin.once.options :as options]
+   [io.github.amiorin.once.tools :as tools]))
+
+(def step-fns [workflow/print-step-fn
+               (step-fns/->exit-step-fn ::end)
+               (step-fns/->print-error-step-fn ::end)])
+
+(defn opts-fn
+  [opts]
+  (let [dir (workflow/path opts ::tools/tofu)]
+    (merge-with merge opts {::workflow/params (if (fs/exists? dir)
+                                                (-> (p/shell {:dir dir
+                                                              :out :string} "tofu output --json")
+                                                    :out
+                                                    (json/parse-string keyword)
+                                                    (->> (s/select-one [:params :value])))
+                                                {:ip "192.168.0.1"})})))
+
+(defn once-opts
+  [opts]
+  (-> opts
+      (workflow/new-prefix ::start-create-or-delete)
+      opts-fn))
+
+(comment
+  (once-opts options/defaults))
+
+(def create
+  (workflow/->workflow* {:first-step ::start-create-or-delete
+                         :last-step :end-create-or-delete
+                         :pipeline [::tools/tofu ["render tofu:init tofu:apply:-auto-approve"]
+                                    ::tools/ansible ["render ansible-playbook:main.yml" opts-fn]
+                                    ::tools/ansible-local ["render ansible-playbook:main.yml" opts-fn]]}))
+
+(comment
+  (debug tap-values
+    (create [(fn [f step opts]
+               (tap> [step opts])
+               (f step opts))] {::bc/env :repl
+                                ::run/shell-opts {:err *err*
+                                                  :out *out*}
+                                ::tools/tofu-opts (workflow/parse-args "render")
+                                ::tools/ansible-opts (workflow/parse-args "render")
+                                ::tools/ansible-local-opts (workflow/parse-args "render")}))
+  (-> tap-values))
+
+(def delete
+  (workflow/->workflow* {:first-step ::start-create-or-delete
+                         :last-step ::end-create-or-delete
+                         :pipeline [::tools/tofu ["render tofu:init tofu:destroy:-auto-approve"]]}))
+
+(defn once
+  [step-fns {:keys [::workflow/params] :as opts}]
+  (let [hyperscaler "hcloud"
+        opts (->> opts
+                  (merge {::workflow/create-fn create
+                          ::workflow/delete-fn delete})
+                  (s/setval [::workflow/create-opts ::tools/tofu-opts ::workflow/params] {:hyperscaler hyperscaler})
+                  (s/setval [::workflow/delete-opts ::tools/tofu-opts ::workflow/params] {:hyperscaler hyperscaler})
+                  (s/transform [::workflow/create-opts ::tools/tofu-opts ::workflow/params] #(merge % params))
+                  (s/transform [::workflow/delete-opts ::tools/tofu-opts ::workflow/params] #(merge % params)))
+        wf (core/->workflow {:first-step ::start
+                             :wire-fn (fn [step step-fns]
+                                        (case step
+                                          ::start [(partial workflow/run-steps step-fns) ::end]
+                                          ::end [identity]))})]
+    (wf step-fns opts)))
+
+(comment
+  (debug tap-values
+    (once [(fn [f step opts]
+             (tap> [step opts])
+             (f step opts))]
+          {::bc/env :repl
+           ::run/shell-opts {:err *err*
+                             :out *out*}
+           ::workflow/steps [:create]}))
+  (-> tap-values))
+
+(defn once*
+  [args & [opts]]
+  (let [opts (merge (workflow/parse-args args)
+                    {::bc/env :shell}
+                    opts)]
+    (once step-fns opts)))
+
+(comment
+  (debug tap-values
+    (once* "delete create delete" {::bc/env :repl
+                                   ::run/shell-opts {:err *err*
+                                                     :out *out*}
+                                   ::workflow/create-opts {::tools/tofu-opts {::workflow/steps [:render]}
+                                                           ::tools/ansible-opts {::workflow/steps [:render]}
+                                                           ::tools/ansible-local-opts {::workflow/steps [:render]}}
+                                   ::workflow/delete-opts  {::tools/tofu-opts {::workflow/steps [:render]}}}))
+  (-> tap-values))
