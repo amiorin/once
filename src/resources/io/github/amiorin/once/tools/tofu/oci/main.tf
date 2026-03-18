@@ -8,15 +8,15 @@ terraform {
 }
 
 provider "oci" {
-  config_file_profile = "DEFAULT"
+  config_file_profile = "<{ config-file-profile }>"
 }
 
 data "oci_core_subnet" "public_subnet" {
-  subnet_id = "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaaotya32pihejgi25vrdfnjda3qg52kpsjnd7od5oiqifbsi4rqqma"
+  subnet_id = "<{ subnet-id }>"
 }
 
 data "oci_core_images" "ubuntu_24_04_arm" {
-  compartment_id           = "ocid1.tenancy.oc1..aaaaaaaal4wmmpzv2fzkdz2vrfdizywgzjid6dqlgcankrrr7jyydo7ozb3a"
+  compartment_id           = "<{ compartment-id }>"
   operating_system         = "Canonical Ubuntu"
   operating_system_version = "24.04"
   shape                    = "VM.Standard.A1.Flex"
@@ -25,13 +25,13 @@ data "oci_core_images" "ubuntu_24_04_arm" {
 }
 
 resource "oci_core_instance" "ampere_vm" {
-  availability_domain = "xTQn:EU-FRANKFURT-1-AD-1"
-  compartment_id      = "ocid1.tenancy.oc1..aaaaaaaal4wmmpzv2fzkdz2vrfdizywgzjid6dqlgcankrrr7jyydo7ozb3a"
-  display_name        = "my-ampere-instance"
-  shape               = "VM.Standard.A1.Flex"
+  availability_domain = "<{ availability-domain }>"
+  compartment_id      = "<{ compartment-id }>"
+  display_name        = "<{ display-name }>"
+  shape               = "<{ shape }>"
   shape_config {
-    ocpus         = 2
-    memory_in_gbs = 12
+    ocpus         = <{ ocpus }>
+    memory_in_gbs = <{ memory-in-gbs }>
   }
   create_vnic_details {
     subnet_id        = data.oci_core_subnet.public_subnet.id
@@ -40,11 +40,11 @@ resource "oci_core_instance" "ampere_vm" {
   source_details {
     source_type             = "image"
     source_id               = data.oci_core_images.ubuntu_24_04_arm.images[0].id
-    boot_volume_size_in_gbs = 100
-    boot_volume_vpus_per_gb = 30
+    boot_volume_size_in_gbs = <{ boot-volume-size-in-gbs }>
+    boot_volume_vpus_per_gb = <{ boot-volume-vpus-per-gb }>
   }
   metadata = {
-    ssh_authorized_keys = file("~/.ssh/id_ed25519.pub")
+    ssh_authorized_keys = file("<{ ssh-authorized-keys }>")
   }
   connection {
     type = "ssh"
