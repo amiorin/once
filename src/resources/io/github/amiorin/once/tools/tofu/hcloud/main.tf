@@ -20,11 +20,11 @@ provider "hcloud" {
 }
 
 resource "hcloud_server" "node1" {
-  name        = "node1-{{ profile }}"
-  image       = "ubuntu-24.04"
-  server_type = "cx23"
-  location    = "hel1"
-  ssh_keys    = ["32617+amiorin@users.noreply.github.com"]
+  name        = "<{ name }>"
+  image       = "<{ image }>"
+  server_type = "<{ server-type }>"
+  location    = "<{ location  }>"
+  ssh_keys    = ["<{ ssh-keys }>"]
   public_net {
     ipv4_enabled = true
     ipv6_enabled = false
@@ -44,7 +44,7 @@ output "params" {
   value = {
     ip = hcloud_server.node1.ipv4_address
     sudoer = "root"
-    name = "walter"
-    user = "ubuntu"
+    name = "<{ package }>"
+    user = "root"
   }
 }

@@ -14,10 +14,10 @@ See:
         :task (do (shell "clojure-lsp clean-ns")
                   (shell "clojure-lsp format"))}
   tofu {:doc "bb tofu render tofu:init lock tofu:apply:-auto-approve"
-        :task (tools/tofu* *command-line-args* (package/once-opts options/oci))}
+        :task (tools/tofu* *command-line-args* (package/once-opts options/hcloud))}
   ansible {:doc "bb ansible render -- ansible-playbook main.yml"
-           :task (tools/ansible* *command-line-args* (package/once-opts options/oci))}
+           :task (tools/ansible* *command-line-args* (package/once-opts options/hcloud))}
   ansible-local {:doc "bb ansible render -- ansible-playbook main.yml"
-                 :task (tools/ansible-local* *command-line-args* (package/once-opts options/oci))}
+                 :task (tools/ansible-local* *command-line-args* (package/once-opts options/hcloud))}
   once {:doc "bb once create"
-        :task (package/once* *command-line-args* options/oci)}}}
+        :task (package/once* *command-line-args* options/hcloud)}}}
