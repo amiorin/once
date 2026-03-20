@@ -1,7 +1,7 @@
 {:deps {io.github.amiorin/once {:local/root "."}}
  :tasks
  {:requires ([io.github.amiorin.once.package :as package]
-             [io.github.amiorin.once.options :as options]
+             [io.github.amiorin.once.options :refer [no-infra] :rename {no-infra options}]
              [io.github.amiorin.once.tools :as tools])
   help {:doc "the workflow help"
         :override-builtin true
@@ -14,10 +14,10 @@ See:
         :task (do (shell "clojure-lsp clean-ns")
                   (shell "clojure-lsp format"))}
   tofu {:doc "bb tofu render tofu:init lock tofu:apply:-auto-approve"
-        :task (tools/tofu* *command-line-args* (package/once-opts options/hcloud))}
+        :task (tools/tofu* *command-line-args* (package/once-opts options))}
   ansible {:doc "bb ansible render -- ansible-playbook main.yml"
-           :task (tools/ansible* *command-line-args* (package/once-opts options/hcloud))}
+           :task (tools/ansible* *command-line-args* (package/once-opts options))}
   ansible-local {:doc "bb ansible render -- ansible-playbook main.yml"
-                 :task (tools/ansible-local* *command-line-args* (package/once-opts options/hcloud))}
+                 :task (tools/ansible-local* *command-line-args* (package/once-opts options))}
   once {:doc "bb once create"
-        :task (package/once* *command-line-args* options/hcloud)}}}
+        :task (package/once* *command-line-args* options)}}}

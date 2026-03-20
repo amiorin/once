@@ -29,3 +29,12 @@
                                 :server-type "cx23"
                                 :location "hel1"
                                 :ssh-keys "32617+amiorin@users.noreply.github.com"}})
+
+(def no-infra {::render/profile "no-infra"
+               ::workflow/params {:hyperscaler "no-infra"
+                                  :ip "192.168.0.1"
+                                  :user "ubuntu"
+                                  :sudoer "ubuntu"
+                                  :uid "1000"
+                                  :package "once"
+                                  :name "once"}})
