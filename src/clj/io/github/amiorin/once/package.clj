@@ -41,6 +41,7 @@
   (workflow/->workflow* {:first-step ::start-create-or-delete
                          :last-step :end-create-or-delete
                          :pipeline [::tools/tofu ["render tofu:init tofu:apply:-auto-approve"]
+                                    ::tools/tofu-dns ["render tofu:init tofu:apply:-auto-approve" opts-fn]
                                     ::tools/ansible ["render ansible-playbook:main.yml" opts-fn]
                                     ::tools/ansible-local ["render ansible-playbook:main.yml" opts-fn]]}))
 
@@ -52,6 +53,7 @@
                                 ::run/shell-opts {:err *err*
                                                   :out *out*}
                                 ::tools/tofu-opts (workflow/parse-args "render")
+                                ::tools/tofu-dns-opts (workflow/parse-args "render")
                                 ::tools/ansible-opts (workflow/parse-args "render")
                                 ::tools/ansible-local-opts (workflow/parse-args "render")}))
   (-> tap-values))
@@ -59,16 +61,14 @@
 (def delete
   (workflow/->workflow* {:first-step ::start-create-or-delete
                          :last-step ::end-create-or-delete
-                         :pipeline [::tools/tofu ["render tofu:init tofu:destroy:-auto-approve"]]}))
+                         :pipeline [::tools/tofu ["render tofu:init tofu:destroy:-auto-approve"]
+                                    ::tools/tofu-dns ["render tofu:init tofu:destroy:-auto-approve"]]}))
 
 (defn once
   [step-fns {:keys [::workflow/params] :as opts}]
-  (let [hyperscaler "hcloud"
-        opts (->> opts
+  (let [opts (->> opts
                   (merge {::workflow/create-fn create
                           ::workflow/delete-fn delete})
-                  (s/setval [::workflow/create-opts ::tools/tofu-opts ::workflow/params] {:hyperscaler hyperscaler})
-                  (s/setval [::workflow/delete-opts ::tools/tofu-opts ::workflow/params] {:hyperscaler hyperscaler})
                   (s/transform [::workflow/create-opts ::tools/tofu-opts ::workflow/params] #(merge % params))
                   (s/transform [::workflow/delete-opts ::tools/tofu-opts ::workflow/params] #(merge % params)))
         wf (core/->workflow {:first-step ::start

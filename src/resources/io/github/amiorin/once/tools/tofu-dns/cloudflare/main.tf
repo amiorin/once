@@ -17,7 +17,7 @@ provider "cloudflare" {
 
 resource "cloudflare_record" "example_record" {
   zone_id = "f526f293f6aaa115c0e8fb498b3b99f8"
-  name    = "test"
+  name    = "*"
   content = "<{ ip }>"
   type    = "A"
   proxied = false
