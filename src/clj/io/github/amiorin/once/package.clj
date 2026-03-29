@@ -35,7 +35,7 @@
       opts-fn))
 
 (comment
-  (once-opts options/defaults))
+  (once-opts options/oci))
 
 (def create
   (workflow/->workflow* {:first-step ::start-create-or-delete

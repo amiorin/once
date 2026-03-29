@@ -46,6 +46,33 @@
                                                                   :out *err*}}))
   (-> tap-values))
 
+(defn tofu-dns
+  [step-fns opts]
+  (let [opts (workflow/prepare {::workflow/name ::tofu-dns
+                                ::render/templates [{:template (keyword->path ::tofu-dns)
+                                                     :overwrite true
+                                                     :data-fn (fn [{:keys [ip] :as data} _]
+                                                                (assoc data :ip (or ip "192.168.0.1")))
+                                                     :dns-provider "cloudflare"
+                                                     :transform [["{{ dns-provider }}"
+                                                                  delimiters]]}]}
+                               opts)]
+    (workflow/run-steps step-fns opts)))
+
+(defn tofu-dns*
+  [args & [opts]]
+  (let [opts (merge (workflow/parse-args args)
+                    {::bc/env :shell}
+                    opts)]
+    (tofu-dns step-fns opts)))
+
+(comment
+  (debug tap-values
+    (tofu-dns* "render tofu:init" {::bc/env :repl
+                                   ::run/shell-opts {:err *err*
+                                                     :out *err*}}))
+  (-> tap-values))
+
 (defn data-fn [{:keys [ip sudoer] :as data} _]
   (let [sudoer (or sudoer "root")
         hosts [(or ip "64.227.72.100")]]

@@ -8,6 +8,7 @@
 
 (def oci {::render/profile "oci"
           ::workflow/params {:hyperscaler "oci"
+                             :dns-provider "cloudflare"
                              :package "once"
                              :config-file-profile "DEFAULT"
                              :subnet-id "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaaotya32pihejgi25vrdfnjda3qg52kpsjnd7od5oiqifbsi4rqqma"
