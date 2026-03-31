@@ -4,9 +4,12 @@
    [big-config.render :as render]
    [big-config.run :as run]
    [big-config.step-fns :as step-fns]
-   [big-config.utils :refer [debug keyword->path]]
+   [big-config.utils :as utils :refer [debug keyword->path]]
    [big-config.workflow :as workflow]
-   [cheshire.core :as json]))
+   [big-tofu.core :refer [->Construct add-suffix construct]]
+   [cheshire.core :as json]
+   [io.github.amiorin.once.options :as options]
+   [io.github.amiorin.once.params :as params]))
 
 (def step-fns [workflow/print-step-fn
                (step-fns/->exit-step-fn ::workflow/end)
@@ -36,14 +39,80 @@
     (tofu step-fns opts)))
 
 (comment
+  (params/once-opts (merge options/oci
+                           {::bc/env :repl
+                            ::run/shell-opts {:err *err*
+                                              :out *err*}})))
+
+(comment
   (debug tap-values
-    (tofu* "render tofu:init tofu:apply:-auto-approve" {::bc/env :repl
-                                                        ::run/shell-opts {:err *err*
-                                                                          :out *err*}}))
+    (tofu* "render tofu:init tofu:plan"
+           (params/once-opts (merge options/oci
+                                    {::bc/env :repl
+                                     ::run/shell-opts {:err *err*
+                                                       :out *err*}}))))
+  (-> tap-values))
+
+(defn tofu-smtp
+  [step-fns opts]
+  (let [opts (workflow/prepare {::workflow/name ::tofu-smtp
+                                ::render/templates [{:template (keyword->path ::tofu-smtp)
+                                                     :overwrite true
+                                                     :data-fn (fn [{:keys [ip] :as data} _]
+                                                                (assoc data :ip (or ip "192.168.0.1")))
+                                                     :smtp-provider "resend"
+                                                     :transform [["{{ smtp-provider }}"
+                                                                  delimiters]]}]}
+                               opts)]
+    (workflow/run-steps step-fns opts)))
+
+(defn tofu-smtp*
+  [args & [opts]]
+  (let [opts (merge (workflow/parse-args args)
+                    {::bc/env :shell}
+                    opts)]
+    (tofu-smtp step-fns opts)))
+
+(comment
   (debug tap-values
-    (tofu* "render tofu:destroy:-auto-approve" {::bc/env :repl
-                                                ::run/shell-opts {:err *err*
-                                                                  :out *err*}}))
+    (tofu-smtp* "render tofu:init tofu:apply:-auto-approve"
+                (params/once-opts (merge options/oci
+                                         {::bc/env :repl
+                                          ::run/shell-opts {:err *err*
+                                                            :out *err*}}))))
+  (-> tap-values))
+
+(defn render-fn
+  [src {:keys [records zone-id]}]
+  (case src
+    :smtp (let [cloudflare-recores (for [{:keys [name priority record type value]} records]
+                                     (->Construct :resource
+                                                  :cloudflare_record
+                                                  (add-suffix ::smtp-dns (format "-%s-%s" record type))
+                                                  (cond-> {:zone_id zone-id
+                                                           :name name
+                                                           :ttl "60"
+                                                           :type type
+                                                           :proxied false}
+                                                    (= type "TXT") (merge {:content (format "\"%s\"" value)})
+                                                    (= type "MX") (merge {:priority priority
+                                                                          :content value}))))
+                m (or (->> cloudflare-recores
+                           (map construct)
+                           (apply utils/deep-merge)
+                           utils/sort-nested-map) {})]
+            (json/generate-string m {:pretty true}))))
+
+(comment
+  (debug tap-values
+    #_(render-fn :smtp {:zone-id "zone-id"
+                        :records []})
+    (render-fn :smtp {:zone-id "zone-id"
+                      :records [{:name "name"
+                                 :priority 10
+                                 :record "SPF"
+                                 :type "TXT"
+                                 :value "v=spf1 include:amazonses.com ~all"}]}))
   (-> tap-values))
 
 (defn tofu-dns
@@ -55,6 +124,9 @@
                                                                 (assoc data :ip (or ip "192.168.0.1")))
                                                      :dns-provider "cloudflare"
                                                      :transform [["{{ dns-provider }}"
+                                                                  delimiters]
+                                                                 [render-fn
+                                                                  {:smtp "smtp.tf.json"}
                                                                   delimiters]]}]}
                                opts)]
     (workflow/run-steps step-fns opts)))
@@ -68,9 +140,11 @@
 
 (comment
   (debug tap-values
-    (tofu-dns* "render tofu:init" {::bc/env :repl
-                                   ::run/shell-opts {:err *err*
-                                                     :out *err*}}))
+    (tofu-dns* "render tofu:init tofu:plan"
+               (params/once-opts (merge options/oci
+                                        {::bc/env :repl
+                                         ::run/shell-opts {:err *err*
+                                                           :out *err*}}))))
   (-> tap-values))
 
 (defn data-fn [{:keys [ip sudoer] :as data} _]

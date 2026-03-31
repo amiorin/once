@@ -1,49 +1,28 @@
 (ns io.github.amiorin.once.package
   (:require
-   [babashka.fs :as fs]
-   [babashka.process :as p]
    [big-config :as bc]
    [big-config.core :as core]
    [big-config.run :as run]
    [big-config.step-fns :as step-fns]
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]
-   [cheshire.core :as json]
    [com.rpl.specter :as s]
    [io.github.amiorin.once.options :as options]
+   [io.github.amiorin.once.params :as params]
    [io.github.amiorin.once.tools :as tools]))
 
 (def step-fns [workflow/print-step-fn
                (step-fns/->exit-step-fn ::end)
                (step-fns/->print-error-step-fn ::end)])
 
-(defn opts-fn
-  [opts]
-  (let [dir (workflow/path opts ::tools/tofu)]
-    (merge-with merge opts {::workflow/params (if (fs/exists? dir)
-                                                (-> (p/shell {:dir dir
-                                                              :out :string} "tofu output --json")
-                                                    :out
-                                                    (json/parse-string keyword)
-                                                    (->> (s/select-one [:params :value])))
-                                                {:ip "192.168.0.1"})})))
-
-(defn once-opts
-  [opts]
-  (-> opts
-      (workflow/new-prefix ::start-create-or-delete)
-      opts-fn))
-
-(comment
-  (once-opts options/oci))
-
 (def create
   (workflow/->workflow* {:first-step ::start-create-or-delete
                          :last-step :end-create-or-delete
                          :pipeline [::tools/tofu ["render tofu:init tofu:apply:-auto-approve"]
-                                    ::tools/tofu-dns ["render tofu:init tofu:apply:-auto-approve" opts-fn]
-                                    ::tools/ansible ["render ansible-playbook:main.yml" opts-fn]
-                                    ::tools/ansible-local ["render ansible-playbook:main.yml" opts-fn]]}))
+                                    ::tools/tofu-smtp ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
+                                    ::tools/tofu-dns ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
+                                    ::tools/ansible ["render ansible-playbook:main.yml" params/opts-fn]
+                                    ::tools/ansible-local ["render ansible-playbook:main.yml" params/opts-fn]]}))
 
 (comment
   (debug tap-values
@@ -53,6 +32,7 @@
                                 ::run/shell-opts {:err *err*
                                                   :out *out*}
                                 ::tools/tofu-opts (workflow/parse-args "render")
+                                ::tools/tofu-smtp-opts (workflow/parse-args "render")
                                 ::tools/tofu-dns-opts (workflow/parse-args "render")
                                 ::tools/ansible-opts (workflow/parse-args "render")
                                 ::tools/ansible-local-opts (workflow/parse-args "render")}))
@@ -62,6 +42,7 @@
   (workflow/->workflow* {:first-step ::start-create-or-delete
                          :last-step ::end-create-or-delete
                          :pipeline [::tools/tofu ["render tofu:init tofu:destroy:-auto-approve"]
+                                    ::tools/tofu-smtp ["render tofu:init tofu:destroy:-auto-approve"]
                                     ::tools/tofu-dns ["render tofu:init tofu:destroy:-auto-approve"]]}))
 
 (defn once
@@ -70,7 +51,9 @@
                   (merge {::workflow/create-fn create
                           ::workflow/delete-fn delete})
                   (s/transform [::workflow/create-opts ::tools/tofu-opts ::workflow/params] #(merge % params))
-                  (s/transform [::workflow/delete-opts ::tools/tofu-opts ::workflow/params] #(merge % params)))
+                  (s/transform [::workflow/delete-opts ::tools/tofu-opts ::workflow/params] #(merge % params))
+                  (s/transform [::workflow/create-opts ::tools/tofu-dns-opts ::workflow/params] #(merge % params))
+                  (s/transform [::workflow/delete-opts ::tools/tofu-dns-opts ::workflow/params] #(merge % params)))
         wf (core/->workflow {:first-step ::start
                              :wire-fn (fn [step step-fns]
                                         (case step
@@ -98,11 +81,8 @@
 
 (comment
   (debug tap-values
-    (once* "delete create delete" {::bc/env :repl
-                                   ::run/shell-opts {:err *err*
-                                                     :out *out*}
-                                   ::workflow/create-opts {::tools/tofu-opts {::workflow/steps [:render]}
-                                                           ::tools/ansible-opts {::workflow/steps [:render]}
-                                                           ::tools/ansible-local-opts {::workflow/steps [:render]}}
-                                   ::workflow/delete-opts  {::tools/tofu-opts {::workflow/steps [:render]}}}))
+    (once* "create" (merge options/oci
+                           {::bc/env :repl
+                            ::run/shell-opts {:err *err*
+                                              :out *out*}})))
   (-> tap-values))

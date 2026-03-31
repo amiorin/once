@@ -3,12 +3,11 @@
    [big-config.render :as render]
    [big-config.workflow :as workflow]))
 
-(def defaults {::workflow/params {:hyperscaler "oci"
-                                  :package "once"}})
-
 (def oci {::render/profile "oci"
           ::workflow/params {:hyperscaler "oci"
                              :dns-provider "cloudflare"
+                             :zone-id "f526f293f6aaa115c0e8fb498b3b99f8"
+                             :smtp-provider "resend"
                              :package "once"
                              :config-file-profile "DEFAULT"
                              :subnet-id "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaaotya32pihejgi25vrdfnjda3qg52kpsjnd7od5oiqifbsi4rqqma"
@@ -24,6 +23,9 @@
 
 (def hcloud {::render/profile "hcloud"
              ::workflow/params {:hyperscaler "hcloud"
+                                :dns-provider "cloudflare"
+                                :zone-id "f526f293f6aaa115c0e8fb498b3b99f8"
+                                :smtp-provider "resend"
                                 :package "once"
                                 :name "once"
                                 :image "ubuntu-24.04"
@@ -33,6 +35,9 @@
 
 (def no-infra {::render/profile "no-infra"
                ::workflow/params {:hyperscaler "no-infra"
+                                  :dns-provider "cloudflare"
+                                  :zone-id "f526f293f6aaa115c0e8fb498b3b99f8"
+                                  :smtp-provider "resend"
                                   :ip "192.168.0.1"
                                   :user "ubuntu"
                                   :sudoer "ubuntu"

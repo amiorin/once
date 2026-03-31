@@ -15,8 +15,8 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-resource "cloudflare_record" "example_record" {
-  zone_id = "f526f293f6aaa115c0e8fb498b3b99f8"
+resource "cloudflare_record" "star_record" {
+  zone_id = "<{ zone-id }>"
   name    = "*"
   content = "<{ ip }>"
   type    = "A"
