@@ -6,12 +6,8 @@ terraform {
   }
 }
 
-variable "resend_api_key" {
-  sensitive = true
-}
-
 provider "resend" {
-  api_key = var.resend_api_key
+  api_key = "<{ resend-api-key }>"
 }
 
 resource "resend_domain_verification" "domain1" {

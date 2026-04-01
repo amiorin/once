@@ -11,8 +11,8 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   2. **SMTP**: Email infrastructure with OpenTofu (Resend).
   3. **DNS**: Domain configuration with OpenTofu (Cloudflare), including automatic SMTP records.
   4. **SMTP Post-Verification**: Finalizing SMTP setup (e.g., domain verification) with OpenTofu.
-  5. **Remote Config**: System configuration with Ansible on the remote host.
-  6. **Local Config**: Finalizing setup with Ansible on the local machine.
+  5. **Remote Config**: System configuration with Ansible on the remote host (installs Docker and ONCE).
+  6. **Local Config**: Finalizing setup with Ansible on the local machine (configures `~/.ssh/config` for easy access).
 - **Multi-Cloud Support**: Native templates for:
   - **Hetzner Cloud** (`hcloud`)
   - **Oracle Cloud Infrastructure** (`oci`)
@@ -126,6 +126,7 @@ You can trigger workflows directly from a Clojure REPL:
 2. **Infrastructure Hook**: When `create` runs, it first executes OpenTofu to provision resources.
 3. **Inventory & Config Bridging**: The Tofu output (like the new server IP or SMTP records) is captured using `tofu output --json` and injected into the DNS configuration and Ansible inventory generation logic.
 4. **Configuration**: Ansible then connects to the new host using the dynamically generated inventory to apply your playbooks.
+5. **Local Finalization**: The local Ansible playbook updates your local environment (e.g., `~/.ssh/config`) so you can immediately SSH into the server using its name.
 
 ## Project Structure
 

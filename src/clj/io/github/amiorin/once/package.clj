@@ -17,7 +17,7 @@
 (def create
   (workflow/->workflow* {:first-step ::start-create-or-delete
                          :last-step :end-create-or-delete
-                         :pipeline [::tools/tofu ["render tofu:init tofu:apply:-auto-approve"]
+                         :pipeline [::tools/tofu ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
                                     ::tools/tofu-smtp ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
                                     ::tools/tofu-dns ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
                                     ::tools/tofu-smtp-post ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
@@ -42,16 +42,17 @@
 (def delete
   (workflow/->workflow* {:first-step ::start-create-or-delete
                          :last-step ::end-create-or-delete
-                         :pipeline [::tools/tofu-dns ["render tofu:init tofu:destroy:-auto-approve"]
-                                    ::tools/tofu-smtp ["render tofu:init tofu:destroy:-auto-approve"]
-                                    ::tools/tofu ["render tofu:init tofu:destroy:-auto-approve"]]}))
+                         :pipeline [::tools/tofu-smtp-post ["render tofu:init tofu:destroy:-auto-approve" params/opts-fn]
+                                    ::tools/tofu-dns ["render tofu:init tofu:destroy:-auto-approve" params/opts-fn]
+                                    ::tools/tofu-smtp ["render tofu:init tofu:destroy:-auto-approve" params/opts-fn]
+                                    ::tools/tofu ["render tofu:init tofu:destroy:-auto-approve" params/opts-fn]]}))
 
 (defn once
   [step-fns {:keys [::workflow/params] :as opts}]
   (let [opts (->> opts
                   (merge {::workflow/create-fn create
                           ::workflow/delete-fn delete})
-                  (workflow/merge-params [::tools/tofu-opts ::tools/tofu-dns-opts ::tools/tofu-smtp-opts] params))
+                  (workflow/merge-params [::tools/tofu-opts ::tools/tofu-dns-opts ::tools/tofu-dns-opts ::tools/tofu-smtp-opts] params))
         wf (core/->workflow {:first-step ::start
                              :wire-fn (fn [step step-fns]
                                         (case step

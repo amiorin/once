@@ -48,7 +48,8 @@
                                                     (json/parse-string keyword)
                                                     (->> (s/select-one [:params :value :resend_domain]))
                                                     (select-keys [:records :id]))
-                                                {:records []})})))
+                                                {:id "domain-id-not-defined"
+                                                 :records []})})))
 
 (comment
   (debug tap-values

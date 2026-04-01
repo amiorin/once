@@ -7,12 +7,8 @@ terraform {
   }
 }
 
-variable "cloudflare_api_token" {
-  sensitive = true
-}
-
 provider "cloudflare" {
-  api_token = var.cloudflare_api_token
+  api_token = "<{ cloudflare-api-token }>"
 }
 
 resource "cloudflare_record" "star_record" {
