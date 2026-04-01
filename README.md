@@ -6,12 +6,13 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
 
 ## Features
 
-- **End-to-End Orchestration**: A seamless five-stage workflow:
+- **End-to-End Orchestration**: A seamless six-stage workflow:
   1. **Infrastructure**: Provisioning with OpenTofu.
   2. **SMTP**: Email infrastructure with OpenTofu (Resend).
   3. **DNS**: Domain configuration with OpenTofu (Cloudflare), including automatic SMTP records.
-  4. **Remote Config**: System configuration with Ansible on the remote host.
-  5. **Local Config**: Finalizing setup with Ansible on the local machine.
+  4. **SMTP Post-Verification**: Finalizing SMTP setup (e.g., domain verification) with OpenTofu.
+  5. **Remote Config**: System configuration with Ansible on the remote host.
+  6. **Local Config**: Finalizing setup with Ansible on the local machine.
 - **Multi-Cloud Support**: Native templates for:
   - **Hetzner Cloud** (`hcloud`)
   - **Oracle Cloud Infrastructure** (`oci`)
@@ -60,8 +61,8 @@ In `bb.edn`, you can switch the active profile by changing the `require` stateme
 
 The `once` task handles the full lifecycle. You can pass multiple commands:
 
-- **Full Setup**: `bb once create` (Tofu -> Tofu SMTP -> Tofu DNS -> Ansible -> Ansible Local)
-- **Tear Down**: `bb once delete` (Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
+- **Full Setup**: `bb once create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible -> Ansible Local)
+- **Tear Down**: `bb once delete` (Tofu DNS Destroy -> Tofu SMTP Post Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
 - **Sequential**: `bb once delete create` (Clean slate redeploy)
 
 #### 3. Targeted Tools
@@ -79,6 +80,10 @@ You can also run the underlying tools individually. Most tasks require a `render
 - **OpenTofu (DNS)**:
   ```bash
   bb tofu-dns render tofu:init tofu:apply:-auto-approve
+  ```
+- **OpenTofu (SMTP Post-Verification)**:
+  ```bash
+  bb tofu-smtp-post render tofu:init tofu:apply:-auto-approve
   ```
 - **Remote Ansible**:
   ```bash
@@ -119,6 +124,7 @@ You can trigger workflows directly from a Clojure REPL:
   - `tofu/`: Multi-cloud `.tf` templates.
   - `tofu-smtp/`: SMTP configuration templates (Resend).
   - `tofu-dns/`: DNS configuration templates (Cloudflare).
+  - `tofu-smtp-post/`: SMTP post-verification templates (Resend).
   - `ansible/`: Remote system playbooks.
   - `ansible-local/`: Local machine configuration playbooks.
 

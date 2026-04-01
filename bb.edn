@@ -20,6 +20,8 @@ See:
             :task (tools/tofu-dns* *command-line-args* (params/once-opts options))}
   tofu-smtp {:doc "bb tofu-smtp render tofu:init lock tofu:apply:-auto-approve"
              :task (tools/tofu-smtp* *command-line-args* (params/once-opts options))}
+  tofu-smtp-post {:doc "bb tofu-smtp-post render tofu:init lock tofu:apply:-auto-approve"
+                  :task (tools/tofu-smtp-post* *command-line-args* (params/once-opts options))}
   ansible {:doc "bb ansible render -- ansible-playbook main.yml"
            :task (tools/ansible* *command-line-args* (params/once-opts options))}
   ansible-local {:doc "bb ansible render -- ansible-playbook main.yml"

@@ -6,7 +6,6 @@
    [big-config.step-fns :as step-fns]
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]
-   [com.rpl.specter :as s]
    [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.params :as params]
    [io.github.amiorin.once.tools :as tools]))
@@ -21,6 +20,7 @@
                          :pipeline [::tools/tofu ["render tofu:init tofu:apply:-auto-approve"]
                                     ::tools/tofu-smtp ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
                                     ::tools/tofu-dns ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
+                                    ::tools/tofu-smtp-post ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
                                     ::tools/ansible ["render ansible-playbook:main.yml" params/opts-fn]
                                     ::tools/ansible-local ["render ansible-playbook:main.yml" params/opts-fn]]}))
 
@@ -34,6 +34,7 @@
                                 ::tools/tofu-opts (workflow/parse-args "render")
                                 ::tools/tofu-smtp-opts (workflow/parse-args "render")
                                 ::tools/tofu-dns-opts (workflow/parse-args "render")
+                                ::tools/tofu-smtp-post-opts (workflow/parse-args "render")
                                 ::tools/ansible-opts (workflow/parse-args "render")
                                 ::tools/ansible-local-opts (workflow/parse-args "render")}))
   (-> tap-values))
@@ -41,19 +42,16 @@
 (def delete
   (workflow/->workflow* {:first-step ::start-create-or-delete
                          :last-step ::end-create-or-delete
-                         :pipeline [::tools/tofu ["render tofu:init tofu:destroy:-auto-approve"]
+                         :pipeline [::tools/tofu-dns ["render tofu:init tofu:destroy:-auto-approve"]
                                     ::tools/tofu-smtp ["render tofu:init tofu:destroy:-auto-approve"]
-                                    ::tools/tofu-dns ["render tofu:init tofu:destroy:-auto-approve"]]}))
+                                    ::tools/tofu ["render tofu:init tofu:destroy:-auto-approve"]]}))
 
 (defn once
   [step-fns {:keys [::workflow/params] :as opts}]
   (let [opts (->> opts
                   (merge {::workflow/create-fn create
                           ::workflow/delete-fn delete})
-                  (s/transform [::workflow/create-opts ::tools/tofu-opts ::workflow/params] #(merge % params))
-                  (s/transform [::workflow/delete-opts ::tools/tofu-opts ::workflow/params] #(merge % params))
-                  (s/transform [::workflow/create-opts ::tools/tofu-dns-opts ::workflow/params] #(merge % params))
-                  (s/transform [::workflow/delete-opts ::tools/tofu-dns-opts ::workflow/params] #(merge % params)))
+                  (workflow/merge-params [::tools/tofu-opts ::tools/tofu-dns-opts] params))
         wf (core/->workflow {:first-step ::start
                              :wire-fn (fn [step step-fns]
                                         (case step

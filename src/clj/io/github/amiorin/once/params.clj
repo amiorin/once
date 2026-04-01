@@ -29,7 +29,7 @@
                                                     :out
                                                     (json/parse-string keyword)
                                                     (->> (s/select-one [:params :value :resend_domain]))
-                                                    (select-keys [:records]))
+                                                    (select-keys [:records :id]))
                                                 {:records []})})))
 
 (comment
