@@ -4,10 +4,10 @@
    [big-config.workflow :as workflow]))
 
 (def oci {::render/profile "oci"
-          ::workflow/params {:domain "bigconfig.website"
+          ::workflow/params {:domain "bigconfig.online"
                              :hyperscaler "oci"
                              :dns-provider "cloudflare"
-                             :zone-id "f526f293f6aaa115c0e8fb498b3b99f8"
+                             :zone-id "f8d9f9cb95c9431f754df2adec8fd504"
                              :smtp-provider "resend"
                              :resend-server "smtp.resend.com"
                              :resend-port 587
