@@ -49,16 +49,22 @@
     (-> hcloud))
   (-> tap-values))
 
-(def no-infra {::render/profile "no-infra"
-               ::workflow/params {:provider-compute "no-infra"
-                                  :provider-dns "no-infra"
-                                  :provider-smtp "no-infra"
-                                  :no-infra-ip "192.168.0.1"
-                                  :no-infra-user "ubuntu"
-                                  :no-infra-sudoer "ubuntu"
-                                  :no-infra-uid "1000"
-                                  :no-infra-name "once"
-                                  :package "once"}})
+(def ^:private no-infra-compute {::workflow/params {:provider-compute "no-infra"
+                                                    :no-infra-compute-ip "192.168.0.1"
+                                                    :no-infra-compute-user "ubuntu"
+                                                    :no-infra-compute-sudoer "ubuntu"
+                                                    :no-infra-compute-uid "1000"
+                                                    :no-infra-compute-name "once"}})
+
+(def ^:private no-infra-smtp {::workflow/params {:provider-smtp "no-infra"
+                                                 :no-infra-smtp-server "smtp.resend.com"
+                                                 :no-infra-smtp-port 587
+                                                 :no-infra-smtp-username "resend"}})
+
+(def ^:private no-infra-dns {::workflow/params {:provider-dns "no-infra"}})
+
+(def no-infra (merge-with merge common no-infra-compute no-infra-smtp no-infra-dns
+                          {::render/profile "no-infra"}))
 
 (comment
   (debug tap-values

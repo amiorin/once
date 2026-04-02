@@ -70,7 +70,7 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 (def bb oci)
 ```
 
-Note: If you are using the `no-infra` profile, ensure your parameters are prefixed with `no-infra-` (e.g., `no-infra-ip`, `no-infra-user`).
+Note: If you are using the `no-infra` profile, ensure your parameters are correctly prefixed (e.g., `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-smtp-server`).
 
 #### 2. Main Workflow
 
