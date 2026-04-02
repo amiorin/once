@@ -19,7 +19,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   - **No-Infra** (`no-infra`): For when the server is already there.
 - **Dynamic Inventory**: Automatically bridge the gap by generating Ansible inventory directly from OpenTofu outputs.
 - **SMTP Testing Ready**: Automatically installs `s-nail` and configures `.mailrc` on the remote host for immediate SMTP verification.
-- **Environment Overrides**: Support for overriding any configuration parameter via environment variables (e.g., `BC_VAR_RESEND_PASSWORD`).
+- **Environment Overrides**: Support for overriding any configuration parameter via environment variables (e.g., `BC_PAR_RESEND_PASSWORD`).
 - **Configurable Workflows**: Execute complex multi-step processes like `tofu init/apply` followed by multiple `ansible-playbook` runs.
 
 ## Prerequisites
@@ -36,12 +36,12 @@ To use `once`, you need the following tools installed:
 
 ### Configuration Overrides
 
-You can override any parameter defined in `options.clj` using environment variables prefixed with `BC_VAR_`. The variable name is converted to lowercase, and underscores or dots are replaced with hyphens.
+You can override any parameter defined in `options.clj` using environment variables prefixed with `BC_PAR_`. The variable name is converted to lowercase, and underscores or dots are replaced with hyphens.
 
 Example:
 ```bash
-export BC_VAR_RESEND_PASSWORD="your-smtp-password"
-export BC_VAR_DOMAIN="example.com"
+export BC_PAR_RESEND_PASSWORD="your-smtp-password"
+export BC_PAR_DOMAIN="example.com"
 ```
 
 These will be automatically merged into the workflow parameters.

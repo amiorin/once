@@ -10,7 +10,7 @@
    [com.rpl.specter :as s]
    [io.github.amiorin.once.options :as options]))
 
-(def prefix "BC_VAR_")
+(def prefix "BC_PAR_")
 
 (defn- read-bc-vars [opts]
   (let [params-from-env (->> (System/getenv)
