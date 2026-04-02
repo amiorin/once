@@ -49,6 +49,21 @@
     (-> hcloud))
   (-> tap-values))
 
+(def digitalocean (merge-with merge resend cloudflare common
+                              {::render/profile "digitalocean"
+                               ::workflow/params {:provider-compute "digitalocean"
+                                                  :digitalocean-name "once"
+                                                  :digitalocean-region "ams3"
+                                                  :digitalocean-size "s-1vcpu-1gb-35gb-intel"
+                                                  :digitalocean-image "ubuntu-25-10-x64"
+                                                  :digitalocean-vpc-uuid "b6938e67-dc83-11e8-a3da-3cfdfea9f0d8"
+                                                  :digitalocean-ssh-keys "812184"}}))
+
+(comment
+  (debug tap-values
+    (-> digitalocean))
+  (-> tap-values))
+
 (def ^:private no-infra-compute {::workflow/params {:provider-compute "no-infra"
                                                     :no-infra-compute-ip "192.168.0.1"
                                                     :no-infra-compute-user "ubuntu"

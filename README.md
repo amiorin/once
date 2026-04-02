@@ -14,6 +14,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   5. **Remote Config**: System configuration with Ansible on the remote host (installs Docker and ONCE).
   6. **Local Config**: Finalizing setup with Ansible on the local machine (configures `~/.ssh/config` for easy access).
 - **Multi-Cloud Support**: Native templates for:
+  - **DigitalOcean** (`digitalocean`)
   - **Hetzner Cloud** (`hcloud`)
   - **Oracle Cloud Infrastructure** (`oci`)
   - **No-Infra** (`no-infra`): For when the server is already there.
@@ -30,7 +31,7 @@ To use `once`, you need the following tools installed:
 - **[Babashka](https://babashka.org/)**: Recommended for running CLI tasks.
 - **[OpenTofu](https://opentofu.org/docs/intro/install/)**: For infrastructure management.
 - **[Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html)**: For configuration management.
-- **Cloud Credentials**: e.g., `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `RESEND_API_KEY`, or OCI configuration.
+- **Cloud Credentials**: e.g., `DIGITALOCEAN_TOKEN`, `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `RESEND_API_KEY`, or OCI configuration.
 
 ## Usage
 
@@ -40,6 +41,7 @@ You can override any parameter defined in `options.clj` using environment variab
 
 Example:
 ```bash
+export BC_PAR_DO_TOKEN="your-digitalocean-token"
 export BC_PAR_RESEND_PASSWORD="your-smtp-password"
 export BC_PAR_CLOUDFLARE_ZONE_ID="your-zone-id"
 export BC_PAR_DOMAIN="example.com"
@@ -66,8 +68,8 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 
 ```clojure
 ;; options.clj
-;; Switch between oci, hcloud, or no-infra
-(def bb oci)
+;; Switch between digitalocean, oci, hcloud, or no-infra
+(def bb digitalocean)
 ```
 
 Note: If you are using the `no-infra` profile, ensure your parameters are correctly prefixed (e.g., `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-smtp-server`).
