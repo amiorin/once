@@ -12,7 +12,7 @@ provider "cloudflare" {
 }
 
 resource "cloudflare_record" "star_record" {
-  zone_id = "<{ zone-id }>"
+  zone_id = "<{ cloudflare-zone-id }>"
   name    = "*"
   content = "<{ ip }>"
   type    = "A"

@@ -13,11 +13,11 @@ provider "hcloud" {
 }
 
 resource "hcloud_server" "node1" {
-  name        = "<{ name }>"
-  image       = "<{ image }>"
-  server_type = "<{ server-type }>"
-  location    = "<{ location  }>"
-  ssh_keys    = ["<{ ssh-keys }>"]
+  name        = "<{ hcloud-name }>"
+  image       = "<{ hcloud-image }>"
+  server_type = "<{ hcloud-server-type }>"
+  location    = "<{ hcloud-location  }>"
+  ssh_keys    = ["<{ hcloud-ssh-keys }>"]
   public_net {
     ipv4_enabled = true
     ipv6_enabled = false

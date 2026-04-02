@@ -25,8 +25,8 @@
   (let [opts (workflow/prepare {::workflow/name ::tofu
                                 ::render/templates [{:template (keyword->path ::tofu)
                                                      :overwrite true
-                                                     :hyperscaler "hcloud"
-                                                     :transform [["{{ hyperscaler }}"
+                                                     :provider-compute "hcloud"
+                                                     :transform [["{{ provider-compute }}"
                                                                   delimiters]]}]}
                                opts)]
     (workflow/run-steps step-fns opts)))
@@ -60,8 +60,8 @@
                                                      :overwrite true
                                                      :data-fn (fn [{:keys [ip] :as data} _]
                                                                 (assoc data :ip (or ip "192.168.0.1")))
-                                                     :smtp-provider "resend"
-                                                     :transform [["{{ smtp-provider }}"
+                                                     :provider-smtp "resend"
+                                                     :transform [["{{ provider-smtp }}"
                                                                   delimiters]]}]}
                                opts)]
     (workflow/run-steps step-fns opts)))
@@ -83,13 +83,13 @@
   (-> tap-values))
 
 (defn render-fn
-  [src {:keys [records zone-id]}]
+  [src {:keys [records cloudflare-zone-id]}]
   (case src
     :smtp (let [cloudflare-recores (for [{:keys [name priority record type value]} records]
                                      (->Construct :resource
                                                   :cloudflare_record
                                                   (add-suffix ::smtp-dns (format "-%s-%s" record type))
-                                                  (cond-> {:zone_id zone-id
+                                                  (cond-> {:zone_id cloudflare-zone-id
                                                            :name name
                                                            :ttl "60"
                                                            :type type
@@ -105,9 +105,9 @@
 
 (comment
   (debug tap-values
-    #_(render-fn :smtp {:zone-id "zone-id"
+    #_(render-fn :smtp {:cloudflare-zone-id "cloudflare-zone-id"
                         :records []})
-    (render-fn :smtp {:zone-id "zone-id"
+    (render-fn :smtp {:cloudflare-zone-id "cloudflare-zone-id"
                       :records [{:name "name"
                                  :priority 10
                                  :record "SPF"
@@ -122,8 +122,8 @@
                                                      :overwrite true
                                                      :data-fn (fn [{:keys [ip] :as data} _]
                                                                 (assoc data :ip (or ip "192.168.0.1")))
-                                                     :dns-provider "cloudflare"
-                                                     :transform [["{{ dns-provider }}"
+                                                     :provider-dns "cloudflare"
+                                                     :transform [["{{ provider-dns }}"
                                                                   delimiters]
                                                                  [render-fn
                                                                   {:smtp "smtp.tf.json"}
@@ -152,8 +152,8 @@
   (let [opts (workflow/prepare {::workflow/name ::tofu-smtp-post
                                 ::render/templates [{:template (keyword->path ::tofu-smtp-post)
                                                      :overwrite true
-                                                     :smtp-provider "resend"
-                                                     :transform [["{{ smtp-provider }}"
+                                                     :provider-smtp "resend"
+                                                     :transform [["{{ provider-smtp }}"
                                                                   delimiters]]}]}
                                opts)]
     (workflow/run-steps step-fns opts)))
