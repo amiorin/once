@@ -4,16 +4,16 @@
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]))
 
-(def common {::workflow/params {:domain "bigconfig.online"
-                                :package "once"}})
+(def ^:private common {::workflow/params {:domain "bigconfig.online"
+                                          :package "once"}})
 
-(def resend {::workflow/params {:provider-smtp "resend"
-                                :resend-server "smtp.resend.com"
-                                :resend-port 587
-                                :resend-username "resend"}})
+(def ^:private resend {::workflow/params {:provider-smtp "resend"
+                                          :resend-server "smtp.resend.com"
+                                          :resend-port 587
+                                          :resend-username "resend"}})
 
-(def cloudflare {::workflow/params {:provider-dns "cloudflare"
-                                    :cloudflare-zone-id "f8d9f9cb95c9431f754df2adec8fd504"}})
+(def ^:private cloudflare {::workflow/params {:provider-dns "cloudflare"
+                                              :cloudflare-zone-id "f8d9f9cb95c9431f754df2adec8fd504"}})
 
 (def oci (merge-with merge resend common cloudflare
                      {::render/profile "oci"
@@ -53,14 +53,21 @@
                ::workflow/params {:provider-compute "no-infra"
                                   :provider-dns "no-infra"
                                   :provider-smtp "no-infra"
-                                  :ip "192.168.0.1"
-                                  :user "ubuntu"
-                                  :sudoer "ubuntu"
-                                  :uid "1000"
-                                  :package "once"
-                                  :name "once"}})
+                                  :no-infra-ip "192.168.0.1"
+                                  :no-infra-user "ubuntu"
+                                  :no-infra-sudoer "ubuntu"
+                                  :no-infra-uid "1000"
+                                  :no-infra-name "once"
+                                  :package "once"}})
 
 (comment
   (debug tap-values
     (-> no-infra))
+  (-> tap-values))
+
+(def bb oci)
+
+(comment
+  (debug tap-values
+    (-> bb))
   (-> tap-values))

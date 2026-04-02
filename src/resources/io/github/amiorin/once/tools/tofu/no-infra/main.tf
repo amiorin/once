@@ -1,9 +1,9 @@
 output "params" {
   value = {
-    ip = "<{ ip }>"
-    sudoer = "<{ sudoer }>"
-    uid = "<{ uid }>"
+    ip = "<{ no-infra-ip }>"
+    sudoer = "<{ no-infra-sudoer }>"
+    uid = "<{ no-infra-uid }>"
     name = "<{ package }>"
-    user = "<{ user }>"
+    user = "<{ no-infra-user }>"
   }
 }

@@ -62,15 +62,15 @@ cd once
 edit src/clj/io/github/amiorin/once/options.clj
 ```
 
-In `bb.edn`, you can switch the active profile by changing the `require` statement:
+In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profile used by Babashka by changing the `bb` definition:
 
 ```clojure
-;; bb.edn
-:requires [...
-           ;; Switch between oci, hcloud, or no-infra
-           [io.github.amiorin.once.options :refer [oci] :rename {oci options}]
-           ...]
+;; options.clj
+;; Switch between oci, hcloud, or no-infra
+(def bb oci)
 ```
+
+Note: If you are using the `no-infra` profile, ensure your parameters are prefixed with `no-infra-` (e.g., `no-infra-ip`, `no-infra-user`).
 
 #### 2. Main Workflow
 
