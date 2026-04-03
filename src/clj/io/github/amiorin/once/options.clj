@@ -4,7 +4,7 @@
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]))
 
-(def ^:private common {::workflow/params {:domain "bigconfig.online"
+(def ^:private common {::workflow/params {:domain "bigconfig.website"
                                           :package "once"}})
 
 (def ^:private resend {::workflow/params {:provider-smtp "resend"
@@ -13,7 +13,7 @@
                                           :resend-username "resend"}})
 
 (def ^:private cloudflare {::workflow/params {:provider-dns "cloudflare"
-                                              :cloudflare-zone-id "f8d9f9cb95c9431f754df2adec8fd504"}})
+                                              :cloudflare-zone-id "f526f293f6aaa115c0e8fb498b3b99f8"}})
 
 (def oci (merge-with merge resend common cloudflare
                      {::render/profile "oci"
@@ -24,9 +24,9 @@
                                          :oci-availability-domain "xTQn:EU-FRANKFURT-1-AD-1"
                                          :oci-display-name "my-ampere-instance"
                                          :oci-shape "VM.Standard.A1.Flex"
-                                         :oci-ocpus 2
-                                         :oci-memory-in-gbs 12
-                                         :oci-boot-volume-size-in-gbs 100
+                                         :oci-ocpus 4
+                                         :oci-memory-in-gbs 24
+                                         :oci-boot-volume-size-in-gbs 200
                                          :oci-boot-volume-vpus-per-gb 30
                                          :oci-ssh-authorized-keys "~/.ssh/id_ed25519.pub"}}))
 

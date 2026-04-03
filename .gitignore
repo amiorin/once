@@ -1,5 +1,6 @@
 .*
 !.gitignore
+!.github
 !.envrc
 !.envrc.private.example
 !.dir-locals.el

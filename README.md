@@ -4,6 +4,8 @@
 
 It is built on top of [big-config](https://github.com/amiorin/big-config), leveraging its workflow and configuration management capabilities.
 
+![Demo](.github/media/demo.gif)
+
 ## Features
 
 - **End-to-End Orchestration**: A seamless six-stage workflow:
