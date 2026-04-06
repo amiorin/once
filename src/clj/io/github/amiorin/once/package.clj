@@ -65,10 +65,11 @@
     (once [(fn [f step opts]
              (tap> [step opts])
              (f step opts))]
-          {::bc/env :repl
-           ::run/shell-opts {:err *err*
-                             :out *out*}
-           ::workflow/steps [:create]}))
+          (merge options/oci
+                 {::bc/env :repl
+                  ::run/shell-opts {:err *err*
+                                    :out *out*}
+                  ::workflow/steps [:create]})))
   (-> tap-values))
 
 (defn once*
