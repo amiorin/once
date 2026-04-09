@@ -15,7 +15,13 @@
 (def ^:private cloudflare {::workflow/params {:provider-dns "cloudflare"
                                               :cloudflare-zone-id "f526f293f6aaa115c0e8fb498b3b99f8"}})
 
-(def oci (merge-with merge resend common cloudflare
+(def ^:private s3 {::workflow/params {:provider-backend "s3"
+                                      :s3-bucket "tf-state-251213589273-eu-west-1"
+                                      :s3-region "eu-west-1"}})
+
+(def ^:private local {::workflow/params {:provider-backend "local"}})
+
+(def oci (merge-with merge resend common cloudflare local
                      {::render/profile "oci"
                       ::workflow/params {:provider-compute "oci"
                                          :oci-config-file-profile "DEFAULT"

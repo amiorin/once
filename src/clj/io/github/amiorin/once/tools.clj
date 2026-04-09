@@ -1,6 +1,7 @@
 (ns io.github.amiorin.once.tools
   (:require
    [big-config :as bc]
+   [big-config.pluggable :as pluggable]
    [big-config.render :as render]
    [big-config.run :as run]
    [big-config.step-fns :as step-fns]
@@ -8,6 +9,7 @@
    [big-config.workflow :as workflow]
    [big-tofu.core :refer [->Construct add-suffix construct]]
    [cheshire.core :as json]
+   [clojure.string :as str]
    [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.params :as params]))
 
@@ -20,6 +22,45 @@
                  :filter-open \{
                  :filter-close \}})
 
+(defn run-steps-with-plugin
+  [plugin-step step-fns opts]
+  (-> (update opts ::workflow/steps #(reduce (fn [steps step]
+                                               (into steps (if (= step :render)
+                                                             [step plugin-step]
+                                                             [step]))) [] %))
+      (->> (workflow/run-steps step-fns))))
+
+(def plugin-step ::render-tofu-backend)
+
+(defn keyword->name
+  "Converts a keyword into a file name string. Namespaces are treated as
+  words and dots are converted into dashes.
+  Example: `:big-config.core/foo` -> `\"big-config-core-foo\"`"
+  [kw]
+  (let [full-str (if-let [ns (namespace kw)]
+                   (str ns "-" (name kw))
+                   (name kw))]
+    (-> full-str
+        (str/replace "/" "-")
+        (str/replace "." "-"))))
+
+(defmethod pluggable/handle-step plugin-step
+  [_step step-fns {:keys [::workflow/name] :as opts}]
+  (let [prepare-keys [::workflow/name ::workflow/path-fn ::workflow/prefix ::workflow/params]
+        plugin-opts (-> (workflow/prepare {::workflow/name name
+                                           ::render/templates [{:template (keyword->path ::tofu-backend)
+                                                                :overwrite true
+                                                                :provider-backend "s3"
+                                                                :data-fn (fn [data {:keys [::workflow/name ::workflow/prefix]}]
+                                                                           (assoc data :s3-key (format "%s/%s.tfstate" prefix (keyword->name name))))
+                                                                :transform [["{{ provider-backend }}"
+                                                                             delimiters]]}]}
+                                          (select-keys opts prepare-keys))
+                        (->> (render/templates step-fns)))]
+    (-> opts
+        (merge (select-keys plugin-opts [::bc/exit ::bc/err]))
+        (update plugin-step (fnil conj []) plugin-opts))))
+
 (defn tofu
   [step-fns opts]
   (let [opts (workflow/prepare {::workflow/name ::tofu
@@ -29,7 +70,7 @@
                                                      :transform [["{{ provider-compute }}"
                                                                   delimiters]]}]}
                                opts)]
-    (workflow/run-steps step-fns opts)))
+    (run-steps-with-plugin plugin-step step-fns opts)))
 
 (defn tofu*
   [args & [opts]]
@@ -39,14 +80,8 @@
     (tofu step-fns opts)))
 
 (comment
-  (params/once-opts (merge options/oci
-                           {::bc/env :repl
-                            ::run/shell-opts {:err *err*
-                                              :out *err*}})))
-
-(comment
   (debug tap-values
-    (tofu* "render tofu:init tofu:plan"
+    (tofu* "render"
            (params/once-opts (merge options/oci
                                     {::bc/env :repl
                                      ::run/shell-opts {:err *err*
@@ -64,7 +99,7 @@
                                                      :transform [["{{ provider-smtp }}"
                                                                   delimiters]]}]}
                                opts)]
-    (workflow/run-steps step-fns opts)))
+    (run-steps-with-plugin plugin-step step-fns opts)))
 
 (defn tofu-smtp*
   [args & [opts]]
@@ -129,7 +164,7 @@
                                                                   {:smtp "smtp.tf.json"}
                                                                   delimiters]]}]}
                                opts)]
-    (workflow/run-steps step-fns opts)))
+    (run-steps-with-plugin plugin-step step-fns opts)))
 
 (defn tofu-dns*
   [args & [opts]]
@@ -156,7 +191,7 @@
                                                      :transform [["{{ provider-smtp }}"
                                                                   delimiters]]}]}
                                opts)]
-    (workflow/run-steps step-fns opts)))
+    (run-steps-with-plugin plugin-step step-fns opts)))
 
 (defn tofu-smtp-post*
   [args & [opts]]

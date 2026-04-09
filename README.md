@@ -15,6 +15,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   4. **SMTP Post-Verification**: Finalizing SMTP setup (e.g., domain verification) with OpenTofu.
   5. **Remote Config**: System configuration with Ansible on the remote host (installs Docker and ONCE).
   6. **Local Config**: Finalizing setup with Ansible on the local machine (configures `~/.ssh/config` for easy access).
+- **OpenTofu S3 Backend**: Support for remote state management using S3, automatically rendered for all Tofu-based stages.
 - **Multi-Cloud Support**: Native templates for:
   - **DigitalOcean** (`digitalocean`)
   - **Hetzner Cloud** (`hcloud`)
@@ -47,6 +48,13 @@ export BC_PAR_DO_TOKEN="your-digitalocean-token"
 export BC_PAR_RESEND_PASSWORD="your-smtp-password"
 export BC_PAR_CLOUDFLARE_ZONE_ID="your-zone-id"
 export BC_PAR_DOMAIN="example.com"
+```
+
+To enable the S3 backend for OpenTofu, set the following parameters:
+```bash
+export BC_PAR_PROVIDER_BACKEND="s3"
+export BC_PAR_S3_BUCKET="your-tf-state-bucket"
+export BC_PAR_S3_REGION="eu-west-1"
 ```
 
 These will be automatically merged into the workflow parameters.
@@ -142,6 +150,7 @@ You can trigger workflows directly from a Clojure REPL:
   - `options.clj`: Where you define your cloud profiles and credentials.
 - `src/resources/.../once/tools/`:
   - `tofu/`: Multi-cloud `.tf` templates.
+  - `tofu-backend/`: OpenTofu backend templates (S3).
   - `tofu-smtp/`: SMTP configuration templates (Resend).
   - `tofu-dns/`: DNS configuration templates (Cloudflare).
   - `tofu-smtp-post/`: SMTP post-verification templates (Resend).
