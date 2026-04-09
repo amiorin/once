@@ -10,6 +10,15 @@ provider "resend" {
   api_key = "<{ resend-api-key }>"
 }
 
+resource "terraform_data" "trigger" {
+  input = timestamp()
+}
+
 resource "resend_domain_verification" "domain1" {
   domain_id = "<{ id }>"
+  lifecycle {
+    replace_triggered_by = [
+      terraform_data.trigger
+    ]
+  }
 }

@@ -27,4 +27,8 @@ See:
   ansible-local {:doc "bb ansible render -- ansible-playbook main.yml"
                  :task (tools/ansible-local* *command-line-args* (params/once-opts options/bb))}
   once {:doc "bb once create"
-        :task (package/once* *command-line-args* options/bb)}}}
+        :task (package/once* *command-line-args* options/bb)}
+  website {:doc "bb once create"
+           :task (package/once* *command-line-args* options/website)}
+  online {:doc "bb once create"
+          :task (package/once* *command-line-args* options/online)}}}

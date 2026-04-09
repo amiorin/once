@@ -21,24 +21,36 @@
 
 (def ^:private local {::workflow/params {:provider-backend "local"}})
 
-(def oci (merge-with merge resend common cloudflare s3
-                     {::render/profile "oci"
-                      ::workflow/params {:provider-compute "oci"
-                                         :oci-config-file-profile "DEFAULT"
-                                         :oci-subnet-id "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaaotya32pihejgi25vrdfnjda3qg52kpsjnd7od5oiqifbsi4rqqma"
-                                         :oci-compartment-id "ocid1.tenancy.oc1..aaaaaaaal4wmmpzv2fzkdz2vrfdizywgzjid6dqlgcankrrr7jyydo7ozb3a"
-                                         :oci-availability-domain "xTQn:EU-FRANKFURT-1-AD-1"
-                                         :oci-display-name "my-ampere-instance"
-                                         :oci-shape "VM.Standard.A1.Flex"
-                                         :oci-ocpus 4
-                                         :oci-memory-in-gbs 24
-                                         :oci-boot-volume-size-in-gbs 200
-                                         :oci-boot-volume-vpus-per-gb 30
-                                         :oci-ssh-authorized-keys "~/.ssh/id_ed25519.pub"}}))
+(def oci {::workflow/params {:provider-compute "oci"
+                             :oci-config-file-profile "DEFAULT"
+                             :oci-subnet-id "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaaotya32pihejgi25vrdfnjda3qg52kpsjnd7od5oiqifbsi4rqqma"
+                             :oci-compartment-id "ocid1.tenancy.oc1..aaaaaaaal4wmmpzv2fzkdz2vrfdizywgzjid6dqlgcankrrr7jyydo7ozb3a"
+                             :oci-availability-domain "xTQn:EU-FRANKFURT-1-AD-1"
+                             :oci-display-name "my-ampere-instance"
+                             :oci-shape "VM.Standard.A1.Flex"
+                             :oci-ocpus 2
+                             :oci-memory-in-gbs 12
+                             :oci-boot-volume-size-in-gbs 100
+                             :oci-boot-volume-vpus-per-gb 30
+                             :oci-ssh-authorized-keys "~/.ssh/id_ed25519.pub"}})
+
+(def online (merge-with merge resend common s3 oci
+                        {::render/profile "online"
+                         ::workflow/params {:domain "bigconfig.online"
+                                            :package "online"
+                                            :provider-dns "cloudflare"
+                                            :cloudflare-zone-id "f8d9f9cb95c9431f754df2adec8fd504"}}))
+
+(def website (merge-with merge resend common s3 oci
+                         {::render/profile "website"
+                          ::workflow/params {:domain "bigconfig.website"
+                                             :package "website"
+                                             :provider-dns "cloudflare"
+                                             :cloudflare-zone-id "f526f293f6aaa115c0e8fb498b3b99f8"}}))
 
 (comment
   (debug tap-values
-    (-> oci))
+    (-> website))
   (-> tap-values))
 
 (def hcloud (merge-with merge resend cloudflare common
@@ -92,7 +104,7 @@
     (-> no-infra))
   (-> tap-values))
 
-(def bb oci)
+(def bb online)
 
 (comment
   (debug tap-values
