@@ -103,13 +103,13 @@
   (-> tap-values))
 
 (defn render-fn
-  [src {:keys [records cloudflare-zone-id]}]
+  [src {:keys [records]}]
   (case src
     :smtp (let [cloudflare-recores (for [{:keys [name priority record type value]} records]
                                      (->Construct :resource
                                                   :cloudflare_record
                                                   (add-suffix ::smtp-dns (format "-%s-%s" record type))
-                                                  (cond-> {:zone_id cloudflare-zone-id
+                                                  (cond-> {:zone_id "${data.cloudflare_zone.domain.id}"
                                                            :name name
                                                            :ttl "60"
                                                            :type type
@@ -125,10 +125,8 @@
 
 (comment
   (debug tap-values
-    #_(render-fn :smtp {:cloudflare-zone-id "cloudflare-zone-id"
-                        :records []})
-    (render-fn :smtp {:cloudflare-zone-id "cloudflare-zone-id"
-                      :records [{:name "name"
+    #_(render-fn :smtp {:records []})
+    (render-fn :smtp {:records [{:name "name"
                                  :priority 10
                                  :record "SPF"
                                  :type "TXT"

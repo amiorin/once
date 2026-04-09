@@ -11,8 +11,12 @@ provider "cloudflare" {
   api_token = "<{ cloudflare-api-token }>"
 }
 
+data "cloudflare_zone" "domain" {
+  name = "<{ domain }>"
+}
+
 resource "cloudflare_record" "star_record" {
-  zone_id = "<{ cloudflare-zone-id }>"
+  zone_id = data.cloudflare_zone.domain.id
   name    = "*"
   content = "<{ ip }>"
   type    = "A"

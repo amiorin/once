@@ -12,8 +12,7 @@
                                           :resend-port 587
                                           :resend-username "resend"}})
 
-(def ^:private cloudflare {::workflow/params {:provider-dns "cloudflare"
-                                              :cloudflare-zone-id "f526f293f6aaa115c0e8fb498b3b99f8"}})
+(def ^:private cloudflare {::workflow/params {:provider-dns "cloudflare"}})
 
 (def ^:private s3 {::workflow/params {:provider-backend "s3"
                                       :s3-bucket "tf-state-251213589273-eu-west-1"
@@ -34,19 +33,15 @@
                              :oci-boot-volume-vpus-per-gb 30
                              :oci-ssh-authorized-keys "~/.ssh/id_ed25519.pub"}})
 
-(def online (merge-with merge resend common s3 oci
+(def online (merge-with merge resend common cloudflare s3 oci
                         {::render/profile "online"
                          ::workflow/params {:domain "bigconfig.online"
-                                            :package "online"
-                                            :provider-dns "cloudflare"
-                                            :cloudflare-zone-id "f8d9f9cb95c9431f754df2adec8fd504"}}))
+                                            :package "online"}}))
 
-(def website (merge-with merge resend common s3 oci
+(def website (merge-with merge resend common cloudflare s3 oci
                          {::render/profile "website"
                           ::workflow/params {:domain "bigconfig.website"
-                                             :package "website"
-                                             :provider-dns "cloudflare"
-                                             :cloudflare-zone-id "f526f293f6aaa115c0e8fb498b3b99f8"}}))
+                                             :package "website"}}))
 
 (comment
   (debug tap-values

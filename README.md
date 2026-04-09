@@ -34,6 +34,7 @@ To use `once`, you need the following tools installed:
 - **[Babashka](https://babashka.org/)**: Recommended for running CLI tasks.
 - **[OpenTofu](https://opentofu.org/docs/intro/install/)**: For infrastructure management.
 - **[Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html)**: For configuration management.
+- **[AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)**: Required for S3 backend management.
 - **Cloud Credentials**: e.g., `DIGITALOCEAN_TOKEN`, `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `RESEND_API_KEY`, or OCI configuration.
 
 ## Usage
@@ -78,7 +79,7 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 
 ```clojure
 ;; options.clj
-;; Switch between digitalocean, oci, hcloud, or no-infra
+;; Switch between digitalocean, oci, hcloud, no-infra, online, or website
 (def bb digitalocean)
 ```
 
