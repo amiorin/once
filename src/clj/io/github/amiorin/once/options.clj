@@ -21,7 +21,7 @@
 
 (def ^:private local {::workflow/params {:provider-backend "local"}})
 
-(def oci (merge-with merge resend common cloudflare local
+(def oci (merge-with merge resend common cloudflare s3
                      {::render/profile "oci"
                       ::workflow/params {:provider-compute "oci"
                                          :oci-config-file-profile "DEFAULT"

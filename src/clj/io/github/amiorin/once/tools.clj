@@ -9,7 +9,6 @@
    [big-config.workflow :as workflow]
    [big-tofu.core :refer [->Construct add-suffix construct]]
    [cheshire.core :as json]
-   [clojure.string :as str]
    [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.params :as params]))
 
@@ -32,27 +31,13 @@
 
 (def plugin-step ::render-tofu-backend)
 
-(defn keyword->name
-  "Converts a keyword into a file name string. Namespaces are treated as
-  words and dots are converted into dashes.
-  Example: `:big-config.core/foo` -> `\"big-config-core-foo\"`"
-  [kw]
-  (let [full-str (if-let [ns (namespace kw)]
-                   (str ns "-" (name kw))
-                   (name kw))]
-    (-> full-str
-        (str/replace "/" "-")
-        (str/replace "." "-"))))
-
 (defmethod pluggable/handle-step plugin-step
   [_step step-fns {:keys [::workflow/name] :as opts}]
-  (let [prepare-keys [::workflow/name ::workflow/path-fn ::workflow/prefix ::workflow/params]
+  (let [prepare-keys [::workflow/name ::workflow/path-fn ::workflow/prefix ::workflow/object-fn ::workflow/object-prefix ::workflow/params]
         plugin-opts (-> (workflow/prepare {::workflow/name name
                                            ::render/templates [{:template (keyword->path ::tofu-backend)
                                                                 :overwrite true
                                                                 :provider-backend "s3"
-                                                                :data-fn (fn [data {:keys [::workflow/name ::workflow/prefix]}]
-                                                                           (assoc data :s3-key (format "%s/%s.tfstate" prefix (keyword->name name))))
                                                                 :transform [["{{ provider-backend }}"
                                                                              delimiters]]}]}
                                           (select-keys opts prepare-keys))
