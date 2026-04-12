@@ -1,6 +1,7 @@
 {:deps {io.github.amiorin/once {:local/root "."}}
  :tasks
- {:requires ([io.github.amiorin.once.params :as params]
+ {:requires ([babashka.process :as p]
+             [io.github.amiorin.once.params :as params]
              [io.github.amiorin.once.options :as options]
              [io.github.amiorin.once.package :as package]
              [io.github.amiorin.once.tools :as tools])
@@ -31,4 +32,16 @@ See:
   website {:doc "bb once create"
            :task (package/once* *command-line-args* options/website)}
   online {:doc "bb once create"
-          :task (package/once* *command-line-args* options/online)}}}
+          :task (package/once* *command-line-args* options/online)}
+  space {:doc "bb once create"
+         :task (package/once* *command-line-args* options/space)}
+  parallel {:doc "bb parallel create — runs online/website/space concurrently"
+            :task (let [cmd (or (first *command-line-args*) "create")
+                        procs (mapv (fn [profile]
+                                      (p/process ["bb" profile cmd]
+                                                 {:inherit true
+                                                  :shutdown p/destroy-tree}))
+                                    ["online" "website" "space"])
+                        results (mapv deref procs)]
+                    (when (some (fn [r] (not= 0 (:exit r))) results)
+                      (System/exit 1)))}}}

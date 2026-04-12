@@ -52,7 +52,7 @@
   (let [opts (->> opts
                   (merge {::workflow/create-fn create
                           ::workflow/delete-fn delete})
-                  (workflow/merge-params [::tools/tofu-opts ::tools/tofu-smtp-opts ::tools/tofu-dns-opts ::tools/tofu-smtp-post-opts] params))
+                  (workflow/merge-params [::tools/tofu-opts ::tools/tofu-smtp-opts ::tools/tofu-dns-opts ::tools/tofu-smtp-post-opts ::tools/ansible-opts] params))
         wf (core/->workflow {:first-step ::start
                              :wire-fn (fn [step step-fns]
                                         (case step

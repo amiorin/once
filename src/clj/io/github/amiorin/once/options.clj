@@ -4,9 +4,6 @@
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]))
 
-(def ^:private once {::workflow/params {:once {:applications [{:host "www.bigconfig.online"
-                                                               :image "ghcr.io/amiorin/big-config-website"}]}}})
-
 (def ^:private common {::workflow/params {:domain "bigconfig.website"
                                           :package "once"}})
 
@@ -30,21 +27,32 @@
                              :oci-availability-domain "xTQn:EU-FRANKFURT-1-AD-1"
                              :oci-display-name "my-ampere-instance"
                              :oci-shape "VM.Standard.A1.Flex"
-                             :oci-ocpus 2
-                             :oci-memory-in-gbs 12
-                             :oci-boot-volume-size-in-gbs 100
+                             :oci-ocpus 1
+                             :oci-memory-in-gbs 4
+                             :oci-boot-volume-size-in-gbs 50
                              :oci-boot-volume-vpus-per-gb 30
                              :oci-ssh-authorized-keys "~/.ssh/id_ed25519.pub"}})
 
-(def online (merge-with merge resend common cloudflare s3 oci once
+(def online (merge-with merge resend common cloudflare s3 oci
                         {::render/profile "online"
                          ::workflow/params {:domain "bigconfig.online"
-                                            :package "online"}}))
+                                            :package "online"
+                                            :once {:applications [{:host "www.bigconfig.online"
+                                                                   :image "ghcr.io/amiorin/big-config-website"}]}}}))
 
-(def website (merge-with merge resend common cloudflare s3 oci once
+(def website (merge-with merge resend common cloudflare s3 oci
                          {::render/profile "website"
                           ::workflow/params {:domain "bigconfig.website"
-                                             :package "website"}}))
+                                             :package "website"
+                                             :once {:applications [{:host "www.bigconfig.website"
+                                                                    :image "ghcr.io/amiorin/big-config-website"}]}}}))
+
+(def space (merge-with merge resend common cloudflare s3 oci
+                       {::render/profile "space"
+                        ::workflow/params {:domain "bigconfig.space"
+                                           :package "space"
+                                           :once {:applications [{:host "www.bigconfig.space"
+                                                                  :image "ghcr.io/amiorin/big-config-website"}]}}}))
 
 (comment
   (debug tap-values
@@ -102,7 +110,7 @@
     (-> no-infra))
   (-> tap-values))
 
-(def bb online)
+(def bb space)
 
 (comment
   (debug tap-values
