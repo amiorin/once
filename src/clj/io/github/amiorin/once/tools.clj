@@ -9,6 +9,7 @@
    [big-config.workflow :as workflow]
    [big-tofu.core :refer [->Construct add-suffix construct]]
    [cheshire.core :as json]
+   [clj-yaml.core :as yaml]
    [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.params :as params]))
 
@@ -222,10 +223,18 @@
                                     :users {:hosts users-hosts}}}}]
     (json/generate-string inventory {:pretty true})))
 
+(defn ansible-once
+  [{:keys [once]}]
+  (let [data [{:name "Reconcile ONCE applications"
+               :become true
+               :once once}]]
+    (yaml/generate-string data :dumper-options {:flow-style :block})))
+
 (defn render
   [target data]
   (case target
-    :inventory (inventory data)))
+    :inventory (inventory data)
+    :ansible-once (ansible-once data)))
 
 (comment
   (render :inventory (data-fn {} {})))
@@ -239,7 +248,8 @@
                                                      :transform [["."
                                                                   :raw]
                                                                  [render
-                                                                  {:inventory "inventory.json"}
+                                                                  {:inventory "inventory.json"
+                                                                   :ansible-once "once.yml"}
                                                                   :raw]]}]}
                                opts)]
     (workflow/run-steps step-fns opts)))

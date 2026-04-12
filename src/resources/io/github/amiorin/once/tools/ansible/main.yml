@@ -51,9 +51,5 @@
       retries: 10
       delay: 10
 
-    - name: Reconcile ONCE applications
-      become: yes
-      once_run:
-        applications:
-          - host: "www.bigconfig.online"
-            image: "ghcr.io/amiorin/big-config-website"
+    - name: Import ONCE tasks
+      import_tasks: once.yml

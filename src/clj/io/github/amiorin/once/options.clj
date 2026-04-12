@@ -4,6 +4,9 @@
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]))
 
+(def ^:private once {::workflow/params {:once {:applications [{:host "www.bigconfig.online"
+                                                               :image "ghcr.io/amiorin/big-config-website"}]}}})
+
 (def ^:private common {::workflow/params {:domain "bigconfig.website"
                                           :package "once"}})
 
@@ -33,12 +36,12 @@
                              :oci-boot-volume-vpus-per-gb 30
                              :oci-ssh-authorized-keys "~/.ssh/id_ed25519.pub"}})
 
-(def online (merge-with merge resend common cloudflare s3 oci
+(def online (merge-with merge resend common cloudflare s3 oci once
                         {::render/profile "online"
                          ::workflow/params {:domain "bigconfig.online"
                                             :package "online"}}))
 
-(def website (merge-with merge resend common cloudflare s3 oci
+(def website (merge-with merge resend common cloudflare s3 oci once
                          {::render/profile "website"
                           ::workflow/params {:domain "bigconfig.website"
                                              :package "website"}}))

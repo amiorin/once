@@ -1,8 +1,8 @@
 (ns io.github.amiorin.once.utils-test
   (:require
    [clojure.java.io :as io]
-   [io.github.amiorin.once.utils :as sut]
-   [clojure.test :refer [deftest is testing]]))
+   [clojure.test :refer [deftest is testing]]
+   [io.github.amiorin.once.utils :as sut]))
 
 (deftest strip-ansi-test
   (testing "strips ANSI escape sequences and OSC 8 hyperlinks"
