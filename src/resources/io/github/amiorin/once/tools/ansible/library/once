@@ -1,11 +1,13 @@
-#!/usr/bin/env bb
+#!/usr/local/bin/bb
 
 (require '[cheshire.core :as json]
          '[babashka.process :as p]
          '[clojure.string :as str]
          '[clojure.set :as set])
 
-;;; Ansible module: once_run
+;;; Ansible module: once
+;;;
+;;; WANT_JSON
 ;;;
 ;;; Reconciles the desired list of ONCE applications against `once list`.
 ;;; Deploys apps that are missing; removes apps that are no longer wanted.
@@ -61,8 +63,6 @@
     (:memory app)        (into ["--memory"         (str (:memory app))])
     (seq (:env app))     (into (mapcat #(vector "--env" %) (:env app)))))
 
-(declare reconcile)
-
 (defn build-remove-cmd [namespace host remove-data?]
   (cond-> ["once" "-n" namespace "remove" host]
     remove-data? (conj "--remove-data")))
@@ -113,7 +113,7 @@
     (debug tap-values
       (def exit-json identity)
       (def fail-json identity)
-      (let [applications [{:host "bar.bigconfig.space"
+      (let [applications [{:host "www.bigconfig.space"
                            :image "ghcr.io/amiorin/big-config-website"}]]
         (reconcile applications "once" false))))
   (-> tap-values))
