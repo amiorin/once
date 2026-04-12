@@ -16,6 +16,7 @@
 ;;;   applications  - required, list of app objects
 ;;;   namespace     - optional, default "once"
 ;;;   remove_data   - optional bool, default false (passed to `once remove`)
+;;;   teardown      - optional bool, default false (workaround to change settings)
 ;;;
 ;;; Each app object:
 ;;;   image         - required (Docker image)
@@ -67,9 +68,13 @@
   (cond-> ["once" "-n" namespace "remove" host]
     remove-data? (conj "--remove-data")))
 
-(defn reconcile [applications namespace remove-data]
+(defn reconcile [applications namespace remove-data? teardown?]
   (when-not (seq applications)
     (fail-json "Missing required parameter: applications"))
+
+  (when teardown?
+    (run! (cond-> ["once" "-n" namespace "teardown"]
+            remove-data? (conj "--remove-data"))))
 
   (let [apps-by-host  (reduce (fn [a e]
                                 (assoc a (:host e) e))
@@ -80,10 +85,8 @@
         to-deploy     (set/difference desired-hosts deployed)
         to-remove     (set/difference deployed desired-hosts)]
 
-    (tap> [apps-by-host desired-hosts list-out deployed to-deploy to-remove])
-
     (doseq [host to-remove]
-      (run! (build-remove-cmd namespace host remove-data)))
+      (run! (build-remove-cmd namespace host remove-data?)))
 
     (doseq [host to-deploy]
       (run! (build-deploy-cmd namespace (apps-by-host host))))
@@ -100,9 +103,11 @@
                  (-> args-file slurp (json/parse-string true))
                  (catch Exception e
                    (fail-json (str "Failed to parse args file: " (.getMessage e)))))
-          {:keys [applications namespace remove-data]
-           :or   {namespace "once" remove-data false}} args]
-      (reconcile applications namespace remove-data))))
+          {:keys [applications namespace remove-data teardown]
+           :or   {namespace "once"
+                  remove-data false
+                  teardown false}} args]
+      (reconcile applications namespace remove-data teardown))))
 
 (when (= *file* (System/getProperty "babashka.file"))
   (apply -main *command-line-args*))
@@ -115,5 +120,5 @@
       (def fail-json identity)
       (let [applications [{:host "www.bigconfig.space"
                            :image "ghcr.io/amiorin/big-config-website"}]]
-        (reconcile applications "once" false))))
+        (reconcile applications "once" false true))))
   (-> tap-values))
