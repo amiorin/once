@@ -116,9 +116,12 @@
   (do
     (require '[big-config.utils :as utils :refer [debug]])
     (debug tap-values
-      (def exit-json identity)
-      (def fail-json identity)
-      (let [applications [{:host "www.bigconfig.space"
+      (def exit-json (fn [& args] {:exit-json args}))
+      (def fail-json (fn [& args] {:fail-json args}))
+      (let [teardown true
+            applications [{:host "www3.bigconfig.space"
+                           :image "ghcr.io/amiorin/big-config-website"}
+                          {:host "www4.bigconfig.space"
                            :image "ghcr.io/amiorin/big-config-website"}]]
         (reconcile applications "once" false true))))
   (-> tap-values))
