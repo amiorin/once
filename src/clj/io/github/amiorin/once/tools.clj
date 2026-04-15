@@ -10,6 +10,7 @@
    [big-tofu.core :refer [->Construct add-suffix construct]]
    [cheshire.core :as json]
    [clj-yaml.core :as yaml]
+   [com.rpl.specter :as s]
    [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.params :as params]))
 
@@ -224,10 +225,12 @@
     (json/generate-string inventory {:pretty true})))
 
 (defn ansible-once
-  [{:keys [once]}]
-  (let [data [{:name "Reconcile ONCE applications"
+  [{:keys [once domain] :as opts}]
+  (let [smtp (-> (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
+                 (assoc :smtp_from (format "noreply <noreply@%s>" domain)))
+        data [{:name "Reconcile ONCE applications"
                :become true
-               :once once}]]
+               :once (s/transform [:applications s/ALL] #(merge % smtp) once)}]]
     (yaml/generate-string data :dumper-options {:flow-style :block})))
 
 (defn render
@@ -263,9 +266,11 @@
 
 (comment
   (debug tap-values
-    (ansible* "render ansible-playbook:main.yml" {::bc/env :repl
-                                                  ::run/shell-opts {:err *err*
-                                                                    :out *err*}}))
+    (ansible* "render"
+              (params/once-opts (merge options/bb
+                                       {::bc/env :repl
+                                        ::run/shell-opts {:err *err*
+                                                          :out *err*}}))))
   (-> tap-values))
 
 (defn ansible-local

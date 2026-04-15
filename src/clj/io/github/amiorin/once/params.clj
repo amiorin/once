@@ -26,15 +26,14 @@
                                                                  :out :string} "tofu output --json")
                                                        :out
                                                        (json/parse-string keyword)
-                                                       (->> (s/select-one [:params :value :resend_domain]))
-                                                       (select-keys [:records :id]))
+                                                       (->> (s/select-one [:params :value])))
                                                    (catch Exception _
                                                      {:id "domain-id-not-defined"
                                                       :records []}))})))
 
 (comment
   (debug tap-values
-    (-> {::render/profile "oci"}
+    (-> {::render/profile "space"}
         (workflow/new-prefix :io.github.amiorin.once.package/start-create-or-delete)
         tofu-smtp-params))
   (-> tap-values))

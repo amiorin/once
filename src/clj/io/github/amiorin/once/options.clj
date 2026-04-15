@@ -51,8 +51,8 @@
                        {::render/profile "space"
                         ::workflow/params {:domain "bigconfig.space"
                                            :package "space"
-                                           :once {:applications [{:host "www.bigconfig.space"
-                                                                  :image "ghcr.io/amiorin/big-config-website"}]}}}))
+                                           :once {:applications [{:host "app.bigconfig.space"
+                                                                  :image "ghcr.io/amiorin/app-bigconfig-website"}]}}}))
 
 (comment
   (debug tap-values
