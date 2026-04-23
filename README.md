@@ -79,7 +79,7 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 
 ```clojure
 ;; options.clj
-;; Switch between digitalocean, oci, hcloud, no-infra, online, or website
+;; Switch between digitalocean, oci, hcloud, no-infra, or online
 (def bb digitalocean)
 ```
 

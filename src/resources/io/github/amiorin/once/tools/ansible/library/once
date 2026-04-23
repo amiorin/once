@@ -71,11 +71,9 @@
 (defn reconcile [applications namespace remove-data? teardown?]
   (when-not (seq applications)
     (fail-json "Missing required parameter: applications"))
-
   (when teardown?
     (run! (cond-> ["once" "-n" namespace "teardown"]
             remove-data? (conj "--remove-data"))))
-
   (let [apps-by-host  (reduce (fn [a e]
                                 (assoc a (:host e) e))
                               {} applications)
@@ -84,13 +82,10 @@
         deployed      (parse-deployed-hosts list-out)
         to-deploy     (set/difference desired-hosts deployed)
         to-remove     (set/difference deployed desired-hosts)]
-
     (doseq [host to-remove]
       (run! (build-remove-cmd namespace host remove-data?)))
-
     (doseq [host to-deploy]
       (run! (build-deploy-cmd namespace (apps-by-host host))))
-
     (exit-json {:changed (boolean (or (seq to-deploy) (seq to-remove)))
                 :deployed (vec to-deploy)
                 :removed  (vec to-remove)})))
@@ -116,12 +111,12 @@
   (do
     (require '[big-config.utils :as utils :refer [debug]])
     (debug tap-values
-      (def exit-json (fn [& args] {:exit-json args}))
-      (def fail-json (fn [& args] {:fail-json args}))
-      (let [teardown true
-            applications [{:host "www3.bigconfig.space"
-                           :image "ghcr.io/amiorin/big-config-website"}
-                          {:host "www4.bigconfig.space"
-                           :image "ghcr.io/amiorin/big-config-website"}]]
-        (reconcile applications "once" false true))))
+      (with-redefs [exit-json (fn [& args] {:exit-json args})
+                    fail-json (fn [& args] {:fail-json args})]
+        (let [#_#_teardown true
+              applications [{:host "www3.bigconfig.space"
+                             :image "ghcr.io/amiorin/big-config-website"}
+                            {:host "www4.bigconfig.space"
+                             :image "ghcr.io/amiorin/big-config-website"}]]
+          (reconcile applications "once" false true)))))
   (-> tap-values))

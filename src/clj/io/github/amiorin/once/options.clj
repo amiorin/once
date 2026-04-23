@@ -4,9 +4,6 @@
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]))
 
-(def ^:private common {::workflow/params {:domain "bigconfig.website"
-                                          :package "once"}})
-
 (def ^:private resend {::workflow/params {:provider-smtp "resend"
                                           :resend-server "smtp.resend.com"
                                           :resend-port 587
@@ -33,33 +30,21 @@
                              :oci-boot-volume-vpus-per-gb 30
                              :oci-ssh-authorized-keys "~/.ssh/id_ed25519.pub"}})
 
-(def online (merge-with merge resend common cloudflare s3 oci
+(def online (merge-with merge resend cloudflare s3 oci
                         {::render/profile "online"
                          ::workflow/params {:domain "bigconfig.online"
                                             :package "online"
                                             :once {:applications [{:host "www.bigconfig.online"
                                                                    :image "ghcr.io/amiorin/big-config-website"}]}}}))
 
-(def website (merge-with merge resend common cloudflare s3 oci
-                         {::render/profile "website"
-                          ::workflow/params {:domain "bigconfig.website"
-                                             :package "website"
-                                             :once {:applications [{:host "www.bigconfig.website"
-                                                                    :image "ghcr.io/amiorin/big-config-website"}]}}}))
-
-(def space (merge-with merge resend common cloudflare s3 oci
+(def space (merge-with merge resend cloudflare s3 oci
                        {::render/profile "space"
                         ::workflow/params {:domain "bigconfig.space"
                                            :package "space"
                                            :once {:applications [{:host "app.bigconfig.space"
                                                                   :image "ghcr.io/amiorin/app-bigconfig-website"}]}}}))
 
-(comment
-  (debug tap-values
-    (-> website))
-  (-> tap-values))
-
-(def hcloud (merge-with merge resend cloudflare common
+(def hcloud (merge-with merge resend cloudflare
                         {::render/profile "hcloud"
                          ::workflow/params {:provider-compute "hcloud"
                                             :hcloud-name "once"
@@ -73,7 +58,7 @@
     (-> hcloud))
   (-> tap-values))
 
-(def digitalocean (merge-with merge resend cloudflare common
+(def digitalocean (merge-with merge resend cloudflare
                               {::render/profile "digitalocean"
                                ::workflow/params {:provider-compute "digitalocean"
                                                   :digitalocean-name "once"
@@ -102,7 +87,7 @@
 
 (def ^:private no-infra-dns {::workflow/params {:provider-dns "no-infra"}})
 
-(def no-infra (merge-with merge common no-infra-compute no-infra-smtp no-infra-dns
+(def no-infra (merge-with merge no-infra-compute no-infra-smtp no-infra-dns
                           {::render/profile "no-infra"}))
 
 (comment

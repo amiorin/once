@@ -29,19 +29,17 @@ See:
                  :task (tools/ansible-local* *command-line-args* (params/once-opts options/bb))}
   once {:doc "bb once create"
         :task (package/once* *command-line-args* options/bb)}
-  website {:doc "bb once create"
-           :task (package/once* *command-line-args* options/website)}
   online {:doc "bb once create"
           :task (package/once* *command-line-args* options/online)}
   space {:doc "bb once create"
          :task (package/once* *command-line-args* options/space)}
-  parallel {:doc "bb parallel create — runs online/website/space concurrently"
+  parallel {:doc "bb parallel create — runs online/space concurrently"
             :task (let [cmd (or (first *command-line-args*) "create")
                         procs (mapv (fn [profile]
                                       (p/process ["bb" profile cmd]
                                                  {:inherit true
                                                   :shutdown p/destroy-tree}))
-                                    ["online" "website" "space"])
+                                    ["online" "space"])
                         results (mapv deref procs)]
                     (when (some (fn [r] (not= 0 (:exit r))) results)
                       (System/exit 1)))}}}
