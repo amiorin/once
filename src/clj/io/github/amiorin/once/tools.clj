@@ -54,6 +54,7 @@
                                 ::render/templates [{:template (keyword->path ::tofu)
                                                      :overwrite true
                                                      :provider-compute "hcloud"
+                                                     :compute-prevent-destroy true
                                                      :transform [["{{ provider-compute }}"
                                                                   delimiters]]}]}
                                opts)]

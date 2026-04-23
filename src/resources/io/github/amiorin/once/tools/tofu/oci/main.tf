@@ -54,6 +54,9 @@ resource "oci_core_instance" "ampere_vm" {
   provisioner "remote-exec" {
     inline = ["ls"]
   }
+  lifecycle {
+    prevent_destroy = <{ compute-prevent-destroy }>
+  }
 }
 
 output "params" {

@@ -93,6 +93,12 @@ The `once` task handles the full lifecycle. You can pass multiple commands:
 - **Tear Down**: `bb once delete` (Tofu DNS Destroy -> Tofu SMTP Post Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
 - **Sequential**: `bb once delete create` (Clean slate redeploy)
 
+Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb once delete`, first override it:
+
+```bash
+export BC_PAR_COMPUTE_PREVENT_DESTROY=false
+```
+
 #### 3. Targeted Tools
 
 You can also run the underlying tools individually. Most tasks require a `render` step first to generate the necessary config files from templates into the `.dist/` directory.

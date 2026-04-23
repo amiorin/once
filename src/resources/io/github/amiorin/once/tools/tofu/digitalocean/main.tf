@@ -29,6 +29,9 @@ resource "digitalocean_droplet" "node1" {
   provisioner "remote-exec" {
     inline = ["ls"]
   }
+  lifecycle {
+    prevent_destroy = <{ compute-prevent-destroy }>
+  }
 }
 
 output "params" {
