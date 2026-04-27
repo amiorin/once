@@ -254,7 +254,7 @@
                                                                  [render
                                                                   {:inventory "inventory.json"
                                                                    :ansible-once "once.yml"}
-                                                                  :raw]]}]}
+                                                                  delimiters]]}]}
                                opts)]
     (workflow/run-steps step-fns opts)))
 

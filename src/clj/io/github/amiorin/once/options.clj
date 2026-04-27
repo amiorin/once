@@ -41,8 +41,9 @@
                        {::render/profile "space"
                         ::workflow/params {:domain "bigconfig.space"
                                            :package "space"
-                                           :once {:applications [{:host "app.bigconfig.space"
-                                                                  :image "ghcr.io/amiorin/app-bigconfig-website"}]}}}))
+                                           :once {:applications [{:host "marketplace-api.bigconfig.space"
+                                                                  :image "ghcr.io/amiorin/once-pocketbase"
+                                                                  :env ["SUPERUSER_PASSWORD=<{ superuser-password }>"]}]}}}))
 
 (def hcloud (merge-with merge resend cloudflare
                         {::render/profile "hcloud"
