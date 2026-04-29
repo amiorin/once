@@ -110,11 +110,11 @@
   (case src
     :smtp (let [cloudflare-recores (for [{:keys [name priority record type value]} records]
                                      (->Construct :resource
-                                                  :cloudflare_record
+                                                  :cloudflare_dns_record
                                                   (add-suffix ::smtp-dns (format "-%s-%s" record type))
                                                   (cond-> {:zone_id "${data.cloudflare_zone.domain.id}"
                                                            :name name
-                                                           :ttl "60"
+                                                           :ttl "1"
                                                            :type type
                                                            :proxied false}
                                                     (= type "TXT") (merge {:content (format "\"%s\"" value)})
