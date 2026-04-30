@@ -228,7 +228,7 @@
 (defn ansible-once
   [{:keys [once domain] :as opts}]
   (let [smtp (-> (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
-                 (assoc :smtp_from (format "noreply <noreply@%s>" domain)))
+                 (assoc :smtp_from (format "Info <info@notifications.%s>" domain)))
         data [{:name "Reconcile ONCE applications"
                :become true
                :once (s/transform [:applications s/ALL] #(merge % smtp) once)}]]

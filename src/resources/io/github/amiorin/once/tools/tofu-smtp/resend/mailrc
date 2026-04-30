@@ -5,5 +5,5 @@ set smtp-auth=login
 set smtp-use-starttls
 
 # Identity Settings
-set from="Fizzy <fizzy@<{ domain }>>"
+set from="Info <info@notifications.<{ domain }>>"
 set hostname=<{ domain  }>
