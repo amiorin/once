@@ -11,7 +11,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
 - **End-to-End Orchestration**: A seamless six-stage workflow:
   1. **Infrastructure**: Provisioning with OpenTofu.
   2. **SMTP**: Email infrastructure with OpenTofu (Resend).
-  3. **DNS**: Domain configuration with OpenTofu (Cloudflare), including automatic SMTP records.
+  3. **DNS**: Domain configuration with OpenTofu (Cloudflare provider v5), including automatic SMTP records, apex (`@`) and wildcard (`*`) A records proxied through Cloudflare, and a curated bundle of zone settings (TLS 1.3, strict SSL, always-use-HTTPS, etc.).
   4. **SMTP Post-Verification**: Finalizing SMTP setup (e.g., domain verification) with OpenTofu.
   5. **Remote Config**: System configuration with Ansible on the remote host (installs Docker and ONCE).
   6. **Local Config**: Finalizing setup with Ansible on the local machine (configures `~/.ssh/config` for easy access).
@@ -78,9 +78,11 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 
 ```clojure
 ;; options.clj
-;; Switch between digitalocean, oci, hcloud, no-infra, or online
-(def bb digitalocean)
+;; Switch between digitalocean, oci, hcloud, no-infra, online, or space
+(def bb space)
 ```
+
+`online` and `space` are application profiles built on top of `oci` — they pin a domain, package, and the list of containerized apps deployed by Ansible (the `space` profile, for example, deploys a templated Pocketbase instance).
 
 Note: If you are using the `no-infra` profile, ensure your parameters are correctly prefixed (e.g., `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-smtp-server`).
 
@@ -91,6 +93,8 @@ The `once` task handles the full lifecycle. You can pass multiple commands:
 - **Full Setup**: `bb once create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible -> Ansible Local)
 - **Tear Down**: `bb once delete` (Tofu DNS Destroy -> Tofu SMTP Post Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
 - **Sequential**: `bb once delete create` (Clean slate redeploy)
+- **Profile-targeted**: `bb online create`, `bb space create` (run a specific application profile regardless of the active `bb` var)
+- **Parallel**: `bb parallel create` / `bb parallel delete` (runs `online` and `space` concurrently)
 
 Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb once delete`, first override it:
 

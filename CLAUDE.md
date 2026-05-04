@@ -75,8 +75,9 @@ bb ansible-local render -- ansible-playbook main.yml
 
 ### Profile-specific tasks
 ```bash
-bb website create    # uses options/website profile
-bb online create     # uses options/online profile
+bb online create        # uses options/online profile (bigconfig.online)
+bb space create         # uses options/space profile (bigconfig.space, pocketbase)
+bb parallel create      # runs online + space concurrently (also works with delete)
 ```
 
 ## Key Architecture Concepts
@@ -86,10 +87,10 @@ bb online create     # uses options/online profile
 2. **tofu-smtp** — set up SMTP (Resend)
 3. **tofu-dns** — configure DNS (Cloudflare), injecting SMTP records
 4. **tofu-smtp-post** — finalize SMTP after DNS verification
-5. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`
+5. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, deploy applications listed under `:once {:applications [...]}`
 6. **ansible-local** — local config: update `~/.ssh/config`
 
-Delete reverses the Tofu stages (4→3→2→1 destroy order).
+Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb once delete`.
 
 ### Template Rendering
 `big-config` renders templates from `src/resources/` into `.dist/` using parameters. Templates use `{{ ... }}` delimiters for provider switching and `{ ... }` for filter expressions.
@@ -121,15 +122,19 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use
 
 ### Configuration Profiles (`options.clj`)
-Profiles are plain Clojure maps composed with `merge-with merge`:
+Two layers compose into a profile: **compute** profiles (`oci`, `hcloud`, `digitalocean`, `no-infra`) and **application** profiles (`online`, `space`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. Profiles are plain Clojure maps composed with `merge-with merge`:
 ```clojure
-(def online (merge-with merge resend common cloudflare s3 oci
-                        {::render/profile "online"
-                         ::workflow/params {:domain "bigconfig.online"}}))
+(def space (merge-with merge resend cloudflare s3 oci
+                       {::render/profile "space"
+                        ::workflow/params {:domain "bigconfig.space"
+                                           :package "space"
+                                           :once {:applications [{:host "marketplace-api.bigconfig.space"
+                                                                  :image "ghcr.io/amiorin/once-pocketbase"
+                                                                  :env ["SUPERUSER_PASSWORD=<{ superuser-password }>"]}]}}}))
 ```
 The `bb` var sets the active profile for Babashka tasks:
 ```clojure
-(def bb online)  ; change this to switch profiles
+(def bb space)  ; change this to switch profiles
 ```
 
 ### REPL Development Pattern
@@ -157,7 +162,7 @@ Functions follow a pipeline pattern where each function takes and returns an `op
 | `digitalocean` | DigitalOcean | `digitalocean-name`, `digitalocean-region`, `digitalocean-size`, `digitalocean-image` |
 | `no-infra` | Existing server | `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-compute-sudoer` |
 
-All cloud profiles combine with `resend` (SMTP) and `cloudflare` (DNS) sub-profiles.
+All cloud profiles combine with `resend` (SMTP) and `cloudflare` (DNS) sub-profiles. The Cloudflare DNS template (provider `~> 5.0`) creates apex (`@`) and wildcard (`*`) A records proxied through Cloudflare and applies a fixed bundle of zone settings (TLS 1.3, strict SSL, always-use-HTTPS, brotli, etc.). Outgoing mail is sent from `info@notifications.<domain>`.
 
 ## Dependencies
 
