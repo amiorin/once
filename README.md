@@ -23,7 +23,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   - **No-Infra** (`no-infra`): For when the server is already there.
 - **Dynamic Inventory**: Automatically bridge the gap by generating Ansible inventory directly from OpenTofu outputs.
 - **SMTP Testing Ready**: Automatically installs `s-nail` and configures `.mailrc` on the remote host for immediate SMTP verification.
-- **Environment Overrides**: Support for overriding any configuration parameter via environment variables (e.g., `BC_PAR_CLOUDFLARE_ZONE_ID`).
+- **Environment Overrides**: Support for overriding any configuration parameter via environment variables (e.g., `BC_PAR_DOMAIN`).
 - **Configurable Workflows**: Execute complex multi-step processes like `tofu init/apply` followed by multiple `ansible-playbook` runs.
 
 ## Prerequisites
@@ -47,7 +47,6 @@ Example:
 ```bash
 export BC_PAR_DO_TOKEN="your-digitalocean-token"
 export BC_PAR_RESEND_PASSWORD="your-smtp-password"
-export BC_PAR_CLOUDFLARE_ZONE_ID="your-zone-id"
 export BC_PAR_DOMAIN="example.com"
 ```
 
