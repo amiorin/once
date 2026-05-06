@@ -12,34 +12,20 @@
 See:
 * https://bigconfig.it/paramss/intro/
 * https://bigconfig.it/api/workflow/")}
-  tidy {:doc "tidy clojure files"
-        :task (do (shell "clojure-lsp clean-ns")
-                  (shell "clojure-lsp format"))}
-  tofu {:doc "bb tofu render tofu:init lock tofu:apply:-auto-approve"
+  once {:doc "bb once create | bb once delete"
+        :task (package/once* *command-line-args* options/bb)}
+  tofu {:doc "bb tofu render tofu:init tofu:apply:-auto-approve"
         :task (tools/tofu* *command-line-args* (params/once-opts options/bb))}
-  tofu-dns {:doc "bb tofu-dns render tofu:init lock tofu:apply:-auto-approve"
+  tofu-dns {:doc "bb tofu-dns render tofu:init tofu:apply:-auto-approve"
             :task (tools/tofu-dns* *command-line-args* (params/once-opts options/bb))}
-  tofu-smtp {:doc "bb tofu-smtp render tofu:init lock tofu:apply:-auto-approve"
+  tofu-smtp {:doc "bb tofu-smtp render tofu:init tofu:apply:-auto-approve"
              :task (tools/tofu-smtp* *command-line-args* (params/once-opts options/bb))}
-  tofu-smtp-post {:doc "bb tofu-smtp-post render tofu:init lock tofu:apply:-auto-approve"
+  tofu-smtp-post {:doc "bb tofu-smtp-post render tofu:init tofu:apply:-auto-approve"
                   :task (tools/tofu-smtp-post* *command-line-args* (params/once-opts options/bb))}
   ansible {:doc "bb ansible render -- ansible-playbook main.yml"
            :task (tools/ansible* *command-line-args* (params/once-opts options/bb))}
   ansible-local {:doc "bb ansible render -- ansible-playbook main.yml"
                  :task (tools/ansible-local* *command-line-args* (params/once-opts options/bb))}
-  once {:doc "bb once create"
-        :task (package/once* *command-line-args* options/bb)}
-  online {:doc "bb once create"
-          :task (package/once* *command-line-args* options/online)}
-  space {:doc "bb once create"
-         :task (package/once* *command-line-args* options/space)}
-  parallel {:doc "bb parallel create — runs online/space concurrently"
-            :task (let [cmd (or (first *command-line-args*) "create")
-                        procs (mapv (fn [profile]
-                                      (p/process ["bb" profile cmd]
-                                                 {:inherit true
-                                                  :shutdown p/destroy-tree}))
-                                    ["online" "space"])
-                        results (mapv deref procs)]
-                    (when (some (fn [r] (not= 0 (:exit r))) results)
-                      (System/exit 1)))}}}
+  -tidy {:doc "tidy clojure files"
+         :task (do (shell "clojure-lsp clean-ns")
+                   (shell "clojure-lsp format"))}}}
