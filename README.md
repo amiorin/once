@@ -78,11 +78,11 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 
 ```clojure
 ;; options.clj
-;; Switch between digitalocean, oci, hcloud, no-infra, online, or space
-(def bb space)
+;; Switch between online, space, website, or no-infra
+(def bb website)
 ```
 
-`online` and `space` are application profiles built on top of `oci` — they pin a domain, package, and the list of containerized apps deployed by Ansible (the `space` profile, for example, deploys a templated Pocketbase instance).
+`online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `hcloud`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
 
 Note: If you are using the `no-infra` profile, ensure your parameters are correctly prefixed (e.g., `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-smtp-server`).
 
@@ -93,8 +93,6 @@ The `once` task handles the full lifecycle. You can pass multiple commands:
 - **Full Setup**: `bb once create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible -> Ansible Local)
 - **Tear Down**: `bb once delete` (Tofu DNS Destroy -> Tofu SMTP Post Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
 - **Sequential**: `bb once delete create` (Clean slate redeploy)
-- **Profile-targeted**: `bb online create`, `bb space create` (run a specific application profile regardless of the active `bb` var)
-- **Parallel**: `bb parallel create` / `bb parallel delete` (runs `online` and `space` concurrently)
 
 Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb once delete`, first override it:
 
@@ -172,7 +170,7 @@ You can trigger workflows directly from a Clojure REPL:
 If you are contributing to `once`, you can use the following task to keep the code clean:
 
 ```bash
-bb tidy
+bb -tidy
 ```
 
 This uses `clojure-lsp` to clean namespaces and format the source code.

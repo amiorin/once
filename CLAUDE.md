@@ -48,7 +48,7 @@ once/
 
 ### Code Maintenance
 ```bash
-bb tidy           # clean-ns + format via clojure-lsp
+bb -tidy          # clean-ns + format via clojure-lsp
 ```
 
 ### Running Tests
@@ -73,12 +73,7 @@ bb ansible render -- ansible-playbook main.yml
 bb ansible-local render -- ansible-playbook main.yml
 ```
 
-### Profile-specific tasks
-```bash
-bb online create        # uses options/online profile (bigconfig.online)
-bb space create         # uses options/space profile (bigconfig.space, pocketbase)
-bb parallel create      # runs online + space concurrently (also works with delete)
-```
+The active profile is selected by editing `(def bb ...)` in `options.clj` (see Configuration Profiles below).
 
 ## Key Architecture Concepts
 
@@ -122,7 +117,7 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use
 
 ### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: **compute** profiles (`oci`, `hcloud`, `digitalocean`, `no-infra`) and **application** profiles (`online`, `space`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. Profiles are plain Clojure maps composed with `merge-with merge`:
+Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. Profiles are plain Clojure maps composed with `merge-with merge`:
 ```clojure
 (def space (merge-with merge resend cloudflare s3 oci
                        {::render/profile "space"
@@ -132,9 +127,9 @@ Two layers compose into a profile: **compute** profiles (`oci`, `hcloud`, `digit
                                                                   :image "ghcr.io/amiorin/once-pocketbase"
                                                                   :env ["SUPERUSER_PASSWORD=<{ superuser-password }>"]}]}}}))
 ```
-The `bb` var sets the active profile for Babashka tasks:
+`online` and `space` ride on `oci`; `website` rides on `hcloud`; `no-infra` targets an existing server. The `bb` var sets the active profile for Babashka tasks:
 ```clojure
-(def bb space)  ; change this to switch profiles
+(def bb website)  ; change this to switch profiles
 ```
 
 ### REPL Development Pattern
