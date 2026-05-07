@@ -12,7 +12,7 @@
 (def ^:private cloudflare {::workflow/params {:provider-dns "cloudflare"}})
 
 (def ^:private s3 {::workflow/params {:provider-backend "s3"
-                                      :s3-bucket "tf-state-251213589273-eu-west-1"
+                                      :s3-bucket "once-dev-251213589273-eu-west-1"
                                       :s3-region "eu-west-1"}})
 
 (def ^:private local {::workflow/params {:provider-backend "local"}})
@@ -63,11 +63,11 @@
                          {::render/profile "website"
                           ::workflow/params {:domain "bigconfig.website"
                                              :package "website"
-                                             :once {:applications [{:host  "www.bigconfig.ai"
+                                             :once {:applications [{:host  "www.bigconfig.website"
                                                                     :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"}
-                                                                   {:host  "bigconfig.ai"
+                                                                   {:host  "bigconfig.website"
                                                                     :image "ghcr.io/amiorin/once-caddy-redirect:latest"}
-                                                                   {:host "forms.bigconfig.ai"
+                                                                   {:host "forms.bigconfig.website"
                                                                     :image "ghcr.io/bigconfig-ai/once-forms:latest"
                                                                     :env ["TARGET_EMAIL=forms@bigconfig.ai"]}]}}}))
 
@@ -76,7 +76,7 @@
                          ::workflow/params {:domain "bigconfig.online"
                                             :package "online"
                                             :once {:applications [{:host "www.bigconfig.online"
-                                                                   :image "ghcr.io/amiorin/big-config-website"}]}}}))
+                                                                   :image "ghcr.io/amiorin/once-bigconfig"}]}}}))
 
 (def space (merge-with merge resend cloudflare s3 oci
                        {::render/profile "space"
