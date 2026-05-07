@@ -68,7 +68,7 @@
                                              :once {:applications [{:host  "www.bigconfig.website"
                                                                     :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"}
                                                                    {:host  "bigconfig.website"
-                                                                    :image "ghcr.io/amiorin/once-caddy-redirect:latest"}
+                                                                    :image "ghcr.io/bigconfig-ai/once-caddy-redirect:latest"}
                                                                    {:host "forms.bigconfig.website"
                                                                     :image "ghcr.io/bigconfig-ai/once-forms:latest"
                                                                     :env ["TARGET_EMAIL=forms@bigconfig.ai"]}]}}}))
@@ -78,7 +78,7 @@
                          ::workflow/params {:domain "bigconfig.online"
                                             :package "online"
                                             :once {:applications [{:host "www.bigconfig.online"
-                                                                   :image "ghcr.io/amiorin/once-bigconfig"}]}}}))
+                                                                   :image "ghcr.io/bigconfig-ai/once-bigconfig"}]}}}))
 
 (def space (merge-with merge resend cloudflare s3 oci deploy
                        {::render/profile "space"
