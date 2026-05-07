@@ -42,7 +42,7 @@
 
 (comment
   (debug tap-values
-    (-> options/oci
+    (-> options/bb
         (workflow/new-prefix :io.github.amiorin.once.package/start-create-or-delete)
         opts-fn))
   (-> tap-values))
@@ -51,4 +51,4 @@
 
 (comment
   (workflow/new-prefix {} :io.github.amiorin.once.package/start-create-or-delete)
-  (once-opts options/oci))
+  (once-opts options/bb))

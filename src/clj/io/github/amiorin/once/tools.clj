@@ -70,7 +70,7 @@
 (comment
   (debug tap-values
     (tofu* "render"
-           (params/once-opts (merge options/oci
+           (params/once-opts (merge options/bb
                                     {::bc/env :repl
                                      ::run/shell-opts {:err *err*
                                                        :out *err*}}))))
@@ -99,7 +99,7 @@
 (comment
   (debug tap-values
     (tofu-smtp* "render tofu:init tofu:apply:-auto-approve"
-                (params/once-opts (merge options/oci
+                (params/once-opts (merge options/bb
                                          {::bc/env :repl
                                           ::run/shell-opts {:err *err*
                                                             :out *err*}}))))
@@ -162,7 +162,7 @@
 (comment
   (debug tap-values
     (tofu-dns* "render tofu:init tofu:plan"
-               (params/once-opts (merge options/oci
+               (params/once-opts (merge options/bb
                                         {::bc/env :repl
                                          ::run/shell-opts {:err *err*
                                                            :out *err*}}))))
@@ -189,7 +189,7 @@
 (comment
   (debug tap-values
     (tofu-smtp-post* "render"
-                     (params/once-opts (merge options/oci
+                     (params/once-opts (merge options/bb
                                               {::bc/env :repl
                                                ::run/shell-opts {:err *err*
                                                                  :out *err*}}))))

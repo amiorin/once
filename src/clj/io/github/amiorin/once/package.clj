@@ -65,7 +65,7 @@
     (once [(fn [f step opts]
              (tap> [step opts])
              (f step opts))]
-          (merge options/oci
+          (merge options/bb
                  {::bc/env :repl
                   ::run/shell-opts {:err *err*
                                     :out *out*}
@@ -81,7 +81,7 @@
 
 (comment
   (debug tap-values
-    (once* "create" (merge options/oci
+    (once* "create" (merge options/bb
                            {::bc/env :repl
                             ::run/shell-opts {:err *err*
                                               :out *out*}})))
