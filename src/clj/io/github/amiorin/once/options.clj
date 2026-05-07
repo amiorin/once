@@ -4,6 +4,8 @@
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]))
 
+(def ^:private deploy {::workflow/params {:deploy-pubkey "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 32617+amiorin@users.noreply.github.com"}})
+
 (def ^:private resend {::workflow/params {:provider-smtp "resend"
                                           :resend-server "smtp.resend.com"
                                           :resend-port 587
@@ -59,7 +61,7 @@
 
 (def ^:private no-infra-dns {::workflow/params {:provider-dns "no-infra"}})
 
-(def website (merge-with merge resend cloudflare s3 hcloud
+(def website (merge-with merge resend cloudflare s3 hcloud deploy
                          {::render/profile "website"
                           ::workflow/params {:domain "bigconfig.website"
                                              :package "website"
@@ -71,14 +73,14 @@
                                                                     :image "ghcr.io/bigconfig-ai/once-forms:latest"
                                                                     :env ["TARGET_EMAIL=forms@bigconfig.ai"]}]}}}))
 
-(def online (merge-with merge resend cloudflare s3 oci
+(def online (merge-with merge resend cloudflare s3 oci deploy
                         {::render/profile "online"
                          ::workflow/params {:domain "bigconfig.online"
                                             :package "online"
                                             :once {:applications [{:host "www.bigconfig.online"
                                                                    :image "ghcr.io/amiorin/once-bigconfig"}]}}}))
 
-(def space (merge-with merge resend cloudflare s3 oci
+(def space (merge-with merge resend cloudflare s3 oci deploy
                        {::render/profile "space"
                         ::workflow/params {:domain "bigconfig.space"
                                            :package "space"
@@ -86,7 +88,7 @@
                                                                   :image "ghcr.io/amiorin/once-pocketbase"
                                                                   :env ["SUPERUSER_PASSWORD=<{ superuser-password }>"]}]}}}))
 
-(def no-infra (merge-with merge no-infra-compute no-infra-smtp no-infra-dns
+(def no-infra (merge-with merge no-infra-compute no-infra-smtp no-infra-dns deploy
                           {::render/profile "no-infra"}))
 
 (def bb website)

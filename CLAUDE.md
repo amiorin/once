@@ -33,10 +33,11 @@ once/
 │       ├── tofu-smtp/       # SMTP (Resend) setup templates
 │       ├── tofu-dns/        # DNS (Cloudflare) templates
 │       ├── tofu-smtp-post/  # SMTP post-verification templates
-│       ├── ansible/         # Remote host playbooks
+│       ├── ansible/         # Remote host playbooks (incl. files/deploy bb script)
 │       └── ansible-local/   # Local machine playbooks
 ├── test/clj/io/github/amiorin/once/
-│   └── tools_test.clj       # Test stub (currently empty)
+│   ├── deploy_test.clj      # Tests for the deploy ForceCommand script
+│   └── utils_test.clj       # Utility tests
 ├── env/dev/clj/user.clj     # REPL dev namespace
 ├── deps.edn                 # Clojure CLI deps and aliases
 ├── bb.edn                   # Babashka task definitions
@@ -82,7 +83,7 @@ The active profile is selected by editing `(def bb ...)` in `options.clj` (see C
 2. **tofu-smtp** — set up SMTP (Resend)
 3. **tofu-dns** — configure DNS (Cloudflare), injecting SMTP records
 4. **tofu-smtp-post** — finalize SMTP after DNS verification
-5. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, deploy applications listed under `:once {:applications [...]}`
+5. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, provision the restricted `deploy` user (NOPASSWD sudo for `/usr/local/bin/once *` + `ForceCommand` Babashka script at `/usr/local/bin/deploy` authorized by `:deploy-pubkey`), deploy applications listed under `:once {:applications [...]}`
 6. **ansible-local** — local config: update `~/.ssh/config`
 
 Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb once delete`.
@@ -117,7 +118,7 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use
 
 ### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. Profiles are plain Clojure maps composed with `merge-with merge`:
+Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying `:deploy-pubkey` (the SSH public key authorized on the remote `deploy` user). Profiles are plain Clojure maps composed with `merge-with merge`:
 ```clojure
 (def space (merge-with merge resend cloudflare s3 oci
                        {::render/profile "space"

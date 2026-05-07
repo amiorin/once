@@ -250,7 +250,7 @@
                                                      :overwrite true
                                                      :data-fn data-fn
                                                      :transform [["."
-                                                                  :raw]
+                                                                  delimiters]
                                                                  [render
                                                                   {:inventory "inventory.json"
                                                                    :ansible-once "once.yml"}

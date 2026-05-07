@@ -13,7 +13,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   2. **SMTP**: Email infrastructure with OpenTofu (Resend).
   3. **DNS**: Domain configuration with OpenTofu (Cloudflare provider v5), including automatic SMTP records, apex (`@`) and wildcard (`*`) A records proxied through Cloudflare, and a curated bundle of zone settings (TLS 1.3, strict SSL, always-use-HTTPS, etc.).
   4. **SMTP Post-Verification**: Finalizing SMTP setup (e.g., domain verification) with OpenTofu.
-  5. **Remote Config**: System configuration with Ansible on the remote host (installs Docker and ONCE).
+  5. **Remote Config**: System configuration with Ansible on the remote host (installs Docker and ONCE; provisions a restricted `deploy` user for one-command redeploys).
   6. **Local Config**: Finalizing setup with Ansible on the local machine (configures `~/.ssh/config` for easy access).
 - **OpenTofu S3 Backend**: Support for remote state management using S3, automatically rendered for all Tofu-based stages.
 - **Multi-Cloud Support**: Native templates for:
@@ -23,6 +23,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   - **No-Infra** (`no-infra`): For when the server is already there.
 - **Dynamic Inventory**: Automatically bridge the gap by generating Ansible inventory directly from OpenTofu outputs.
 - **SMTP Testing Ready**: Automatically installs `s-nail` and configures `.mailrc` on the remote host for immediate SMTP verification.
+- **Restricted Deploy SSH**: Provisions a `deploy` user with NOPASSWD sudo limited to `once`, and an SSH `ForceCommand` Babashka script that accepts only `sudo once update <host>` for hosts present in `once list` (CI-friendly redeploys without root SSH).
 - **Environment Overrides**: Support for overriding any configuration parameter via environment variables (e.g., `BC_PAR_DOMAIN`).
 - **Configurable Workflows**: Execute complex multi-step processes like `tofu init/apply` followed by multiple `ansible-playbook` runs.
 
@@ -83,6 +84,8 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 ```
 
 `online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `hcloud`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
+
+All four profiles also merge in the `deploy` sub-profile, which carries the `deploy-pubkey` SSH public key authorized on the remote `deploy` user. Override it per-environment via `BC_PAR_DEPLOY_PUBKEY` if you need a different key.
 
 Note: If you are using the `no-infra` profile, ensure your parameters are correctly prefixed (e.g., `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-smtp-server`).
 
