@@ -309,7 +309,7 @@
     (->> (get-in params [:once :applications])
          (keep (fn [{:keys [image]}]
                  (when image
-                   (let [{:keys [ok? err]} (run ["skopeo" "inspect" "--no-tags" (str "docker://" image)])]
+                   (let [{:keys [ok? err]} (run ["skopeo" "inspect" "--no-tags" "--override-os" "linux" (str "docker://" image)])]
                      (when-not ok?
                        {:check :image
                         :detail (format "%s — %s" image (or (trim-snippet err) "manifest unknown"))}))))))))
