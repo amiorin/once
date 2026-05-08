@@ -4,7 +4,8 @@
              [io.github.amiorin.once.params :as params]
              [io.github.amiorin.once.options :as options]
              [io.github.amiorin.once.package :as package]
-             [io.github.amiorin.once.tools :as tools])
+             [io.github.amiorin.once.tools :as tools]
+             [io.github.amiorin.once.validation :as validation])
   help {:doc "the workflow help"
         :override-builtin true
         :task (println "Usage: bb <step|cmd>+ -- [raw-command]
@@ -26,6 +27,8 @@ See:
            :task (tools/ansible* *command-line-args* (params/once-opts options/bb))}
   ansible-local {:doc "bb ansible render -- ansible-playbook main.yml"
                  :task (tools/ansible-local* *command-line-args* (params/once-opts options/bb))}
+  validate {:doc "validate active profile, tools, credentials, and docker images"
+            :task (validation/validate* *command-line-args* options/bb)}
   -tidy {:doc "tidy clojure files"
          :task (do (shell "clojure-lsp clean-ns")
                    (shell "clojure-lsp format"))}}}

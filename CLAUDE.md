@@ -26,7 +26,8 @@ once/
 │   │   ├── options.clj      # Cloud profiles & active profile (def bb ...)
 │   │   ├── package.clj      # High-level create/delete workflow definitions
 │   │   ├── params.clj       # Parameter extraction from OpenTofu outputs
-│   │   └── tools.clj        # Tofu/Ansible tool implementations
+│   │   ├── tools.clj        # Tofu/Ansible tool implementations
+│   │   └── validation.clj   # Profile schema (malli), tool/credential/image checks
 │   └── resources/io/github/amiorin/once/tools/
 │       ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
 │       ├── tofu-backend/    # S3 backend config template
@@ -37,7 +38,8 @@ once/
 │       └── ansible-local/   # Local machine playbooks
 ├── test/clj/io/github/amiorin/once/
 │   ├── deploy_test.clj      # Tests for the deploy ForceCommand script
-│   └── utils_test.clj       # Utility tests
+│   ├── utils_test.clj       # Utility tests
+│   └── validation_test.clj  # Tests for the malli profile schema and tool selection
 ├── env/dev/clj/user.clj     # REPL dev namespace
 ├── deps.edn                 # Clojure CLI deps and aliases
 ├── bb.edn                   # Babashka task definitions
@@ -55,6 +57,11 @@ bb -tidy          # clean-ns + format via clojure-lsp
 ### Running Tests
 ```bash
 clojure -M:test   # runs cognitect test-runner against test/clj
+```
+
+### Pre-flight Validation
+```bash
+bb validate       # check active profile schema, required CLIs, credentials, and image refs
 ```
 
 ### Full Lifecycle

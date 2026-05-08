@@ -89,7 +89,15 @@ All four profiles also merge in the `deploy` sub-profile, which carries the `dep
 
 Note: If you are using the `no-infra` profile, ensure your parameters are correctly prefixed (e.g., `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-smtp-server`).
 
-#### 2. Main Workflow
+#### 2. Pre-flight Validation
+
+Before provisioning, run a quick check that the active profile is well-formed, the required CLIs are installed, the credentials work, and the referenced Docker images exist:
+
+```bash
+bb validate
+```
+
+#### 3. Main Workflow
 
 The `once` task handles the full lifecycle. You can pass multiple commands:
 
@@ -103,7 +111,7 @@ Compute resources are rendered with `lifecycle { prevent_destroy = true }` by de
 export BC_PAR_COMPUTE_PREVENT_DESTROY=false
 ```
 
-#### 3. Targeted Tools
+#### 4. Targeted Tools
 
 You can also run the underlying tools individually. Most tasks require a `render` step first to generate the necessary config files from templates into the `.dist/` directory.
 
