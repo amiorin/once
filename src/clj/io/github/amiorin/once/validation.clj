@@ -284,7 +284,7 @@
                           resend-api-key))
           (when (and (= provider-dns "cloudflare") cloudflare-api-token)
             (bearer-check "Cloudflare API"
-                          "https://api.cloudflare.com/client/v4/user/tokens/verify"
+                          "https://api.cloudflare.com/client/v4/zones?per_page=1"
                           cloudflare-api-token))
           (when (and (= provider-compute "hcloud") hcloud-token)
             (bearer-check "Hetzner Cloud API"
