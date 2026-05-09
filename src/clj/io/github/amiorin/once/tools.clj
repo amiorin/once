@@ -34,7 +34,7 @@
 (def plugin-step ::render-tofu-backend)
 
 (defmethod pluggable/handle-step plugin-step
-  [_step step-fns {:keys [::workflow/name] :as opts}]
+  [_f _step step-fns {:keys [::workflow/name] :as opts}]
   (let [prepare-keys [::workflow/name ::workflow/path-fn ::workflow/prefix ::workflow/object-fn ::workflow/object-prefix ::workflow/params]
         plugin-opts (-> (workflow/prepare {::workflow/name name
                                            ::render/templates [{:template (keyword->path ::tofu-backend)
