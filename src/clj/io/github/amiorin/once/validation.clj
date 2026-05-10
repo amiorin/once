@@ -248,7 +248,9 @@
 
 (defn- run [args]
   (try
-    (let [proc   (p/process args {:out :string :err :string})
+    (let [proc   (p/process args {:in  (java.io.ByteArrayInputStream. (byte-array 0))
+                                  :out :string
+                                  :err :string})
           result (deref proc run-timeout-ms ::timeout)]
       (if (= ::timeout result)
         (do
@@ -283,6 +285,17 @@
     (when-not ok?
       (format "%s: %s" label (or (trim-snippet err) "command failed")))))
 
+(defn- oci-config-path []
+  (or (some-> (System/getenv "OCI_CLI_CONFIG_FILE") not-empty)
+      (some-> (System/getenv "OCI_CONFIG_FILE") not-empty)
+      (str (System/getProperty "user.home") "/.oci/config")))
+
+(defn- oci-config-error []
+  (let [path (oci-config-path)]
+    (when-not (.exists (java.io.File. ^String path))
+      (format "OCI: config file not found at %s — run 'oci setup config' to create one"
+              path))))
+
 (defn- credential-errors
   [params]
   (let [{:keys [provider-smtp provider-dns provider-compute provider-backend
@@ -304,7 +317,8 @@
                           "https://api.digitalocean.com/v2/account"
                           do-token))
           (when (and (= provider-compute "oci") (which? "oci"))
-            (cli-check "OCI" ["oci" "iam" "region" "list" "--output" "json"]))
+            (or (oci-config-error)
+                (cli-check "OCI" ["oci" "iam" "region" "list" "--output" "json"])))
           (when (and (= provider-backend "s3") (which? "aws"))
             (cli-check "AWS (S3 backend)" ["aws" "sts" "get-caller-identity"]))]
          (keep identity)
