@@ -244,10 +244,19 @@
 
 ;;; -------------------------------------------------------------- credential checks
 
+(def ^:private run-timeout-ms 30000)
+
 (defn- run [args]
   (try
-    (let [{:keys [exit out err]} @(p/process args {:out :string :err :string})]
-      {:ok? (zero? exit) :exit exit :out out :err err})
+    (let [proc   (p/process args {:out :string :err :string})
+          result (deref proc run-timeout-ms ::timeout)]
+      (if (= ::timeout result)
+        (do
+          (p/destroy-tree proc)
+          {:ok? false :exit -1 :out ""
+           :err (format "command timed out after %dms" run-timeout-ms)})
+        (let [{:keys [exit out err]} result]
+          {:ok? (zero? exit) :exit exit :out out :err err})))
     (catch Exception e
       {:ok? false :exit -1 :out "" :err (.getMessage e)})))
 
