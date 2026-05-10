@@ -15,7 +15,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   4. **SMTP Post-Verification**: Finalizing SMTP setup (e.g., domain verification) with OpenTofu.
   5. **Remote Config**: System configuration with Ansible on the remote host (installs Docker and ONCE; provisions a restricted `deploy` user for one-command redeploys).
   6. **Local Config**: Finalizing setup with Ansible on the local machine (configures `~/.ssh/config` for easy access).
-- **OpenTofu S3 Backend**: Support for remote state management using S3, automatically rendered for all Tofu-based stages.
+- **OpenTofu Remote Backend**: Support for remote state management using S3 or Cloudflare R2, automatically rendered for all Tofu-based stages.
 - **Multi-Cloud Support**: Native templates for:
   - **DigitalOcean** (`digitalocean`)
   - **Hetzner Cloud** (`hcloud`)
@@ -56,6 +56,15 @@ To enable the S3 backend for OpenTofu, set the following parameters:
 export BC_PAR_PROVIDER_BACKEND="s3"
 export BC_PAR_S3_BUCKET="your-tf-state-bucket"
 export BC_PAR_S3_REGION="eu-west-1"
+```
+
+To enable the Cloudflare R2 backend instead:
+```bash
+export BC_PAR_PROVIDER_BACKEND="r2"
+export BC_PAR_R2_BUCKET="your-tf-state-bucket"
+export BC_PAR_R2_ENDPOINT="https://<account-id>.r2.cloudflarestorage.com"   # add `.eu` / `.fedramp` before `r2` for jurisdictioned buckets
+export BC_PAR_R2_ACCESS_KEY_ID="your-r2-access-key"
+export BC_PAR_R2_SECRET_ACCESS_KEY="your-r2-secret"
 ```
 
 These will be automatically merged into the workflow parameters.
@@ -169,7 +178,7 @@ You can trigger workflows directly from a Clojure REPL:
   - `options.clj`: Where you define your cloud profiles and credentials.
 - `src/resources/.../once/tools/`:
   - `tofu/`: Multi-cloud `.tf` templates.
-  - `tofu-backend/`: OpenTofu backend templates (S3).
+  - `tofu-backend/`: OpenTofu backend templates (S3, Cloudflare R2, local).
   - `tofu-smtp/`: SMTP configuration templates (Resend).
   - `tofu-dns/`: DNS configuration templates (Cloudflare).
   - `tofu-smtp-post/`: SMTP post-verification templates (Resend).

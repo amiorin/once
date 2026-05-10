@@ -15,7 +15,10 @@
            :cloudflare-api-token "stub"
            :hcloud-token "stub"
            :do-token "stub"
-           :no-infra-smtp-password "stub"}))
+           :no-infra-smtp-password "stub"
+           :r2-endpoint "https://stub.r2.cloudflarestorage.com"
+           :r2-access-key-id "stub"
+           :r2-secret-access-key "stub"}))
 
 (defn- complete-no-infra
   "Fill in keys that `options/no-infra` deliberately leaves blank — they're
@@ -85,6 +88,14 @@
     (is (= #{"doctl" "aws"}
            (set (map :cmd (v/provider-tools {:provider-compute "digitalocean"
                                              :provider-backend "s3"}))))))
+  (testing "hcloud + r2"
+    (is (= #{"hcloud" "aws"}
+           (set (map :cmd (v/provider-tools {:provider-compute "hcloud"
+                                             :provider-backend "r2"}))))))
+  (testing "oci + r2"
+    (is (= #{"oci" "aws"}
+           (set (map :cmd (v/provider-tools {:provider-compute "oci"
+                                             :provider-backend "r2"}))))))
   (testing "no-infra + local"
     (is (= #{}
            (set (map :cmd (v/provider-tools {:provider-compute "no-infra"

@@ -41,6 +41,9 @@
 (defn- re-schema [rx msg]
   [:and :string [:re {:error/message msg} rx]])
 
+(def ^:private non-empty-string
+  [:and :string [:fn {:error/message "must be a non-empty string"} seq]])
+
 ;;; -------------------------------------------------------------- sub-profile schemas
 
 (def ^:private schema:resend
@@ -84,12 +87,21 @@
    [:s3-bucket :string]
    [:s3-region :string]])
 
+(def ^:private schema:r2
+  [:map
+   [:provider-backend [:= "r2"]]
+   [:r2-bucket non-empty-string]
+   [:r2-endpoint non-empty-string]
+   [:r2-access-key-id non-empty-string]
+   [:r2-secret-access-key non-empty-string]])
+
 (def ^:private schema:local
   [:map [:provider-backend [:= "local"]]])
 
 (def ^:private schema:backend
   [:multi {:dispatch :provider-backend}
    ["s3" schema:s3]
+   ["r2" schema:r2]
    ["local" schema:local]])
 
 (def ^:private schema:oci
@@ -225,7 +237,8 @@
     (= provider-compute "oci")          (conj {:cmd "oci"    :name "OCI CLI" :hint "pip install oci-cli"})
     (= provider-compute "hcloud")       (conj {:cmd "hcloud" :name "hcloud"  :hint "https://github.com/hetznercloud/cli"})
     (= provider-compute "digitalocean") (conj {:cmd "doctl"  :name "doctl"   :hint "https://docs.digitalocean.com/reference/doctl/how-to/install/"})
-    (= provider-backend "s3")           (conj {:cmd "aws"    :name "AWS CLI" :hint "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"})))
+    (= provider-backend "s3")           (conj {:cmd "aws"    :name "AWS CLI" :hint "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"})
+    (= provider-backend "r2")           (conj {:cmd "aws"    :name "AWS CLI" :hint "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"})))
 
 (defn- which?
   [cmd]
@@ -246,21 +259,24 @@
 
 (def ^:private run-timeout-ms 30000)
 
-(defn- run [args]
-  (try
-    (let [proc   (p/process args {:in  (java.io.ByteArrayInputStream. (byte-array 0))
-                                  :out :string
-                                  :err :string})
-          result (deref proc run-timeout-ms ::timeout)]
-      (if (= ::timeout result)
-        (do
-          (p/destroy-tree proc)
-          {:ok? false :exit -1 :out ""
-           :err (format "command timed out after %dms" run-timeout-ms)})
-        (let [{:keys [exit out err]} result]
-          {:ok? (zero? exit) :exit exit :out out :err err})))
-    (catch Exception e
-      {:ok? false :exit -1 :out "" :err (.getMessage e)})))
+(defn- run
+  ([args] (run args nil))
+  ([args extra-env]
+   (try
+     (let [proc   (p/process args (cond-> {:in  (java.io.ByteArrayInputStream. (byte-array 0))
+                                           :out :string
+                                           :err :string}
+                                    (seq extra-env) (assoc :extra-env extra-env)))
+           result (deref proc run-timeout-ms ::timeout)]
+       (if (= ::timeout result)
+         (do
+           (p/destroy-tree proc)
+           {:ok? false :exit -1 :out ""
+            :err (format "command timed out after %dms" run-timeout-ms)})
+         (let [{:keys [exit out err]} result]
+           {:ok? (zero? exit) :exit exit :out out :err err})))
+     (catch Exception e
+       {:ok? false :exit -1 :out "" :err (.getMessage e)}))))
 
 (defn- trim-snippet [s]
   (let [s (some-> s str/trim)]
@@ -280,10 +296,11 @@
                 (if snippet (str " — " snippet) ""))))))
 
 (defn- cli-check
-  [label args]
-  (let [{:keys [ok? err]} (run args)]
-    (when-not ok?
-      (format "%s: %s" label (or (trim-snippet err) "command failed")))))
+  ([label args] (cli-check label args nil))
+  ([label args extra-env]
+   (let [{:keys [ok? err]} (run args extra-env)]
+     (when-not ok?
+       (format "%s: %s" label (or (trim-snippet err) "command failed"))))))
 
 (defn- oci-config-path []
   (or (some-> (System/getenv "OCI_CLI_CONFIG_FILE") not-empty)
@@ -296,32 +313,106 @@
       (format "OCI: config file not found at %s — run 'oci setup config' to create one"
               path))))
 
+(defn- classify-head-bucket-error
+  "Classify a failed `aws s3api head-bucket` invocation by inspecting stderr.
+
+  R2 with an Object-scoped token can't call list-buckets, so head-bucket is
+  the only signal we have. The AWS CLI prints lines like
+  `An error occurred (404) when calling the HeadBucket operation: Not Found`,
+  which we pattern-match to tell missing-bucket from bad credentials."
+  [err]
+  (let [s (str/lower-case (or err ""))]
+    (cond
+      (or (str/includes? s "(404)")
+          (str/includes? s "not found")
+          (str/includes? s "nosuchbucket"))
+      :missing-bucket
+
+      (or (str/includes? s "(401)")
+          (str/includes? s "(403)")
+          (str/includes? s "forbidden")
+          (str/includes? s "unauthorized")
+          (str/includes? s "invalidaccesskey")
+          (str/includes? s "signaturedoesnotmatch"))
+      :bad-credentials
+
+      :else :unknown)))
+
+(defn- r2-errors
+  "Defense in depth: schema rejects empty R2 keys, but if they slip through
+  surface a loud credential error instead of silently skipping the check.
+
+  `:r2-endpoint` is supplied directly (e.g. `https://<acct>.eu.r2.cloudflarestorage.com`
+  for the EU jurisdiction) so we don't need to know which jurisdiction the
+  bucket lives in. Uses a single `aws s3api head-bucket` call (which works
+  with Object-scoped R2 tokens, unlike list-buckets) and classifies the
+  error to tell the user whether the bucket is missing or the credentials
+  are wrong."
+  [{:keys [r2-bucket r2-endpoint r2-access-key-id r2-secret-access-key]}]
+  (let [missing (cond-> []
+                  (str/blank? r2-endpoint)          (conj :r2-endpoint)
+                  (str/blank? r2-bucket)            (conj :r2-bucket)
+                  (str/blank? r2-access-key-id)     (conj :r2-access-key-id)
+                  (str/blank? r2-secret-access-key) (conj :r2-secret-access-key))]
+    (cond
+      (seq missing)
+      [(format "R2: missing credentials: %s" (str/join ", " (map name missing)))]
+
+      (not (which? "aws"))
+      []
+
+      :else
+      (let [env-map  {"AWS_ACCESS_KEY_ID"     r2-access-key-id
+                      "AWS_SECRET_ACCESS_KEY" r2-secret-access-key
+                      "AWS_DEFAULT_REGION"    "auto"}
+            {:keys [ok? err]} (run ["aws" "s3api" "head-bucket"
+                                    "--bucket" r2-bucket
+                                    "--endpoint-url" r2-endpoint]
+                                   env-map)]
+        (if ok?
+          []
+          (let [snippet (or (trim-snippet err) "head-bucket failed")]
+            (case (classify-head-bucket-error err)
+              :missing-bucket
+              [(format "R2 (bucket): %s not found at %s — %s"
+                       r2-bucket r2-endpoint snippet)]
+
+              :bad-credentials
+              [(format "R2 (auth): credentials rejected at %s — %s"
+                       r2-endpoint snippet)]
+
+              :unknown
+              [(format "R2: head-bucket on %s at %s failed — %s"
+                       r2-bucket r2-endpoint snippet)])))))))
+
 (defn- credential-errors
   [params]
   (let [{:keys [provider-smtp provider-dns provider-compute provider-backend
-                resend-api-key cloudflare-api-token hcloud-token do-token]} params]
-    (->> [(when (and (= provider-smtp "resend") resend-api-key)
-            (bearer-check "Resend API"
-                          "https://api.resend.com/api-keys"
-                          resend-api-key))
-          (when (and (= provider-dns "cloudflare") cloudflare-api-token)
-            (bearer-check "Cloudflare API"
-                          "https://api.cloudflare.com/client/v4/zones?per_page=1"
-                          cloudflare-api-token))
-          (when (and (= provider-compute "hcloud") hcloud-token)
-            (bearer-check "Hetzner Cloud API"
-                          "https://api.hetzner.cloud/v1/server_types"
-                          hcloud-token))
-          (when (and (= provider-compute "digitalocean") do-token)
-            (bearer-check "DigitalOcean API"
-                          "https://api.digitalocean.com/v2/account"
-                          do-token))
-          (when (and (= provider-compute "oci") (which? "oci"))
-            (or (oci-config-error)
-                (cli-check "OCI" ["oci" "iam" "region" "list" "--output" "json"])))
-          (when (and (= provider-backend "s3") (which? "aws"))
-            (cli-check "AWS (S3 backend)" ["aws" "sts" "get-caller-identity"]))]
-         (keep identity)
+                resend-api-key cloudflare-api-token hcloud-token do-token]} params
+        single (->> [(when (and (= provider-smtp "resend") resend-api-key)
+                       (bearer-check "Resend API"
+                                     "https://api.resend.com/api-keys"
+                                     resend-api-key))
+                     (when (and (= provider-dns "cloudflare") cloudflare-api-token)
+                       (bearer-check "Cloudflare API"
+                                     "https://api.cloudflare.com/client/v4/zones?per_page=1"
+                                     cloudflare-api-token))
+                     (when (and (= provider-compute "hcloud") hcloud-token)
+                       (bearer-check "Hetzner Cloud API"
+                                     "https://api.hetzner.cloud/v1/server_types"
+                                     hcloud-token))
+                     (when (and (= provider-compute "digitalocean") do-token)
+                       (bearer-check "DigitalOcean API"
+                                     "https://api.digitalocean.com/v2/account"
+                                     do-token))
+                     (when (and (= provider-compute "oci") (which? "oci"))
+                       (or (oci-config-error)
+                           (cli-check "OCI" ["oci" "iam" "region" "list" "--output" "json"])))
+                     (when (and (= provider-backend "s3") (which? "aws"))
+                       (cli-check "AWS (S3 backend)" ["aws" "sts" "get-caller-identity"]))]
+                    (keep identity))
+        multi  (when (= provider-backend "r2") (r2-errors params))]
+    (->> (concat single multi)
          (mapv (fn [m] {:check :credential :detail m})))))
 
 ;;; -------------------------------------------------------------- image checks

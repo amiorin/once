@@ -17,6 +17,12 @@
                                       :s3-bucket "once-dev-251213589273-eu-west-1"
                                       :s3-region "eu-west-1"}})
 
+(def ^:private r2 {::workflow/params {:provider-backend "r2"
+                                      :r2-bucket "tofu-state-319271fed8bc6d2d9059362be1165f37-eu"
+                                      :r2-endpoint "https://319271fed8bc6d2d9059362be1165f37.eu.r2.cloudflarestorage.com"
+                                      :r2-access-key-id ""
+                                      :r2-secret-access-key ""}})
+
 (def ^:private local {::workflow/params {:provider-backend "local"}})
 
 (def ^:private oci {::workflow/params {:provider-compute "oci"
@@ -61,7 +67,7 @@
 
 (def ^:private no-infra-dns {::workflow/params {:provider-dns "no-infra"}})
 
-(def website (merge-with merge resend cloudflare s3 hcloud deploy
+(def website (merge-with merge resend cloudflare r2 digitalocean deploy
                          {::render/profile "website"
                           ::workflow/params {:domain "bigconfig.website"
                                              :package "website"
@@ -73,14 +79,14 @@
                                                                     :image "ghcr.io/bigconfig-ai/once-forms:latest"
                                                                     :env ["TARGET_EMAIL=forms@bigconfig.ai"]}]}}}))
 
-(def online (merge-with merge resend cloudflare s3 oci deploy
+(def online (merge-with merge resend cloudflare r2 oci deploy
                         {::render/profile "online"
                          ::workflow/params {:domain "bigconfig.online"
                                             :package "online"
                                             :once {:applications [{:host "www.bigconfig.online"
                                                                    :image "ghcr.io/bigconfig-ai/once-bigconfig"}]}}}))
 
-(def space (merge-with merge resend cloudflare s3 oci deploy
+(def space (merge-with merge resend cloudflare r2 oci deploy
                        {::render/profile "space"
                         ::workflow/params {:domain "bigconfig.space"
                                            :package "space"
@@ -100,5 +106,7 @@
          :online online
          :space space
          :no-infra no-infra
+         :s3 s3
+         :r2 r2
          :bb bb}))
   (-> tap-values))

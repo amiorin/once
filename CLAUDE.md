@@ -30,7 +30,7 @@ once/
 │   │   └── validation.clj   # Profile schema (malli), tool/credential/image checks
 │   └── resources/io/github/amiorin/once/tools/
 │       ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
-│       ├── tofu-backend/    # S3 backend config template
+│       ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
 │       ├── tofu-smtp/       # SMTP (Resend) setup templates
 │       ├── tofu-dns/        # DNS (Cloudflare) templates
 │       ├── tofu-smtp-post/  # SMTP post-verification templates
@@ -107,14 +107,14 @@ Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources
 Any `::workflow/params` key can be overridden at runtime:
 ```bash
 export BC_PAR_DOMAIN="example.com"
-export BC_PAR_PROVIDER_BACKEND="s3"
+export BC_PAR_PROVIDER_BACKEND="s3"   # or "r2" / "local"
 export BC_PAR_S3_BUCKET="my-tf-state-bucket"
 export BC_PAR_HCLOUD_TOKEN="xxx"
 ```
 Variable names are uppercased; hyphens become underscores. Sensitive credentials go in `.envrc.private` (gitignored).
 
 ### Plugin System
-`tools.clj` uses `pluggable/handle-step` for the S3 backend plugin (`::render-tofu-backend`). After each `render` step, the plugin injects the backend configuration — this is done via `run-steps-with-plugin`.
+`tools.clj` uses `pluggable/handle-step` for the remote-state backend plugin (`::render-tofu-backend`). After each `render` step, the plugin injects the backend configuration (S3, R2, or local) based on `:provider-backend` — this is done via `run-steps-with-plugin`.
 
 ## Code Conventions
 

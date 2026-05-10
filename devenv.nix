@@ -11,5 +11,6 @@
     pkgs.awscli2
     pkgs.skopeo
     pkgs.hcloud
+    pkgs.doctl
   ];
 }
