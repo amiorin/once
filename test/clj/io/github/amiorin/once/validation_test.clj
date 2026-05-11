@@ -112,6 +112,31 @@
     (is (= 1 (count errors)))
     (is (str/includes? (:detail (first errors)) "OpenTofu"))))
 
+(deftest cloudflare-zone-checks-configured-domain
+  (testing "configured zone exists"
+    (with-redefs [v/run (fn
+                          ([args]
+                           (is (some #(str/includes? % "name=bigconfig.website") args))
+                           {:ok? true :exit 0 :out "{\"success\":true,\"result\":[{\"id\":\"zone-id\"}]}" :err ""})
+                          ([args _extra-env]
+                           (is (some #(str/includes? % "name=bigconfig.website") args))
+                           {:ok? true :exit 0 :out "{\"success\":true,\"result\":[{\"id\":\"zone-id\"}]}" :err ""}))]
+      (is (empty? (#'v/credential-errors
+                   (select-keys (::workflow/params (with-creds options/website))
+                                [:provider-dns :domain :cloudflare-api-token]))))))
+  (testing "configured zone is missing"
+    (with-redefs [v/run (fn
+                          ([_args]
+                           {:ok? true :exit 0 :out "{\"success\":true,\"result\":[]}" :err ""})
+                          ([_args _extra-env]
+                           {:ok? true :exit 0 :out "{\"success\":true,\"result\":[]}" :err ""}))]
+      (let [errors (#'v/credential-errors
+                    (select-keys (::workflow/params (with-creds options/website))
+                                 [:provider-dns :domain :cloudflare-api-token]))]
+        (is (= 1 (count errors)))
+        (is (str/includes? (:detail (first errors)) "Cloudflare zone"))
+        (is (str/includes? (:detail (first errors)) "bigconfig.website"))))))
+
 (deftest domain-regex-table
   (let [params-of (fn [domain]
                     (-> options/website

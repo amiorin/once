@@ -20,10 +20,14 @@
    [big-config.render :as render]
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]
+   [cheshire.core :as json]
    [clojure.string :as str]
    [io.github.amiorin.once.options :as options]
    [malli.core :as m]
-   [malli.error :as me]))
+   [malli.error :as me])
+  (:import
+   [java.net URLEncoder]
+   [java.nio.charset StandardCharsets]))
 
 ;;; -------------------------------------------------------------- regexes
 
@@ -295,6 +299,39 @@
                 label exit
                 (if snippet (str " — " snippet) ""))))))
 
+(defn- url-encode [s]
+  (URLEncoder/encode (str s) StandardCharsets/UTF_8))
+
+(defn- cloudflare-zone-check
+  [domain token]
+  (let [url (str "https://api.cloudflare.com/client/v4/zones?name="
+                 (url-encode domain)
+                 "&status=active&per_page=1")
+        {:keys [ok? exit out err]} (run ["curl" "-sf"
+                                         "-H" (str "Authorization: Bearer " token)
+                                         url])]
+    (if-not ok?
+      (let [snippet (trim-snippet err)]
+        (format "Cloudflare API: token rejected (curl exit %d)%s"
+                exit
+                (if snippet (str " — " snippet) "")))
+      (try
+        (let [{:keys [success result errors]} (json/parse-string out keyword)]
+          (cond
+            (false? success)
+            (format "Cloudflare API: zone lookup failed%s"
+                    (if-let [snippet (trim-snippet (pr-str errors))]
+                      (str " — " snippet)
+                      ""))
+
+            (empty? result)
+            (format "Cloudflare zone: %s not found or not active" domain)
+
+            :else nil))
+        (catch Exception e
+          (format "Cloudflare API: invalid zone lookup response — %s"
+                  (.getMessage e)))))))
+
 (defn- cli-check
   ([label args] (cli-check label args nil))
   ([label args extra-env]
@@ -388,15 +425,13 @@
 (defn- credential-errors
   [params]
   (let [{:keys [provider-smtp provider-dns provider-compute provider-backend
-                resend-api-key cloudflare-api-token hcloud-token do-token]} params
+                domain resend-api-key cloudflare-api-token hcloud-token do-token]} params
         single (->> [(when (and (= provider-smtp "resend") resend-api-key)
                        (bearer-check "Resend API"
                                      "https://api.resend.com/api-keys"
                                      resend-api-key))
-                     (when (and (= provider-dns "cloudflare") cloudflare-api-token)
-                       (bearer-check "Cloudflare API"
-                                     "https://api.cloudflare.com/client/v4/zones?per_page=1"
-                                     cloudflare-api-token))
+                     (when (and (= provider-dns "cloudflare") domain cloudflare-api-token)
+                       (cloudflare-zone-check domain cloudflare-api-token))
                      (when (and (= provider-compute "hcloud") hcloud-token)
                        (bearer-check "Hetzner Cloud API"
                                      "https://api.hetzner.cloud/v1/server_types"
