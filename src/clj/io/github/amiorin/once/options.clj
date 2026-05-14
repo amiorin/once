@@ -102,12 +102,21 @@
 
 (comment
   (debug tap-values
-    (-> {:local local
+    (-> {:deploy deploy
+         :resend resend
+         :cloudflare cloudflare
+         :s3 s3
+         :r2 r2
+         :local local
+         :oci oci
+         :hcloud hcloud
          :digitalocean digitalocean
+         :no-infra-compute no-infra-compute
+         :no-infra-smtp no-infra-smtp
+         :no-infra-dns no-infra-dns
+         :website website
          :online online
          :space space
          :no-infra no-infra
-         :s3 s3
-         :r2 r2
          :bb bb}))
   (-> tap-values))

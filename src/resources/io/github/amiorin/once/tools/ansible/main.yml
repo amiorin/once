@@ -16,7 +16,9 @@
 
     - name: Install ONCE
       ansible.builtin.shell: >-
-        curl https://get.once.com | ONCE_INTERACTIVE=false sh
+        curl -fsSL https://get.once.com -o install-once.sh
+        && ONCE_INTERACTIVE=false sh install-once.sh
+        && rm install-once.sh
       args:
         creates: /usr/local/bin/once
       register: once_install_result

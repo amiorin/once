@@ -1,6 +1,7 @@
 {:deps {io.github.amiorin/once {:local/root "."}}
  :tasks
  {:requires ([babashka.process :as p]
+             [io.github.amiorin.once.describe :as describe]
              [io.github.amiorin.once.params :as params]
              [io.github.amiorin.once.options :as options]
              [io.github.amiorin.once.package :as package]
@@ -31,6 +32,11 @@ Tasks:
             Usage:
               bb validate
 
+  describe  Show configured providers, compute SSH reachability, and deployed
+            ONCE applications for the active profile.
+            Usage:
+              bb describe
+
 See:
 * https://bigconfig.ai/paramss/intro/
 * https://bigconfig.ai/api/workflow/")}
@@ -38,6 +44,9 @@ See:
         :task (package/once* *command-line-args* options/bb)}
   validate {:doc "validate active profile, tools, credentials, and docker images"
             :task (validation/validate* *command-line-args* options/bb)}
+  describe {:doc "describe active profile providers, compute, and deployed applications"
+            :override-builtin true
+            :task (describe/describe* *command-line-args* options/bb)}
   -tofu {:doc "bb tofu render tofu:init tofu:apply:-auto-approve"
         :task (tools/tofu* *command-line-args* (params/once-opts options/bb))}
   -tofu-dns {:doc "bb tofu-dns render tofu:init tofu:apply:-auto-approve"
