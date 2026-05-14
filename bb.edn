@@ -38,8 +38,7 @@ Tasks:
               bb describe
 
 See:
-* https://bigconfig.ai/paramss/intro/
-* https://bigconfig.ai/api/workflow/")}
+* https://www.bigconfig.ai/manual")}
   once {:doc "bb once create | bb once delete"
         :task (package/once* *command-line-args* options/bb)}
   validate {:doc "validate active profile, tools, credentials, and docker images"
