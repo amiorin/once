@@ -21,8 +21,8 @@
                                     ::tools/tofu-smtp ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
                                     ::tools/tofu-dns ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
                                     ::tools/tofu-smtp-post ["render tofu:init tofu:apply:-auto-approve" params/opts-fn]
-                                    ::tools/ansible ["render ansible-playbook:main.yml" params/opts-fn]
-                                    ::tools/ansible-local ["render ansible-playbook:main.yml" params/opts-fn]]}))
+                                    ::tools/ansible-local ["render ansible-playbook:main.yml" params/opts-fn]
+                                    ::tools/ansible ["render ansible-playbook:main.yml" params/opts-fn]]}))
 
 (comment
   (debug tap-values
@@ -35,8 +35,8 @@
                                 ::tools/tofu-smtp-opts (workflow/parse-args "render")
                                 ::tools/tofu-dns-opts (workflow/parse-args "render")
                                 ::tools/tofu-smtp-post-opts (workflow/parse-args "render")
-                                ::tools/ansible-opts (workflow/parse-args "render")
-                                ::tools/ansible-local-opts (workflow/parse-args "render")}))
+                                ::tools/ansible-local-opts (workflow/parse-args "render")
+                                ::tools/ansible-opts (workflow/parse-args "render")}))
   (-> tap-values))
 
 (def delete
