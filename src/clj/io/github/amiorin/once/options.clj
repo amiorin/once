@@ -4,7 +4,8 @@
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]))
 
-(def ^:private deploy {::workflow/params {:deploy-pubkey "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 32617+amiorin@users.noreply.github.com"}})
+(def ^:private deploy {::workflow/params {:compute-pubkey "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 32617+amiorin@users.noreply.github.com"
+                                          :deploy-pubkey "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII1Lbgxiv2OnDKwc8Wx25SQlGyI+iY1drUii/IMZ3YSh deploy@bigconfig.ai"}})
 
 (def ^:private resend {::workflow/params {:provider-smtp "resend"
                                           :resend-server "smtp.resend.com"

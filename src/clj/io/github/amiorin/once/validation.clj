@@ -9,7 +9,9 @@
     2. Tools     — required CLIs (tofu, ansible-playbook, ssh, curl, skopeo,
                    plus per-provider CLIs) are on PATH.
     3. Credentials — tokens / cloud configs authenticate against their APIs via
-                   curl or the provider CLI.
+                   curl or the provider CLI; for cloud compute profiles,
+                   SSH_AUTH_SOCK points to an ssh-agent with :compute-pubkey
+                   loaded.
     4. Images    — every image referenced by :once :applications resolves on
                    its registry via `skopeo inspect`.
 
@@ -173,6 +175,7 @@
    [:domain (re-schema domain-rx "must be a valid domain")]
    [:package [:and :string [:fn {:error/message "must be a non-empty string"} seq]]]
    [:once [:map [:applications [:vector schema:application]]]]
+   [:compute-pubkey (re-schema ssh-pubkey-rx "must look like an SSH public key")]
    [:deploy-pubkey (re-schema ssh-pubkey-rx "must look like an SSH public key")]])
 
 (defn- hosts-match-domain?
@@ -422,33 +425,81 @@
               [(format "R2: head-bucket on %s at %s failed — %s"
                        r2-bucket r2-endpoint snippet)])))))))
 
+(def ^:private cloud-compute-providers #{"oci" "hcloud" "digitalocean"})
+
+(defn- cloud-compute?
+  [{:keys [provider-compute]}]
+  (contains? cloud-compute-providers provider-compute))
+
+(defn- ssh-pubkey-identity
+  [s]
+  (let [[key-type key-body] (some-> s str/trim (str/split #"\s+" 3))]
+    (when (and (not (str/blank? key-type))
+               (not (str/blank? key-body)))
+      [key-type key-body])))
+
+(defn- ssh-agent-errors
+  [{:keys [compute-pubkey] :as params} env]
+  (if-not (cloud-compute? params)
+    []
+    (let [sock (some-> (get env "SSH_AUTH_SOCK") str/trim)]
+      (cond
+        (str/blank? sock)
+        ["SSH agent: SSH_AUTH_SOCK is not set; start ssh-agent and run ssh-add for :compute-pubkey"]
+
+        :else
+        (let [{:keys [ok? exit out err]} (run ["ssh-add" "-L"] {"SSH_AUTH_SOCK" sock})
+              wanted (ssh-pubkey-identity compute-pubkey)
+              agent-msg (str err "\n" out)]
+          (cond
+            (nil? wanted)
+            ["SSH agent: :compute-pubkey is not a parseable SSH public key"]
+
+            ok?
+            (let [loaded (set (keep ssh-pubkey-identity (str/split-lines (or out ""))))]
+              (if (contains? loaded wanted)
+                []
+                [(format "SSH agent: :compute-pubkey is not loaded in ssh-agent at SSH_AUTH_SOCK=%s" sock)]))
+
+            (str/includes? (str/lower-case agent-msg) "no identities")
+            [(format "SSH agent: :compute-pubkey is not loaded; the agent at SSH_AUTH_SOCK=%s has no identities" sock)]
+
+            :else
+            (let [snippet (trim-snippet err)]
+              [(format "SSH agent: ssh-add -L failed for SSH_AUTH_SOCK=%s (exit %d)%s"
+                       sock
+                       exit
+                       (if snippet (str " — " snippet) ""))])))))))
+
 (defn- credential-errors
-  [params]
-  (let [{:keys [provider-smtp provider-dns provider-compute provider-backend
-                domain resend-api-key cloudflare-api-token hcloud-token do-token]} params
-        single (->> [(when (and (= provider-smtp "resend") resend-api-key)
-                       (bearer-check "Resend API"
-                                     "https://api.resend.com/api-keys"
-                                     resend-api-key))
-                     (when (and (= provider-dns "cloudflare") domain cloudflare-api-token)
-                       (cloudflare-zone-check domain cloudflare-api-token))
-                     (when (and (= provider-compute "hcloud") hcloud-token)
-                       (bearer-check "Hetzner Cloud API"
-                                     "https://api.hetzner.cloud/v1/server_types"
-                                     hcloud-token))
-                     (when (and (= provider-compute "digitalocean") do-token)
-                       (bearer-check "DigitalOcean API"
-                                     "https://api.digitalocean.com/v2/account"
-                                     do-token))
-                     (when (and (= provider-compute "oci") (which? "oci"))
-                       (or (oci-config-error)
-                           (cli-check "OCI" ["oci" "iam" "region" "list" "--output" "json"])))
-                     (when (and (= provider-backend "s3") (which? "aws"))
-                       (cli-check "AWS (S3 backend)" ["aws" "sts" "get-caller-identity"]))]
-                    (keep identity))
-        multi  (when (= provider-backend "r2") (r2-errors params))]
-    (->> (concat single multi)
-         (mapv (fn [m] {:check :credential :detail m})))))
+  ([params] (credential-errors params (System/getenv)))
+  ([params env]
+   (let [{:keys [provider-smtp provider-dns provider-compute provider-backend
+                 domain resend-api-key cloudflare-api-token hcloud-token do-token]} params
+         single (->> [(when (and (= provider-smtp "resend") resend-api-key)
+                        (bearer-check "Resend API"
+                                      "https://api.resend.com/api-keys"
+                                      resend-api-key))
+                      (when (and (= provider-dns "cloudflare") domain cloudflare-api-token)
+                        (cloudflare-zone-check domain cloudflare-api-token))
+                      (when (and (= provider-compute "hcloud") hcloud-token)
+                        (bearer-check "Hetzner Cloud API"
+                                      "https://api.hetzner.cloud/v1/server_types"
+                                      hcloud-token))
+                      (when (and (= provider-compute "digitalocean") do-token)
+                        (bearer-check "DigitalOcean API"
+                                      "https://api.digitalocean.com/v2/account"
+                                      do-token))
+                      (when (and (= provider-compute "oci") (which? "oci"))
+                        (or (oci-config-error)
+                            (cli-check "OCI" ["oci" "iam" "region" "list" "--output" "json"])))
+                      (when (and (= provider-backend "s3") (which? "aws"))
+                        (cli-check "AWS (S3 backend)" ["aws" "sts" "get-caller-identity"]))]
+                     (keep identity))
+         multi  (concat (when (= provider-backend "r2") (r2-errors params))
+                        (ssh-agent-errors params env))]
+     (->> (concat single multi)
+          (mapv (fn [m] {:check :credential :detail m}))))))
 
 ;;; -------------------------------------------------------------- image checks
 
@@ -477,7 +528,7 @@
          errors (vec (concat
                       (schema-errors opts')
                       (tool-errors params)
-                      (credential-errors params)
+                      (credential-errors params env)
                       (image-errors params)))]
      {:ok? (empty? errors)
       :errors errors})))

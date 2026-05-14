@@ -30,6 +30,9 @@
            :once     {:applications []}
            :provider-backend "local"}))
 
+(def ^:private test-compute-pubkey
+  (get-in options/website [::workflow/params :compute-pubkey]))
+
 (deftest public-profiles-pass-schema-with-stub-creds
   (doseq [[name profile] [["website"  (with-creds options/website)]
                           ["online"   (with-creds options/online)]
@@ -43,6 +46,12 @@
     (is (seq errors))
     (is (some #(str/includes? (:detail %) "resend-api-key") errors)
         "missing :resend-api-key should be flagged by the schema phase")))
+
+(deftest missing-compute-pubkey-is-reported
+  (let [errors (v/schema-errors (update (with-creds options/website)
+                                        ::workflow/params dissoc :compute-pubkey))]
+    (is (seq errors))
+    (is (some #(str/includes? (:detail %) "compute-pubkey") errors))))
 
 (deftest bad-domain-format-is-reported
   (let [bad    (-> options/website
@@ -111,6 +120,44 @@
         errors     (v/tool-errors params which-stub)]
     (is (= 1 (count errors)))
     (is (str/includes? (:detail (first errors)) "OpenTofu"))))
+
+(deftest ssh-agent-checks-cloud-compute-pubkey
+  (let [params      {:provider-compute "hcloud"
+                     :compute-pubkey test-compute-pubkey}
+        key-id-line (str/join " " (take 2 (str/split test-compute-pubkey #"\s+")))]
+    (testing "missing SSH_AUTH_SOCK is reported for cloud compute"
+      (let [errors (#'v/ssh-agent-errors params {})]
+        (is (= 1 (count errors)))
+        (is (str/includes? (first errors) "SSH_AUTH_SOCK"))))
+    (testing "no-infra skips the ssh-agent check"
+      (is (empty? (#'v/ssh-agent-errors (assoc params :provider-compute "no-infra") {}))))
+    (testing "loaded key is matched by type and body, ignoring comments"
+      (with-redefs [v/run (fn
+                            ([_args]
+                             (throw (ex-info "unexpected one-arg run" {})))
+                            ([args extra-env]
+                             (is (= ["ssh-add" "-L"] args))
+                             (is (= {"SSH_AUTH_SOCK" "/tmp/agent.sock"} extra-env))
+                             {:ok? true :exit 0 :out (str key-id-line " other-comment\n") :err ""}))]
+        (is (empty? (#'v/ssh-agent-errors params {"SSH_AUTH_SOCK" "/tmp/agent.sock"})))))
+    (testing "missing loaded key is reported"
+      (with-redefs [v/run (fn
+                            ([_args]
+                             (throw (ex-info "unexpected one-arg run" {})))
+                            ([_args _extra-env]
+                             {:ok? true :exit 0 :out "ssh-ed25519 AAAAother comment\n" :err ""}))]
+        (let [errors (#'v/ssh-agent-errors params {"SSH_AUTH_SOCK" "/tmp/agent.sock"})]
+          (is (= 1 (count errors)))
+          (is (str/includes? (first errors) "not loaded")))))
+    (testing "dead SSH_AUTH_SOCK is reported"
+      (with-redefs [v/run (fn
+                            ([_args]
+                             (throw (ex-info "unexpected one-arg run" {})))
+                            ([_args _extra-env]
+                             {:ok? false :exit 2 :out "" :err "Error connecting to agent: No such file or directory"}))]
+        (let [errors (#'v/ssh-agent-errors params {"SSH_AUTH_SOCK" "/tmp/dead.sock"})]
+          (is (= 1 (count errors)))
+          (is (str/includes? (first errors) "ssh-add -L failed")))))))
 
 (deftest cloudflare-zone-checks-configured-domain
   (testing "configured zone exists"
