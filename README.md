@@ -13,8 +13,8 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
   2. **SMTP**: Email infrastructure with OpenTofu (Resend).
   3. **DNS**: Domain configuration with OpenTofu (Cloudflare provider v5), including automatic SMTP records, apex (`@`) and wildcard (`*`) A records proxied through Cloudflare, and a curated bundle of zone settings (TLS 1.3, strict SSL, always-use-HTTPS, etc.).
   4. **SMTP Post-Verification**: Finalizing SMTP setup (e.g., domain verification) with OpenTofu.
-  5. **Remote Config**: System configuration with Ansible on the remote host (installs Docker and ONCE; provisions a restricted `deploy` user for one-command redeploys).
-  6. **Local Config**: Finalizing setup with Ansible on the local machine (configures `~/.ssh/config` for easy access).
+  5. **Local Config**: Ansible on the local machine wires up `~/.ssh/config` so the freshly provisioned host is reachable as `Host once` for the next stage.
+  6. **Remote Config**: Ansible on the remote host installs Docker and ONCE, provisions a restricted `deploy` user for one-command redeploys, and reconciles the configured applications.
 - **OpenTofu Remote Backend**: Support for remote state management using S3 or Cloudflare R2, automatically rendered for all Tofu-based stages.
 - **Multi-Cloud Support**: Native templates for:
   - **DigitalOcean** (`digitalocean`)
@@ -92,26 +92,32 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 (def bb website)
 ```
 
-`online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `hcloud`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
+`online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `digitalocean`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
 
-All four profiles also merge in the `deploy` sub-profile, which carries the `deploy-pubkey` SSH public key authorized on the remote `deploy` user. Override it per-environment via `BC_PAR_DEPLOY_PUBKEY` if you need a different key.
+All four profiles also merge in the `deploy` sub-profile, which carries two SSH public keys:
+- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb validate` checks this).
+- `deploy-pubkey` — the key authorized on the remote `deploy` user with `ForceCommand` (CI-driven redeploys).
+
+Override either per-environment via `BC_PAR_COMPUTE_PUBKEY` and `BC_PAR_DEPLOY_PUBKEY`.
 
 Note: If you are using the `no-infra` profile, ensure your parameters are correctly prefixed (e.g., `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-smtp-server`).
 
 #### 2. Pre-flight Validation
 
-Before provisioning, run a quick check that the active profile is well-formed, the required CLIs are installed, the credentials work, and the referenced Docker images exist:
+Before provisioning, run a quick check that the active profile is well-formed, the required CLIs are installed, the credentials work, the referenced Docker images exist, and (for cloud compute profiles) `:compute-pubkey` is loaded in `ssh-agent` so Ansible can connect to the new host:
 
 ```bash
 bb validate
 ```
 
+For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
+
 #### 3. Main Workflow
 
 The `once` task handles the full lifecycle. You can pass multiple commands:
 
-- **Full Setup**: `bb once create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible -> Ansible Local)
-- **Tear Down**: `bb once delete` (Tofu DNS Destroy -> Tofu SMTP Post Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
+- **Full Setup**: `bb once create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible Local -> Ansible)
+- **Tear Down**: `bb once delete` (Tofu SMTP Post Destroy -> Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
 - **Sequential**: `bb once delete create` (Clean slate redeploy)
 
 Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb once delete`, first override it:
@@ -120,7 +126,15 @@ Compute resources are rendered with `lifecycle { prevent_destroy = true }` by de
 export BC_PAR_COMPUTE_PREVENT_DESTROY=false
 ```
 
-#### 4. Targeted Tools
+#### 4. Post-provisioning Report
+
+Once a stack is up, `bb describe` prints a human-readable status for the active profile: configured providers (compute, backend, SMTP, DNS), SSH reachability of the compute host, and every ONCE application discovered on the server with image, tag, running digest, registry digest, and whether an update is available. Most checks are soft failures; only a missing remote `once` command causes a non-zero exit.
+
+```bash
+bb describe
+```
+
+#### 5. Targeted Tools
 
 You can also run the underlying tools individually. Most tasks require a `render` step first to generate the necessary config files from templates into the `.dist/` directory.
 
@@ -166,16 +180,18 @@ You can trigger workflows directly from a Clojure REPL:
 1. **Template Rendering**: `big-config` takes templates from `src/resources` and your options to generate valid Tofu and Ansible files in `.dist/`.
 2. **Infrastructure Hook**: When `create` runs, it first executes OpenTofu to provision resources.
 3. **Inventory & Config Bridging**: The Tofu output (like the new server IP or SMTP records) is captured using `tofu output --json` and injected into the DNS configuration and Ansible inventory generation logic.
-4. **Configuration**: Ansible then connects to the new host using the dynamically generated inventory to apply your playbooks.
-5. **Local Finalization**: The local Ansible playbook updates your local environment (e.g., `~/.ssh/config`) so you can immediately SSH into the server using its name.
+4. **Local Finalization**: The local Ansible playbook updates your local environment (e.g., `~/.ssh/config`) so the new server is reachable as `Host once` before the remote stage runs.
+5. **Configuration**: Ansible then connects to the new host using the dynamically generated inventory to apply your playbooks.
 
 ## Project Structure
 
 - `src/clj/.../once/`:
+  - `options.clj`: Where you define your cloud profiles and credentials.
   - `package.clj`: Defines the high-level `create`/`delete` workflows.
   - `params.clj`: Logic for extracting parameters from Tofu outputs.
   - `tools.clj`: Implementation details for Tofu, Tofu SMTP, Tofu DNS, and Ansible wrappers.
-  - `options.clj`: Where you define your cloud profiles and credentials.
+  - `validation.clj`: Profile schema, tool, credential, image, and ssh-agent checks (`bb validate`).
+  - `describe.clj`: Post-provisioning report (`bb describe`).
 - `src/resources/.../once/tools/`:
   - `tofu/`: Multi-cloud `.tf` templates.
   - `tofu-backend/`: OpenTofu backend templates (S3, Cloudflare R2, local).

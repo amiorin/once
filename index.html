@@ -406,6 +406,7 @@
       <ul>
         <li><a href="#once-cmd">bb once</a></li>
         <li><a href="#validate">bb validate</a></li>
+        <li><a href="#describe">bb describe</a></li>
         <li><a href="#tools-cmd">bb tofu / ansible</a></li>
         <li><a href="#tidy">bb -tidy</a></li>
       </ul>
@@ -461,6 +462,7 @@
       <li>A <strong>domain</strong> you control (Cloudflare-managed).</li>
       <li>A list of <strong>applications</strong> (<code>:host</code>, <code>:image</code>, optional <code>:env</code>).</li>
       <li>Credentials for the chosen <strong>cloud</strong>, <strong>SMTP</strong>, <strong>DNS</strong>, and <strong>state backend</strong>.</li>
+      <li>An <code>ssh-agent</code> with <code>:compute-pubkey</code> loaded — Ansible uses it to reach the freshly provisioned host (cloud compute profiles only).</li>
     </ul>
     <h3>What you get</h3>
     <ul>
@@ -497,13 +499,17 @@ $EDITOR src/clj/io/github/amiorin/once/options.clj</code></pre>
 
     <h3>3. Pre-flight</h3>
 <pre><code><span class="kw">bb</span> validate</code></pre>
-    <p>Verifies schema, required CLIs, credentials (live API calls), and that every <code>:image</code> resolves on its registry.</p>
+    <p>Verifies schema, required CLIs, credentials (live API calls including a Cloudflare zone lookup), that every <code>:image</code> resolves on its registry, and that <code>:compute-pubkey</code> is loaded in <code>ssh-agent</code> for cloud compute profiles.</p>
 
     <h3>4. Provision</h3>
 <pre><code><span class="kw">bb</span> once create</code></pre>
     <p>Runs all six stages. On success, your apps are reachable at the hosts in <code>:once :applications</code>.</p>
 
-    <h3>5. Tear down</h3>
+    <h3>5. Describe</h3>
+<pre><code><span class="kw">bb</span> describe</code></pre>
+    <p>Verify what's actually running on the new host: configured providers, SSH reachability, and every ONCE application with its image, tag, running digest, and an <em>update-available?</em> flag derived from comparing against the live registry.</p>
+
+    <h3>6. Tear down</h3>
 <pre><code><span class="kw">export</span> BC_PAR_COMPUTE_PREVENT_DESTROY=<span class="str">false</span>
 <span class="kw">bb</span> once delete</code></pre>
     <div class="note warn"><span class="label">Warn</span>Compute resources render with <code>lifecycle { prevent_destroy = true }</code> by default. <code>bb once delete</code> will fail until you flip the flag — that is the intended safety net.</div>
@@ -562,7 +568,8 @@ source_env_if_exists .envrc.private</code></pre>
         <tr><td><code>package</code></td><td>The <code>create</code> / <code>delete</code> workflow definitions.</td></tr>
         <tr><td><code>params</code></td><td>Reading Tofu outputs back into the workflow's <code>::workflow/params</code> map.</td></tr>
         <tr><td><code>tools</code></td><td>The Tofu and Ansible tool wrappers, plus the backend-render plugin step.</td></tr>
-        <tr><td><code>validation</code></td><td>Malli schema, tool / credential / image pre-flight checks.</td></tr>
+        <tr><td><code>validation</code></td><td>Malli schema, tool / credential / image / ssh-agent pre-flight checks.</td></tr>
+        <tr><td><code>describe</code></td><td>Post-provisioning report: providers, SSH reachability, and remote ONCE applications (with running vs. registry digest comparison).</td></tr>
       </tbody>
     </table>
     <p>Templates live alongside the code in <code>src/resources/io/github/amiorin/once/tools/</code> and are rendered into <code>.dist/</code> at runtime.</p>
@@ -578,8 +585,8 @@ source_env_if_exists .envrc.private</code></pre>
       <div class="stage"><span class="n">2</span><div class="label">tofu-smtp</div><div class="sub">Resend domain</div></div>
       <div class="stage"><span class="n">3</span><div class="label">tofu-dns</div><div class="sub">Cloudflare zone</div></div>
       <div class="stage"><span class="n">4</span><div class="label">tofu-smtp-post</div><div class="sub">verify domain</div></div>
-      <div class="stage"><span class="n">5</span><div class="label">ansible</div><div class="sub">remote host</div></div>
-      <div class="stage"><span class="n">6</span><div class="label">ansible-local</div><div class="sub">~/.ssh/config</div></div>
+      <div class="stage"><span class="n">5</span><div class="label">ansible-local</div><div class="sub">~/.ssh/config</div></div>
+      <div class="stage"><span class="n">6</span><div class="label">ansible</div><div class="sub">remote host</div></div>
     </div>
 
     <h3>1 · tofu — compute</h3>
@@ -595,7 +602,10 @@ source_env_if_exists .envrc.private</code></pre>
     <h3>4 · tofu-smtp-post — verify domain</h3>
     <p>Now that DNS exists, this stage finalises Resend setup: typically calling Resend's domain-verify endpoint so the domain transitions to <em>verified</em>.</p>
 
-    <h3>5 · ansible — remote host</h3>
+    <h3>5 · ansible-local — local SSH config</h3>
+    <p>Local playbook that updates <code>~/.ssh/config</code> with a <code>Host once</code> stanza pointing at the freshly provisioned VM. Running it before the remote stage means the next playbook (and any post-deploy <code>ssh once</code>) goes through the same alias, so host-key prompts and connection details are settled before Ansible's own connection is opened.</p>
+
+    <h3>6 · ansible — remote host</h3>
     <p>The big stage. The remote playbook (<code>tools/ansible/main.yml</code>):</p>
     <ul>
       <li>Installs Docker (idempotent, retried).</li>
@@ -607,9 +617,6 @@ source_env_if_exists .envrc.private</code></pre>
       <li>Authorizes <code>:deploy-pubkey</code> with <code>restrict,command="/usr/local/bin/deploy"</code> in <code>/home/deploy/.ssh/authorized_keys</code>.</li>
       <li>Imports <code>once.yml</code> — generated by <code>tools/ansible-once</code> — which reconciles every entry in <code>:once :applications</code>.</li>
     </ul>
-
-    <h3>6 · ansible-local — local SSH config</h3>
-    <p>Local playbook that updates <code>~/.ssh/config</code> with a <code>Host once</code> stanza pointing at the freshly provisioned VM. After this you can <code>ssh once</code> with no further setup.</p>
 
     <h3>Delete order</h3>
     <p><code>bb once delete</code> reverses the four Tofu stages in destroy order: <code>tofu-smtp-post → tofu-dns → tofu-smtp → tofu</code>. Ansible stages are not "destroyed" — they were configuration, not resources.</p>
@@ -877,13 +884,19 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   <!-- ============================================================ -->
   <section id="deploy-sub">
     <h2>The <code>deploy</code> sub-profile</h2>
-    <p>All four application profiles merge in:</p>
+    <p>All four application profiles merge in two SSH public keys:</p>
 <pre><code>(<span class="kw">def</span> ^:private deploy
-  {::workflow/params {:deploy-pubkey
-                      <span class="str">"ssh-ed25519 AAAAC3… 32617+amiorin@users.noreply.github.com"</span>}})</code></pre>
-    <p>Override per-environment with:</p>
-<pre><code><span class="kw">export</span> BC_PAR_DEPLOY_PUBKEY=<span class="str">"ssh-ed25519 …"</span></code></pre>
-    <p>This key is authorized on the remote <code>deploy</code> user with <code>ForceCommand</code>. See <a href="#deploy-user">Restricted deploy SSH</a>.</p>
+  {::workflow/params {:compute-pubkey
+                      <span class="str">"ssh-ed25519 AAAAC3… 32617+amiorin@users.noreply.github.com"</span>
+                      :deploy-pubkey
+                      <span class="str">"ssh-ed25519 AAAAC3… deploy@bigconfig.ai"</span>}})</code></pre>
+    <ul>
+      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb once create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb validate</code> rejects the run if it isn't loaded (for cloud compute profiles).</li>
+      <li><code>:deploy-pubkey</code> — the key authorized on the remote <code>deploy</code> user with <code>ForceCommand</code>. See <a href="#deploy-user">Restricted deploy SSH</a>.</li>
+    </ul>
+    <p>Override either per-environment:</p>
+<pre><code><span class="kw">export</span> BC_PAR_COMPUTE_PUBKEY=<span class="str">"ssh-ed25519 …"</span>
+<span class="kw">export</span> BC_PAR_DEPLOY_PUBKEY=<span class="str">"ssh-ed25519 …"</span></code></pre>
   </section>
 
   <!-- ============================================================ -->
@@ -902,6 +915,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
         <tr><td><code>:resend-password</code></td><td><code>BC_PAR_RESEND_PASSWORD</code></td></tr>
         <tr><td><code>:r2-access-key-id</code></td><td><code>BC_PAR_R2_ACCESS_KEY_ID</code></td></tr>
         <tr><td><code>:r2-secret-access-key</code></td><td><code>BC_PAR_R2_SECRET_ACCESS_KEY</code></td></tr>
+        <tr><td><code>:compute-pubkey</code></td><td><code>BC_PAR_COMPUTE_PUBKEY</code></td></tr>
         <tr><td><code>:deploy-pubkey</code></td><td><code>BC_PAR_DEPLOY_PUBKEY</code></td></tr>
         <tr><td><code>:compute-prevent-destroy</code></td><td><code>BC_PAR_COMPUTE_PREVENT_DESTROY</code></td></tr>
       </tbody>
@@ -926,13 +940,23 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
     <h2><code>bb validate</code></h2>
     <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> never short-circuits.</p>
     <ol>
-      <li><strong>Schema</strong> (<code>malli</code>): every required key is present and well-typed; every <code>:once :applications :host</code> equals or is a subdomain of <code>:domain</code>.</li>
+      <li><strong>Schema</strong> (<code>malli</code>): every required key is present and well-typed; every <code>:once :applications :host</code> equals or is a subdomain of <code>:domain</code>; both <code>:compute-pubkey</code> and <code>:deploy-pubkey</code> look like SSH public keys.</li>
       <li><strong>Tools</strong>: required CLIs are on <code>PATH</code> (base + per-provider).</li>
-      <li><strong>Credentials</strong>: tokens authenticate (curl bearer-checks for Resend / Cloudflare / Hetzner / DO; <code>oci iam region list</code>; <code>aws sts get-caller-identity</code> for S3; <code>aws s3api head-bucket</code> for R2).</li>
-      <li><strong>Images</strong>: every <code>:image</code> in <code>:once :applications</code> resolves on its registry via <code>skopeo inspect</code>.</li>
+      <li>
+        <strong>Credentials</strong>: tokens authenticate against their providers.
+        <ul>
+          <li>Resend / Hetzner / DigitalOcean: curl bearer-check.</li>
+          <li>Cloudflare: token bearer-check <em>plus</em> a zone lookup that confirms the configured <code>:domain</code> is an active zone on the account.</li>
+          <li>OCI: <code>oci iam region list</code> (with <code>~/.oci/config</code> existence pre-check).</li>
+          <li>S3 backend: <code>aws sts get-caller-identity</code>.</li>
+          <li>R2 backend: <code>aws s3api head-bucket</code> (classified into <code>:missing-bucket</code> / <code>:bad-credentials</code> / <code>:unknown</code>).</li>
+          <li>Cloud compute (<code>oci</code>/<code>hcloud</code>/<code>digitalocean</code>): <code>SSH_AUTH_SOCK</code> must point to an <code>ssh-agent</code> that has <code>:compute-pubkey</code> loaded (<code>ssh-add -L</code>). Without this, Ansible cannot reach the freshly provisioned VM.</li>
+        </ul>
+      </li>
+      <li><strong>Images</strong>: every <code>:image</code> in <code>:once :applications</code> resolves on its registry via <code>skopeo inspect --override-os linux</code>.</li>
     </ol>
     <p>Sample failure output:</p>
-<pre><code>Validation failed (3 issues):
+<pre><code>Validation failed (4 issues):
 
   Schema:
     - workflow/params → once → applications → 0 → host: must be a valid hostname
@@ -941,8 +965,46 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
     - skopeo not found on PATH. Install: https://github.com/containers/skopeo/blob/main/install.md
 
   Credentials:
-    - Cloudflare API: token rejected (curl exit 22)</code></pre>
-    <p>Programmatic API: <code>(validation/validate options/bb) ; =&gt; {:ok? false :errors […]}</code>.</p>
+    - Cloudflare zone: example.com not found or not active
+    - SSH agent: :compute-pubkey is not loaded in ssh-agent at SSH_AUTH_SOCK=/tmp/ssh-…/agent.123</code></pre>
+    <p>Programmatic API: <code>(validation/validate options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests).</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="describe">
+    <h2><code>bb describe</code></h2>
+    <p>Post-provisioning report. Given the active profile, <code>describe</code> renders the params, queries the live infrastructure, and prints a human-readable summary:</p>
+    <ul>
+      <li><strong>Profile</strong>: <code>::render/profile</code> (e.g. <code>website</code>, <code>space</code>).</li>
+      <li><strong>Providers</strong>: configured names for compute, backend, SMTP, and DNS.</li>
+      <li><strong>Compute</strong>: resolved <code>:ip</code> and SSH user, plus a reachability probe (<code>ssh BatchMode=yes true</code>).</li>
+      <li><strong>Applications</strong>: for every host returned by <code>sudo once list</code>, the matching Docker container's status, image, tag, running digest (from <code>docker image inspect</code>'s <code>RepoDigests</code>), the live registry digest (via <code>skopeo inspect</code> against the matching OS/arch), and an <em>update-available?</em> flag derived from comparing the two.</li>
+    </ul>
+    <p>Most checks are soft failures (unreachable host, no apps yet, registry hiccup) and don't change the exit code — only a missing remote <code>once</code> command (the server has not been provisioned with ONCE) is fatal.</p>
+<pre><code><span class="kw">bb</span> describe</code></pre>
+    <p>Sample output:</p>
+<pre><code>Profile: website
+
+Providers:
+  Compute: digitalocean
+  Backend: r2
+  SMTP: resend
+  DNS: cloudflare
+
+Compute:
+  IP: 203.0.113.42
+  SSH user: root
+  Status: running (ssh ok)
+
+Applications:
+  - www.bigconfig.website
+    status: running
+    image: ghcr.io/bigconfig-ai/once-bigconfig:latest
+    version: latest
+    digest: sha256:1a2b…
+    registry digest: sha256:1a2b…
+    update available: no</code></pre>
+    <p>Programmatic API: <code>(describe/describe options/bb)</code> returns the same shape as a map (<code>:profile</code>, <code>:providers</code>, <code>:compute</code>, <code>:applications</code>, <code>:applications-error</code>, <code>:fatal-error?</code>) so tests and tooling can consume it directly. The 3-arg arity <code>(describe opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and stubbed params resolver.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1034,7 +1096,8 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
 │   │   ├── package.clj      <span class="com">; create / delete workflows</span>
 │   │   ├── params.clj       <span class="com">; tofu output → params</span>
 │   │   ├── tools.clj        <span class="com">; stage wrappers + plugin step</span>
-│   │   └── validation.clj   <span class="com">; malli + tools/creds/images</span>
+│   │   ├── validation.clj   <span class="com">; malli + tools/creds/images/ssh-agent</span>
+│   │   └── describe.clj     <span class="com">; post-provisioning report</span>
 │   └── resources/io/github/amiorin/once/tools/
 │       ├── tofu/{do,hcloud,oci,no-infra}/
 │       ├── tofu-backend/{s3,r2,local}/
@@ -1045,6 +1108,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
 │       └── ansible-local/   <span class="com">; local playbook</span>
 ├── test/clj/io/github/amiorin/once/
 │   ├── deploy_test.clj
+│   ├── describe_test.clj
 │   ├── utils_test.clj
 │   └── validation_test.clj
 ├── env/dev/clj/user.clj     <span class="com">; REPL dev ns</span>
@@ -1080,6 +1144,10 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
         <tr>
           <td><code>validation</code></td>
           <td><code>schema:profile</code>, <code>validate</code>, <code>validate*</code>, <code>tool-errors</code>, <code>credential-errors</code>, <code>image-errors</code></td>
+        </tr>
+        <tr>
+          <td><code>describe</code></td>
+          <td><code>describe</code>, <code>describe*</code>, <code>provider-summary</code>, <code>parse-once-list</code>, <code>image-&gt;repository+tag</code>, <code>matching-repo-digest</code>, <code>strip-ansi</code></td>
         </tr>
       </tbody>
     </table>
@@ -1125,11 +1193,12 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   <section id="testing">
     <h2>Testing</h2>
 <pre><code><span class="kw">clojure</span> -M:test</code></pre>
-    <p>Cognitect's <code>test-runner</code> against <code>test/clj/</code>. Three test namespaces:</p>
+    <p>Cognitect's <code>test-runner</code> against <code>test/clj/</code>. Four test namespaces:</p>
     <ul>
       <li><code>deploy_test</code> — <code>ForceCommand</code> Babashka script, including allow-list parsing and rejection paths.</li>
+      <li><code>describe_test</code> — <code>once list</code> parsing, image reference normalization, digest matching, and the end-to-end <code>describe</code> assembly against a stub command runner.</li>
       <li><code>utils_test</code> — small utility helpers.</li>
-      <li><code>validation_test</code> — schema rules (incl. cross-field <code>hosts-match-domain?</code>) and tool/credential paths via stub <code>which-fn</code>.</li>
+      <li><code>validation_test</code> — schema rules (incl. cross-field <code>hosts-match-domain?</code>), tool/credential paths via stub <code>which-fn</code>, the Cloudflare zone check, and the <code>ssh-agent</code> identity check.</li>
     </ul>
   </section>
 
@@ -1138,7 +1207,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
     <h2>What to avoid</h2>
     <ul>
       <li><strong>Don't add error handling for cases that cannot happen.</strong> <code>big-config</code> already routes step failure via <code>::bc/exit</code> and <code>::bc/err</code>; piling try/catches on top obscures the actual signal.</li>
-      <li><strong>Don't create new namespaces speculatively.</strong> The five existing namespaces map cleanly to their responsibilities. Resist splitting until a real new concern appears.</li>
+      <li><strong>Don't create new namespaces speculatively.</strong> The six existing namespaces (<code>options</code>, <code>package</code>, <code>params</code>, <code>tools</code>, <code>validation</code>, <code>describe</code>) map cleanly to their responsibilities. Resist splitting until a real new concern appears.</li>
       <li><strong>Don't modify <code>.dist/</code>.</strong> It is generated output. If a template needs to change, change the source under <code>src/resources/</code>.</li>
       <li><strong>No credentials in source.</strong> Use <code>BC_PAR_*</code> via <code>.envrc.private</code>.</li>
     </ul>
@@ -1173,6 +1242,17 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
 <pre><code>(validation/validate options/bb)
 ;; =&gt; {:ok? false :errors [{:check :tool :detail "..."} ...]}</code></pre>
     <p>Pass an env map as a second arg to inject custom env vars (used by tests).</p>
+
+    <h3><code>describe/describe</code></h3>
+<pre><code>(describe/describe options/bb)
+;; =&gt; {:profile "website"
+;;     :providers {:compute "digitalocean" :backend "r2" :smtp "resend" :dns "cloudflare"}
+;;     :compute {:ip "203.0.113.42" :user "root" :running? true :detail "ssh ok"}
+;;     :applications [{:host … :status … :image … :version … :digest …
+;;                     :registry-digest … :new-version? false}]
+;;     :applications-error nil
+;;     :fatal-error? false}</code></pre>
+    <p>The 3-arg arity <code>(describe opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and a stubbed params resolver. <code>describe*</code> is the CLI wrapper that prints the report and exits non-zero on <code>:fatal-error?</code>.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1185,6 +1265,7 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
         <tr><td><code>:domain</code></td><td>domain</td><td>Cloudflare-managed.</td></tr>
         <tr><td><code>:package</code></td><td>non-empty string</td><td>Used as the <code>.dist/</code> subdir name.</td></tr>
         <tr><td><code>:once</code></td><td>map</td><td><code>{:applications [{:host :image :env}…]}</code></td></tr>
+        <tr><td><code>:compute-pubkey</code></td><td>SSH public key</td><td>Private half must be loaded in <code>ssh-agent</code> on the operator's machine for cloud compute profiles.</td></tr>
         <tr><td><code>:deploy-pubkey</code></td><td>SSH public key</td><td>Authorized on the remote <code>deploy</code> user.</td></tr>
         <tr><td><code>:provider-smtp</code></td><td>"resend" | "no-infra"</td><td>Dispatch.</td></tr>
         <tr><td><code>:provider-dns</code></td><td>"cloudflare" | "no-infra"</td><td>Dispatch.</td></tr>
@@ -1244,7 +1325,7 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
     <p>Defined with <a href="https://github.com/metosin/malli">malli</a> in <code>validation.clj</code>. Sketch:</p>
 <pre><code>schema:profile     <span class="com">; ::render/profile string + ::workflow/params</span>
 └─ schema:params
-    ├─ schema:base-params       <span class="com">; :domain :package :once :deploy-pubkey</span>
+    ├─ schema:base-params       <span class="com">; :domain :package :once :compute-pubkey :deploy-pubkey</span>
     ├─ schema:smtp              <span class="com">; multi on :provider-smtp</span>
     │   ├─ schema:resend
     │   └─ schema:no-infra-smtp

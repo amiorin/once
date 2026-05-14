@@ -27,7 +27,8 @@ once/
 │   │   ├── package.clj      # High-level create/delete workflow definitions
 │   │   ├── params.clj       # Parameter extraction from OpenTofu outputs
 │   │   ├── tools.clj        # Tofu/Ansible tool implementations
-│   │   └── validation.clj   # Profile schema (malli), tool/credential/image checks
+│   │   ├── validation.clj   # Profile schema (malli), tool/credential/image/ssh-agent checks
+│   │   └── describe.clj     # Post-provisioning report (providers, SSH, deployed apps)
 │   └── resources/io/github/amiorin/once/tools/
 │       ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
 │       ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
@@ -38,6 +39,7 @@ once/
 │       └── ansible-local/   # Local machine playbooks
 ├── test/clj/io/github/amiorin/once/
 │   ├── deploy_test.clj      # Tests for the deploy ForceCommand script
+│   ├── describe_test.clj    # Tests for the describe report (parsing + assembly)
 │   ├── utils_test.clj       # Utility tests
 │   └── validation_test.clj  # Tests for the malli profile schema and tool selection
 ├── env/dev/clj/user.clj     # REPL dev namespace
@@ -61,7 +63,14 @@ clojure -M:test   # runs cognitect test-runner against test/clj
 
 ### Pre-flight Validation
 ```bash
-bb validate       # check active profile schema, required CLIs, credentials, and image refs
+bb validate       # check active profile schema, required CLIs, credentials, image refs,
+                  # and that :compute-pubkey is loaded in ssh-agent (cloud providers only)
+```
+
+### Post-provisioning Report
+```bash
+bb describe       # configured providers + SSH reachability + deployed ONCE applications
+                  # (image, tag, running digest, registry digest, update-available?)
 ```
 
 ### Full Lifecycle
@@ -90,8 +99,8 @@ The active profile is selected by editing `(def bb ...)` in `options.clj` (see C
 2. **tofu-smtp** — set up SMTP (Resend)
 3. **tofu-dns** — configure DNS (Cloudflare), injecting SMTP records
 4. **tofu-smtp-post** — finalize SMTP after DNS verification
-5. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, provision the restricted `deploy` user (NOPASSWD sudo for `/usr/local/bin/once *` + `ForceCommand` Babashka script at `/usr/local/bin/deploy` authorized by `:deploy-pubkey`), deploy applications listed under `:once {:applications [...]}`
-6. **ansible-local** — local config: update `~/.ssh/config`
+5. **ansible-local** — local config: update `~/.ssh/config` so the remote host is reachable as `Host once` for the next stage
+6. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, provision the restricted `deploy` user (NOPASSWD sudo for `/usr/local/bin/once *` + `ForceCommand` Babashka script at `/usr/local/bin/deploy` authorized by `:deploy-pubkey`), deploy applications listed under `:once {:applications [...]}`
 
 Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb once delete`.
 
@@ -125,9 +134,9 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use
 
 ### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying `:deploy-pubkey` (the SSH public key authorized on the remote `deploy` user). Profiles are plain Clojure maps composed with `merge-with merge`:
+Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb validate` enforces this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
 ```clojure
-(def space (merge-with merge resend cloudflare s3 oci
+(def space (merge-with merge resend cloudflare r2 oci deploy
                        {::render/profile "space"
                         ::workflow/params {:domain "bigconfig.space"
                                            :package "space"
@@ -135,7 +144,7 @@ Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud
                                                                   :image "ghcr.io/amiorin/once-pocketbase"
                                                                   :env ["SUPERUSER_PASSWORD=<{ superuser-password }>"]}]}}}))
 ```
-`online` and `space` ride on `oci`; `website` rides on `hcloud`; `no-infra` targets an existing server. The `bb` var sets the active profile for Babashka tasks:
+`online` and `space` ride on `oci`; `website` rides on `digitalocean`; `no-infra` targets an existing server. The `bb` var sets the active profile for Babashka tasks:
 ```clojure
 (def bb website)  ; change this to switch profiles
 ```
@@ -188,6 +197,6 @@ Commit messages use [Conventional Commits](https://www.conventionalcommits.org/)
 ## What to Avoid
 
 - Do not add error handling for cases that cannot happen (big-config handles step failure via `::bc/exit` and `::bc/err`)
-- Do not create new namespaces unless a genuine new concern arises; the four existing namespaces map cleanly to their responsibilities
+- Do not create new namespaces unless a genuine new concern arises; the six existing namespaces (`options`, `package`, `params`, `tools`, `validation`, `describe`) map cleanly to their responsibilities
 - Do not modify `.dist/` — it is generated output, not source
 - Credentials and tokens never go in source files; use `.envrc.private` (already gitignored via the whitelist `.gitignore`)
