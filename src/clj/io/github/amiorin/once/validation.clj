@@ -4,8 +4,9 @@
   Four phases run in a single pass and their errors are collected into a flat
   list:
 
-    1. Schema    — malli validates required keys, value formats, and a
-                   cross-field rule (every application :host must match :domain).
+    1. Schema    — malli validates required keys, rejects REPLACE_ME placeholders,
+                   value formats, and a cross-field rule (every application :host
+                   must match :domain).
     2. Tools     — required CLIs (tofu, ansible-playbook, ssh, curl, skopeo,
                    plus per-provider CLIs) are on PATH.
     3. Credentials — tokens / cloud configs authenticate against their APIs via
@@ -44,30 +45,59 @@
 (def ^:private ssh-pubkey-rx
   #"^ssh-(ed25519|rsa|dss|ecdsa) [A-Za-z0-9+/=]+( .*)?$")
 
+(defn- placeholder?
+  [v]
+  (and (string? v)
+       (str/includes? v "REPLACE_ME")))
+
+(defn- not-placeholder?
+  [v]
+  (not (placeholder? v)))
+
+(defn- blank-or-placeholder?
+  [v]
+  (or (nil? v)
+      (and (string? v)
+           (or (str/blank? v)
+               (placeholder? v)))))
+
+(defn- real-value?
+  [v]
+  (not (blank-or-placeholder? v)))
+
+(def ^:private no-placeholder
+  [:fn {:error/message "must replace REPLACE_ME with a real value"} not-placeholder?])
+
+(def ^:private string-value
+  [:and :string no-placeholder])
+
+(def ^:private int-value
+  [:and no-placeholder :int])
+
 (defn- re-schema [rx msg]
-  [:and :string [:re {:error/message msg} rx]])
+  [:and :string no-placeholder [:re {:error/message msg} rx]])
 
 (def ^:private non-empty-string
-  [:and :string [:fn {:error/message "must be a non-empty string"} seq]])
+  [:and :string no-placeholder [:fn {:error/message "must be a non-empty string"} seq]])
 
 ;;; -------------------------------------------------------------- sub-profile schemas
 
 (def ^:private schema:resend
   [:map
    [:provider-smtp [:= "resend"]]
-   [:resend-server :string]
-   [:resend-port :int]
-   [:resend-username :string]
-   [:resend-api-key :string]
-   [:resend-password :string]])
+   [:resend-server string-value]
+   [:resend-port int-value]
+   [:resend-username string-value]
+   [:resend-api-key string-value]
+   [:resend-password string-value]])
 
 (def ^:private schema:no-infra-smtp
   [:map
    [:provider-smtp [:= "no-infra"]]
-   [:no-infra-smtp-server :string]
-   [:no-infra-smtp-port :int]
-   [:no-infra-smtp-username :string]
-   [:no-infra-smtp-password :string]])
+   [:no-infra-smtp-server string-value]
+   [:no-infra-smtp-port int-value]
+   [:no-infra-smtp-username string-value]
+   [:no-infra-smtp-password string-value]])
 
 (def ^:private schema:smtp
   [:multi {:dispatch :provider-smtp}
@@ -77,7 +107,7 @@
 (def ^:private schema:cloudflare
   [:map
    [:provider-dns [:= "cloudflare"]]
-   [:cloudflare-api-token :string]])
+   [:cloudflare-api-token string-value]])
 
 (def ^:private schema:no-infra-dns
   [:map [:provider-dns [:= "no-infra"]]])
@@ -90,8 +120,8 @@
 (def ^:private schema:s3
   [:map
    [:provider-backend [:= "s3"]]
-   [:s3-bucket :string]
-   [:s3-region :string]])
+   [:s3-bucket string-value]
+   [:s3-region string-value]])
 
 (def ^:private schema:r2
   [:map
@@ -113,47 +143,47 @@
 (def ^:private schema:oci
   [:map
    [:provider-compute [:= "oci"]]
-   [:oci-config-file-profile :string]
-   [:oci-subnet-id :string]
-   [:oci-compartment-id :string]
-   [:oci-availability-domain :string]
-   [:oci-display-name :string]
-   [:oci-shape :string]
-   [:oci-ocpus :int]
-   [:oci-memory-in-gbs :int]
-   [:oci-boot-volume-size-in-gbs :int]
-   [:oci-boot-volume-vpus-per-gb :int]
-   [:oci-ssh-authorized-keys :string]])
+   [:oci-config-file-profile string-value]
+   [:oci-subnet-id string-value]
+   [:oci-compartment-id string-value]
+   [:oci-availability-domain string-value]
+   [:oci-display-name string-value]
+   [:oci-shape string-value]
+   [:oci-ocpus int-value]
+   [:oci-memory-in-gbs int-value]
+   [:oci-boot-volume-size-in-gbs int-value]
+   [:oci-boot-volume-vpus-per-gb int-value]
+   [:oci-ssh-authorized-keys string-value]])
 
 (def ^:private schema:hcloud
   [:map
    [:provider-compute [:= "hcloud"]]
-   [:hcloud-name :string]
-   [:hcloud-image :string]
-   [:hcloud-server-type :string]
-   [:hcloud-location :string]
-   [:hcloud-ssh-keys :string]
-   [:hcloud-token :string]])
+   [:hcloud-name string-value]
+   [:hcloud-image string-value]
+   [:hcloud-server-type string-value]
+   [:hcloud-location string-value]
+   [:hcloud-ssh-keys string-value]
+   [:hcloud-token string-value]])
 
 (def ^:private schema:digitalocean
   [:map
    [:provider-compute [:= "digitalocean"]]
-   [:digitalocean-name :string]
-   [:digitalocean-region :string]
-   [:digitalocean-size :string]
-   [:digitalocean-image :string]
-   [:digitalocean-vpc-uuid :string]
-   [:digitalocean-ssh-keys :string]
-   [:do-token :string]])
+   [:digitalocean-name string-value]
+   [:digitalocean-region string-value]
+   [:digitalocean-size string-value]
+   [:digitalocean-image string-value]
+   [:digitalocean-vpc-uuid string-value]
+   [:digitalocean-ssh-keys string-value]
+   [:do-token string-value]])
 
 (def ^:private schema:no-infra-compute
   [:map
    [:provider-compute [:= "no-infra"]]
-   [:no-infra-compute-ip :string]
-   [:no-infra-compute-user :string]
-   [:no-infra-compute-sudoer :string]
-   [:no-infra-compute-uid :string]
-   [:no-infra-compute-name :string]])
+   [:no-infra-compute-ip string-value]
+   [:no-infra-compute-user string-value]
+   [:no-infra-compute-sudoer string-value]
+   [:no-infra-compute-uid string-value]
+   [:no-infra-compute-name string-value]])
 
 (def ^:private schema:compute
   [:multi {:dispatch :provider-compute}
@@ -168,12 +198,12 @@
   [:map
    [:host (re-schema hostname-rx "must be a valid hostname")]
    [:image (re-schema image-rx "must be a valid image ref (e.g. ghcr.io/org/name:tag)")]
-   [:env {:optional true} [:vector :string]]])
+   [:env {:optional true} [:vector string-value]]])
 
 (def ^:private schema:base-params
   [:map
    [:domain (re-schema domain-rx "must be a valid domain")]
-   [:package [:and :string [:fn {:error/message "must be a non-empty string"} seq]]]
+   [:package non-empty-string]
    [:once [:map [:applications [:vector schema:application]]]]
    [:compute-pubkey (re-schema ssh-pubkey-rx "must look like an SSH public key")]
    [:deploy-pubkey (re-schema ssh-pubkey-rx "must look like an SSH public key")]])
@@ -201,7 +231,7 @@
 
 (def schema:profile
   [:map
-   [::render/profile :string]
+   [::render/profile string-value]
    [::workflow/params schema:params]])
 
 ;;; -------------------------------------------------------------- schema errors
@@ -379,8 +409,8 @@
       :else :unknown)))
 
 (defn- r2-errors
-  "Defense in depth: schema rejects empty R2 keys, but if they slip through
-  surface a loud credential error instead of silently skipping the check.
+  "Defense in depth: schema rejects empty or placeholder R2 keys, but if they
+  slip through surface a loud credential error instead of silently skipping the check.
 
   `:r2-endpoint` is supplied directly (e.g. `https://<acct>.eu.r2.cloudflarestorage.com`
   for the EU jurisdiction) so we don't need to know which jurisdiction the
@@ -390,13 +420,13 @@
   are wrong."
   [{:keys [r2-bucket r2-endpoint r2-access-key-id r2-secret-access-key]}]
   (let [missing (cond-> []
-                  (str/blank? r2-endpoint)          (conj :r2-endpoint)
-                  (str/blank? r2-bucket)            (conj :r2-bucket)
-                  (str/blank? r2-access-key-id)     (conj :r2-access-key-id)
-                  (str/blank? r2-secret-access-key) (conj :r2-secret-access-key))]
+                  (blank-or-placeholder? r2-endpoint)          (conj :r2-endpoint)
+                  (blank-or-placeholder? r2-bucket)            (conj :r2-bucket)
+                  (blank-or-placeholder? r2-access-key-id)     (conj :r2-access-key-id)
+                  (blank-or-placeholder? r2-secret-access-key) (conj :r2-secret-access-key))]
     (cond
       (seq missing)
-      [(format "R2: missing credentials: %s" (str/join ", " (map name missing)))]
+      [(format "R2: missing or placeholder credentials: %s" (str/join ", " (map name missing)))]
 
       (not (which? "aws"))
       []
@@ -444,6 +474,9 @@
     []
     (let [sock (some-> (get env "SSH_AUTH_SOCK") str/trim)]
       (cond
+        (placeholder? compute-pubkey)
+        ["SSH agent: :compute-pubkey still contains REPLACE_ME"]
+
         (str/blank? sock)
         ["SSH agent: SSH_AUTH_SOCK is not set; start ssh-agent and run ssh-add for :compute-pubkey"]
 
@@ -476,17 +509,17 @@
   ([params env]
    (let [{:keys [provider-smtp provider-dns provider-compute provider-backend
                  domain resend-api-key cloudflare-api-token hcloud-token do-token]} params
-         single (->> [(when (and (= provider-smtp "resend") resend-api-key)
+         single (->> [(when (and (= provider-smtp "resend") (real-value? resend-api-key))
                         (bearer-check "Resend API"
                                       "https://api.resend.com/api-keys"
                                       resend-api-key))
-                      (when (and (= provider-dns "cloudflare") domain cloudflare-api-token)
+                      (when (and (= provider-dns "cloudflare") (real-value? domain) (real-value? cloudflare-api-token))
                         (cloudflare-zone-check domain cloudflare-api-token))
-                      (when (and (= provider-compute "hcloud") hcloud-token)
+                      (when (and (= provider-compute "hcloud") (real-value? hcloud-token))
                         (bearer-check "Hetzner Cloud API"
                                       "https://api.hetzner.cloud/v1/server_types"
                                       hcloud-token))
-                      (when (and (= provider-compute "digitalocean") do-token)
+                      (when (and (= provider-compute "digitalocean") (real-value? do-token))
                         (bearer-check "DigitalOcean API"
                                       "https://api.digitalocean.com/v2/account"
                                       do-token))
@@ -508,7 +541,7 @@
   (when (which? "skopeo")
     (->> (get-in params [:once :applications])
          (keep (fn [{:keys [image]}]
-                 (when image
+                 (when (real-value? image)
                    (let [{:keys [ok? err]} (run ["skopeo" "inspect" "--no-tags" "--override-os" "linux" (str "docker://" image)])]
                      (when-not ok?
                        {:check :image

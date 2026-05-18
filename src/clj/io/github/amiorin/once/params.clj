@@ -33,7 +33,7 @@
 
 (comment
   (debug tap-values
-    (-> {::render/profile "space"}
+    (-> {::render/profile "profile-gamma"}
         (workflow/new-prefix :io.github.amiorin.once.package/start-create-or-delete)
         tofu-smtp-params))
   (-> tap-values))

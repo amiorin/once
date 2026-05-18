@@ -6,55 +6,68 @@
    [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.validation :as v]))
 
+(def ^:private test-compute-pubkey
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 test@example.com")
+
+(def ^:private test-deploy-pubkey
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII1Lbgxiv2OnDKwc8Wx25SQlGyI+iY1drUii/IMZ3YSh deploy@example.com")
+
 (defn- with-creds
-  "Stub all credential keys that come from BC_PAR_* in real runs."
+  "Replace REPLACE_ME placeholders with schema-valid test values."
   [opts]
   (update opts ::workflow/params merge
-          {:resend-api-key "stub"
+          {:compute-pubkey test-compute-pubkey
+           :deploy-pubkey test-deploy-pubkey
+           :resend-api-key "stub"
            :resend-password "stub"
            :cloudflare-api-token "stub"
            :hcloud-token "stub"
+           :hcloud-ssh-keys "stub-key"
            :do-token "stub"
+           :digitalocean-vpc-uuid "stub-vpc"
+           :digitalocean-ssh-keys "stub-key"
+           :oci-config-file-profile "DEFAULT"
+           :oci-subnet-id "stub-subnet"
+           :oci-compartment-id "stub-compartment"
+           :oci-availability-domain "stub-ad"
+           :oci-ssh-authorized-keys "~/.ssh/id_ed25519.pub"
+           :no-infra-compute-ip "192.0.2.10"
+           :no-infra-compute-user "ubuntu"
+           :no-infra-compute-sudoer "ubuntu"
+           :no-infra-compute-uid "1000"
+           :no-infra-compute-name "once"
            :no-infra-smtp-password "stub"
+           :r2-bucket "stub-bucket"
            :r2-endpoint "https://stub.r2.cloudflarestorage.com"
            :r2-access-key-id "stub"
-           :r2-secret-access-key "stub"}))
-
-(defn- complete-no-infra
-  "Fill in keys that `options/no-infra` deliberately leaves blank — they're
-  expected to come from BC_PAR_* env vars in production."
-  [opts]
-  (update opts ::workflow/params merge
-          {:domain   "example.com"
-           :package  "no-infra"
-           :once     {:applications []}
-           :provider-backend "local"}))
-
-(def ^:private test-compute-pubkey
-  (get-in options/website [::workflow/params :compute-pubkey]))
+           :r2-secret-access-key "stub"
+           :s3-bucket "stub-bucket"
+           :s3-region "eu-west-1"}))
 
 (deftest public-profiles-pass-schema-with-stub-creds
-  (doseq [[name profile] [["website"  (with-creds options/website)]
-                          ["online"   (with-creds options/online)]
-                          ["space"    (with-creds options/space)]
-                          ["no-infra" (-> options/no-infra with-creds complete-no-infra)]]]
+  (doseq [[name profile] [["profile-alpha"    (with-creds options/profile-alpha)]
+                          ["profile-beta"     (with-creds options/profile-beta)]
+                          ["profile-gamma"    (with-creds options/profile-gamma)]
+                          ["profile-no-infra" (with-creds options/profile-no-infra)]]]
     (testing name
       (is (nil? (v/schema-errors profile))))))
 
-(deftest missing-required-credential-is-reported
-  (let [errors (v/schema-errors options/website)]
+(deftest placeholder-credential-is-reported
+  (let [errors (v/schema-errors options/profile-alpha)]
     (is (seq errors))
-    (is (some #(str/includes? (:detail %) "resend-api-key") errors)
-        "missing :resend-api-key should be flagged by the schema phase")))
+    (is (some #(and (str/includes? (:detail %) "resend-api-key")
+                    (str/includes? (:detail %) "REPLACE_ME"))
+              errors)
+        "placeholder :resend-api-key should be flagged by the schema phase")))
 
 (deftest missing-compute-pubkey-is-reported
-  (let [errors (v/schema-errors (update (with-creds options/website)
+  (let [errors (v/schema-errors (update (with-creds options/profile-alpha)
                                         ::workflow/params dissoc :compute-pubkey))]
     (is (seq errors))
     (is (some #(str/includes? (:detail %) "compute-pubkey") errors))))
 
 (deftest bad-domain-format-is-reported
-  (let [bad    (-> options/website
+  (let [bad    (-> options/profile-alpha
                    with-creds
                    (assoc-in [::workflow/params :domain] "not_a_domain")
                    (assoc-in [::workflow/params :once :applications] []))
@@ -65,7 +78,7 @@
               errors))))
 
 (deftest cross-field-mismatched-host-is-reported
-  (let [bad    (-> options/website
+  (let [bad    (-> options/profile-alpha
                    with-creds
                    (assoc-in [::workflow/params :once :applications]
                              [{:host  "alien.example.com"
@@ -75,12 +88,12 @@
     (is (some #(str/includes? (:detail %) "subdomain") errors))))
 
 (deftest cross-field-apex-and-subdomain-pass
-  (let [ok (-> options/website
+  (let [ok (-> options/profile-alpha
                with-creds
                (assoc-in [::workflow/params :once :applications]
-                         [{:host "bigconfig.website"
+                         [{:host "alpha.example.com"
                            :image "ghcr.io/foo/bar:latest"}
-                          {:host "www.bigconfig.website"
+                          {:host "www.alpha.example.com"
                            :image "ghcr.io/foo/bar:latest"}]))]
     (is (nil? (v/schema-errors ok)))))
 
@@ -115,7 +128,7 @@
                                              :provider-backend "local"})))))))
 
 (deftest tool-errors-honors-injected-which-fn
-  (let [params     (::workflow/params (with-creds options/website))
+  (let [params     (::workflow/params (with-creds options/profile-alpha))
         which-stub #(not= % "tofu")
         errors     (v/tool-errors params which-stub)]
     (is (= 1 (count errors)))
@@ -163,13 +176,13 @@
   (testing "configured zone exists"
     (with-redefs [v/run (fn
                           ([args]
-                           (is (some #(str/includes? % "name=bigconfig.website") args))
+                           (is (some #(str/includes? % "name=alpha.example.com") args))
                            {:ok? true :exit 0 :out "{\"success\":true,\"result\":[{\"id\":\"zone-id\"}]}" :err ""})
                           ([args _extra-env]
-                           (is (some #(str/includes? % "name=bigconfig.website") args))
+                           (is (some #(str/includes? % "name=alpha.example.com") args))
                            {:ok? true :exit 0 :out "{\"success\":true,\"result\":[{\"id\":\"zone-id\"}]}" :err ""}))]
       (is (empty? (#'v/credential-errors
-                   (select-keys (::workflow/params (with-creds options/website))
+                   (select-keys (::workflow/params (with-creds options/profile-alpha))
                                 [:provider-dns :domain :cloudflare-api-token]))))))
   (testing "configured zone is missing"
     (with-redefs [v/run (fn
@@ -178,15 +191,15 @@
                           ([_args _extra-env]
                            {:ok? true :exit 0 :out "{\"success\":true,\"result\":[]}" :err ""}))]
       (let [errors (#'v/credential-errors
-                    (select-keys (::workflow/params (with-creds options/website))
+                    (select-keys (::workflow/params (with-creds options/profile-alpha))
                                  [:provider-dns :domain :cloudflare-api-token]))]
         (is (= 1 (count errors)))
         (is (str/includes? (:detail (first errors)) "Cloudflare zone"))
-        (is (str/includes? (:detail (first errors)) "bigconfig.website"))))))
+        (is (str/includes? (:detail (first errors)) "alpha.example.com"))))))
 
 (deftest domain-regex-table
   (let [params-of (fn [domain]
-                    (-> options/website
+                    (-> options/profile-alpha
                         with-creds
                         (assoc-in [::workflow/params :domain] domain)
                         (assoc-in [::workflow/params :once :applications] [])))]
@@ -201,10 +214,10 @@
 
 (deftest image-regex-table
   (let [params-of (fn [image]
-                    (-> options/website
+                    (-> options/profile-alpha
                         with-creds
                         (assoc-in [::workflow/params :once :applications]
-                                  [{:host "www.bigconfig.website" :image image}])))]
+                                  [{:host "www.alpha.example.com" :image image}])))]
     (testing "valid"
       (doseq [i ["ghcr.io/foo/bar"
                  "ghcr.io/foo/bar:latest"
