@@ -405,7 +405,7 @@
       <div class="group">CLI Reference</div>
       <ul>
         <li><a href="#once-cmd">bb once</a></li>
-        <li><a href="#validate">bb once validate</a></li>
+        <li><a href="#validate">bb validate / bb once validate</a></li>
         <li><a href="#describe">bb once describe</a></li>
         <li><a href="#tools-cmd">bb -tofu / -ansible</a></li>
         <li><a href="#tidy">bb -tidy</a></li>
@@ -498,8 +498,8 @@ $EDITOR src/clj/io/github/amiorin/once/options.clj</code></pre>
 <span class="kw">export</span> BC_PAR_R2_SECRET_ACCESS_KEY=<span class="str">"…"</span></code></pre>
 
     <h3>3. Pre-flight</h3>
-<pre><code><span class="kw">bb</span> once validate</code></pre>
-    <p>Verifies schema, required CLIs, credentials (live API calls including a Cloudflare zone lookup), that every <code>:image</code> resolves on its registry, and that <code>:compute-pubkey</code> is loaded in <code>ssh-agent</code> for cloud compute profiles.</p>
+<pre><code><span class="kw">bb</span> validate</code></pre>
+    <p><code>bb validate</code> is a strict shortcut for <code>bb once validate</code>: it accepts no extra arguments and exits non-zero if any are supplied. It verifies schema, required CLIs, credentials (live API calls including a Cloudflare zone lookup), that every <code>:image</code> resolves on its registry, and that <code>:compute-pubkey</code> is loaded in <code>ssh-agent</code> for cloud compute profiles.</p>
 
     <h3>4. Provision</h3>
 <pre><code><span class="kw">bb</span> once create</code></pre>
@@ -518,7 +518,7 @@ $EDITOR src/clj/io/github/amiorin/once/options.clj</code></pre>
   <!-- ============================================================ -->
   <section id="prereqs">
     <h2>Prerequisites</h2>
-    <p>The exact list of CLIs depends on your active profile. <code>bb once validate</code> tells you which ones are missing.</p>
+    <p>The exact list of CLIs depends on your active profile. <code>bb validate</code> / <code>bb once validate</code> tell you which ones are missing.</p>
     <table>
       <thead><tr><th>Tool</th><th>Required for</th><th>Install hint</th></tr></thead>
       <tbody>
@@ -891,7 +891,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
                       :deploy-pubkey
                       <span class="str">"ssh-ed25519 AAAAC3… deploy@bigconfig.ai"</span>}})</code></pre>
     <ul>
-      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb once create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb once validate</code> rejects the run if it isn't loaded (for cloud compute profiles).</li>
+      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb once create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb validate</code> / <code>bb once validate</code> reject the run if it isn't loaded (for cloud compute profiles).</li>
       <li><code>:deploy-pubkey</code> — the key authorized on the remote <code>deploy</code> user with <code>ForceCommand</code>. See <a href="#deploy-user">Restricted deploy SSH</a>.</li>
     </ul>
     <p>Override either per-environment:</p>
@@ -927,21 +927,22 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   <!-- ============================================================ -->
   <section id="once-cmd">
     <h2><code>bb once</code></h2>
-<pre><code><span class="kw">bb</span> once validate         <span class="com"># opt-in pre-flight checks</span>
+<pre><code><span class="kw">bb</span> validate              <span class="com"># strict shortcut for bb once validate</span>
+<span class="kw">bb</span> once validate         <span class="com"># opt-in pre-flight checks; can be chained</span>
 <span class="kw">bb</span> once describe         <span class="com"># opt-in post-provisioning report</span>
 <span class="kw">bb</span> once create           <span class="com"># full 6-stage pipeline</span>
 <span class="kw">bb</span> once delete           <span class="com"># reverse 4 Tofu stages</span>
 <span class="kw">bb</span> once validate create  <span class="com"># validate, then create if validation passes</span>
 <span class="kw">bb</span> once delete create    <span class="com"># clean-slate redeploy</span></code></pre>
-    <p>Defined in <code>bb.edn</code> as <code>(package/once* *command-line-args* options/bb)</code>. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested.</p>
+    <p><code>bb once</code> is defined in <code>bb.edn</code> as <code>(package/once* *command-line-args* options/bb)</code>. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested. The top-level <code>bb validate</code> task calls the same validation step with no args, and exits with an error if <code>*command-line-args*</code> is non-empty.</p>
     <h3>Step skipping &amp; partial runs</h3>
     <p>You can pass tool-level args to override what each stage does. For example, replace the default <code>render tofu:init tofu:apply:-auto-approve</code> sequence by editing <code>package.clj</code>'s pipeline — or by invoking individual stage tasks (see <a href="#tools-cmd">bb -tofu / -ansible</a>).</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="validate">
-    <h2><code>bb once validate</code></h2>
-    <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> is an opt-in workflow step and never short-circuits internally.</p>
+    <h2><code>bb validate</code> / <code>bb once validate</code></h2>
+    <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> is an opt-in workflow step and never short-circuits internally. Use <code>bb validate</code> for validation by itself; use <code>bb once validate</code> when chaining with other workflow steps such as <code>create</code>.</p>
     <ol>
       <li><strong>Schema</strong> (<code>malli</code>): every required key is present and well-typed; every <code>:once :applications :host</code> equals or is a subdomain of <code>:domain</code>; both <code>:compute-pubkey</code> and <code>:deploy-pubkey</code> look like SSH public keys.</li>
       <li><strong>Tools</strong>: required CLIs are on <code>PATH</code> (base + per-provider).</li>
@@ -970,7 +971,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   Credentials:
     - Cloudflare zone: example.com not found or not active
     - SSH agent: :compute-pubkey is not loaded in ssh-agent at SSH_AUTH_SOCK=/tmp/ssh-…/agent.123</code></pre>
-    <p>Programmatic API: <code>(validation/validate-report options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests). <code>validation/validate</code> is the workflow step function used by <code>bb once validate</code>.</p>
+    <p>Programmatic API: <code>(validation/validate-report options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests). <code>validation/validate</code> is the workflow step function used by <code>bb once validate</code>; the <code>bb validate</code> task invokes it as a no-argument shortcut.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1154,7 +1155,7 @@ Applications:
         </tr>
       </tbody>
     </table>
-    <p>Functions ending in <code>*</code> are CLI/REPL entry points: they accept a string of args and merge default <code>::bc/env :shell</code>. Validation and description are now exposed as <code>bb once validate</code> / <code>bb once describe</code> workflow steps rather than standalone star wrappers.</p>
+    <p>Functions ending in <code>*</code> are CLI/REPL entry points: they accept a string of args and merge default <code>::bc/env :shell</code>. Validation and description are exposed as <code>bb once validate</code> / <code>bb once describe</code> workflow steps rather than standalone star wrappers; <code>bb validate</code> is only a strict no-argument Babashka shortcut for the validation step.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1321,7 +1322,7 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
     </table>
 
     <h3>Compute (provider-specific keys)</h3>
-    <p>See the <a href="#compute">Compute providers</a> cards above. All listed keys are <em>required</em> per provider; <code>bb once validate</code> lists the missing ones.</p>
+    <p>See the <a href="#compute">Compute providers</a> cards above. All listed keys are <em>required</em> per provider; <code>bb validate</code> / <code>bb once validate</code> list the missing ones.</p>
   </section>
 
   <!-- ============================================================ -->

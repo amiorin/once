@@ -95,7 +95,7 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 `online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `digitalocean`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
 
 All four profiles also merge in the `deploy` sub-profile, which carries two SSH public keys:
-- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb once validate` checks this).
+- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb validate` / `bb once validate` check this).
 - `deploy-pubkey` — the key authorized on the remote `deploy` user with `ForceCommand` (CI-driven redeploys).
 
 Override either per-environment via `BC_PAR_COMPUTE_PUBKEY` and `BC_PAR_DEPLOY_PUBKEY`.
@@ -107,16 +107,16 @@ Note: If you are using the `no-infra` profile, ensure your parameters are correc
 Before provisioning, run a quick check that the active profile is well-formed, the required CLIs are installed, the credentials work, the referenced Docker images exist, and (for cloud compute profiles) `:compute-pubkey` is loaded in `ssh-agent` so Ansible can connect to the new host:
 
 ```bash
-bb once validate
+bb validate
 ```
 
-For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
+`bb validate` is a strict shortcut for `bb once validate`: it accepts no extra arguments and exits non-zero if any are supplied. For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
 
 #### 3. Main Workflow
 
-The `once` task handles the full lifecycle. `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`. You can pass multiple commands:
+The `once` task handles the full lifecycle. `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`. You can pass multiple commands to `bb once`; use the top-level `bb validate` shortcut only for validation by itself.
 
-- **Pre-flight Validation**: `bb once validate`
+- **Pre-flight Validation**: `bb validate` (same as `bb once validate`)
 - **Full Setup**: `bb once create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible Local -> Ansible)
 - **Tear Down**: `bb once delete` (Tofu SMTP Post Destroy -> Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
 - **Sequential**: `bb once validate create` (Validate, then create only if validation passes)

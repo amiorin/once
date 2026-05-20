@@ -63,7 +63,8 @@ clojure -M:test   # runs cognitect test-runner against test/clj
 
 ### Pre-flight Validation
 ```bash
-bb once validate  # check active profile schema, required CLIs, credentials, image refs,
+bb validate       # shortcut for `bb once validate`; accepts no extra args
+                  # checks active profile schema, required CLIs, credentials, image refs,
                   # and that :compute-pubkey is loaded in ssh-agent (cloud providers only)
 ```
 
@@ -75,7 +76,8 @@ bb once describe  # configured providers + SSH reachability + deployed ONCE appl
 
 ### Full Lifecycle
 ```bash
-bb once validate            # opt-in pre-flight checks
+bb validate                 # opt-in pre-flight checks (strict shortcut for `bb once validate`)
+bb once validate            # same validation via workflow step; can be chained
 bb once describe            # opt-in post-provisioning report
 bb once create              # provision everything (all 6 stages)
 bb once delete              # tear down (reverse 4 Tofu stages)
@@ -107,7 +109,7 @@ The active profile is selected by editing `(def bb ...)` in `options.clj` (see C
 
 Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb once delete`.
 
-`validate` and `describe` are opt-in `big-config.workflow/run-steps` steps exposed through `bb once validate` and `bb once describe`. They are not standalone `bb.edn` tasks and do not run automatically before `create`.
+`validate` and `describe` are opt-in `big-config.workflow/run-steps` steps exposed through `bb once validate` and `bb once describe`. Validation is also exposed as a top-level `bb validate` shortcut, which accepts no extra args and exits non-zero when `*command-line-args*` is non-empty. These steps do not run automatically before `create`.
 
 ### Template Rendering
 `big-config` renders templates from `src/resources/` into `.dist/` using parameters. Templates use `{{ ... }}` delimiters for provider switching and `{ ... }` for filter expressions.
@@ -139,7 +141,7 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use
 
 ### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb once validate` enforces this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
+Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb validate` / `bb once validate` enforce this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
 ```clojure
 (def space (merge-with merge resend cloudflare r2 oci deploy
                        {::render/profile "space"

@@ -9,6 +9,10 @@
         :task (println "Usage: bb <task> [args...]
 
 Tasks:
+  validate  Shortcut for `bb once validate`.
+            Usage:
+              bb validate              Run pre-flight checks for the active profile.
+
   once      Provision or tear down infrastructure for the active profile.
             Usage:
               bb once validate         Run pre-flight checks for the active profile.
@@ -29,6 +33,14 @@ See:
 * https://www.bigconfig.ai/manual")}
   once {:doc "bb once validate | bb once describe | bb once create | bb once delete"
         :task (package/once* *command-line-args* options/bb)}
+  validate {:doc "Shortcut for bb once validate"
+            :task (if (seq *command-line-args*)
+                    (do
+                      (binding [*out* *err*]
+                        (println "Error: bb validate does not accept arguments.")
+                        (println "Usage: bb validate"))
+                      (System/exit 1))
+                    (package/once* ["validate"] options/bb))}
   -tofu {:doc "bb tofu render tofu:init tofu:apply:-auto-approve"
         :task (tools/tofu* *command-line-args* (params/once-opts options/bb))}
   -tofu-dns {:doc "bb tofu-dns render tofu:init tofu:apply:-auto-approve"
