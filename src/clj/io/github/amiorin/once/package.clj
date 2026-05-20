@@ -6,9 +6,11 @@
    [big-config.step-fns :as step-fns]
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]
+   [io.github.amiorin.once.describe :as describe]
    [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.params :as params]
-   [io.github.amiorin.once.tools :as tools]))
+   [io.github.amiorin.once.tools :as tools]
+   [io.github.amiorin.once.validation :as validation]))
 
 (def step-fns [workflow/print-step-fn
                (step-fns/->exit-step-fn ::end)
@@ -51,7 +53,9 @@
   [step-fns {:keys [::workflow/params] :as opts}]
   (let [opts (->> opts
                   (merge {::workflow/create-fn create
-                          ::workflow/delete-fn delete})
+                          ::workflow/delete-fn delete
+                          ::workflow/validate-fn validation/validate
+                          ::workflow/describe-fn describe/describe})
                   (workflow/merge-params [::tools/tofu-opts ::tools/tofu-smtp-opts ::tools/tofu-dns-opts ::tools/tofu-smtp-post-opts ::tools/ansible-opts] params))
         wf (core/->workflow {:first-step ::start
                              :wire-fn (fn [step step-fns]

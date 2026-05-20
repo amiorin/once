@@ -1,12 +1,9 @@
 {:deps {io.github.amiorin/once {:local/root "."}}
  :tasks
- {:requires ([babashka.process :as p]
-             [io.github.amiorin.once.describe :as describe]
-             [io.github.amiorin.once.params :as params]
+ {:requires ([io.github.amiorin.once.params :as params]
              [io.github.amiorin.once.options :as options]
              [io.github.amiorin.once.package :as package]
-             [io.github.amiorin.once.tools :as tools]
-             [io.github.amiorin.once.validation :as validation])
+             [io.github.amiorin.once.tools :as tools])
   help {:doc "the workflow help"
         :override-builtin true
         :task (println "Usage: bb <task> [args...]
@@ -14,38 +11,24 @@
 Tasks:
   once      Provision or tear down infrastructure for the active profile.
             Usage:
+              bb once validate         Run pre-flight checks for the active profile.
+              bb once describe         Show providers, SSH reachability, and deployed apps.
               bb once create           Run the full 6-stage create pipeline:
                                          tofu -> tofu-smtp -> tofu-dns ->
-                                         tofu-smtp-post -> ansible -> ansible-local
+                                         tofu-smtp-post -> ansible-local -> ansible
               bb once delete           Reverse the 4 Tofu stages (destroy order 4->3->2->1).
+              bb once validate create  Validate, then create only if validation passes.
               bb once delete create    Clean-slate redeploy.
             Notes:
+              * validate/describe run only when explicitly requested.
               * Compute resources render with prevent_destroy = true by default.
                 Override with: BC_PAR_COMPUTE_PREVENT_DESTROY=false bb once delete
               * The active profile is selected by (def bb ...) in options.clj.
 
-  validate  Pre-flight checks for the active profile. Verifies:
-              * profile schema (malli)
-              * required CLIs are installed
-              * credentials are present
-              * referenced docker images are reachable
-            Usage:
-              bb validate
-
-  describe  Show configured providers, compute SSH reachability, and deployed
-            ONCE applications for the active profile.
-            Usage:
-              bb describe
-
 See:
 * https://www.bigconfig.ai/manual")}
-  once {:doc "bb once create | bb once delete"
+  once {:doc "bb once validate | bb once describe | bb once create | bb once delete"
         :task (package/once* *command-line-args* options/bb)}
-  validate {:doc "validate active profile, tools, credentials, and docker images"
-            :task (validation/validate* *command-line-args* options/bb)}
-  describe {:doc "describe active profile providers, compute, and deployed applications"
-            :override-builtin true
-            :task (describe/describe* *command-line-args* options/bb)}
   -tofu {:doc "bb tofu render tofu:init tofu:apply:-auto-approve"
         :task (tools/tofu* *command-line-args* (params/once-opts options/bb))}
   -tofu-dns {:doc "bb tofu-dns render tofu:init tofu:apply:-auto-approve"

@@ -24,7 +24,7 @@ once/
 ├── src/
 │   ├── clj/io/github/amiorin/once/
 │   │   ├── options.clj      # Cloud profiles & active profile (def bb ...)
-│   │   ├── package.clj      # High-level create/delete workflow definitions
+│   │   ├── package.clj      # High-level create/delete workflows + validate/describe step wiring
 │   │   ├── params.clj       # Parameter extraction from OpenTofu outputs
 │   │   ├── tools.clj        # Tofu/Ansible tool implementations
 │   │   ├── validation.clj   # Profile schema (malli), tool/credential/image/ssh-agent checks
@@ -63,31 +63,34 @@ clojure -M:test   # runs cognitect test-runner against test/clj
 
 ### Pre-flight Validation
 ```bash
-bb validate       # check active profile schema, required CLIs, credentials, image refs,
+bb once validate  # check active profile schema, required CLIs, credentials, image refs,
                   # and that :compute-pubkey is loaded in ssh-agent (cloud providers only)
 ```
 
 ### Post-provisioning Report
 ```bash
-bb describe       # configured providers + SSH reachability + deployed ONCE applications
+bb once describe  # configured providers + SSH reachability + deployed ONCE applications
                   # (image, tag, running digest, registry digest, update-available?)
 ```
 
 ### Full Lifecycle
 ```bash
+bb once validate            # opt-in pre-flight checks
+bb once describe            # opt-in post-provisioning report
 bb once create              # provision everything (all 6 stages)
 bb once delete              # tear down (reverse 4 Tofu stages)
+bb once validate create     # validate, then create only if validation passes
 bb once delete create       # clean slate redeploy
 ```
 
 ### Individual Tools (each requires `render` first)
 ```bash
-bb tofu render tofu:init tofu:apply:-auto-approve
-bb tofu-smtp render tofu:init tofu:apply:-auto-approve
-bb tofu-dns render tofu:init tofu:apply:-auto-approve
-bb tofu-smtp-post render tofu:init tofu:apply:-auto-approve
-bb ansible render -- ansible-playbook main.yml
-bb ansible-local render -- ansible-playbook main.yml
+bb -tofu render tofu:init tofu:apply:-auto-approve
+bb -tofu-smtp render tofu:init tofu:apply:-auto-approve
+bb -tofu-dns render tofu:init tofu:apply:-auto-approve
+bb -tofu-smtp-post render tofu:init tofu:apply:-auto-approve
+bb -ansible render -- ansible-playbook main.yml
+bb -ansible-local render -- ansible-playbook main.yml
 ```
 
 The active profile is selected by editing `(def bb ...)` in `options.clj` (see Configuration Profiles below).
@@ -103,6 +106,8 @@ The active profile is selected by editing `(def bb ...)` in `options.clj` (see C
 6. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, provision the restricted `deploy` user (NOPASSWD sudo for `/usr/local/bin/once *` + `ForceCommand` Babashka script at `/usr/local/bin/deploy` authorized by `:deploy-pubkey`), deploy applications listed under `:once {:applications [...]}`
 
 Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb once delete`.
+
+`validate` and `describe` are opt-in `big-config.workflow/run-steps` steps exposed through `bb once validate` and `bb once describe`. They are not standalone `bb.edn` tasks and do not run automatically before `create`.
 
 ### Template Rendering
 `big-config` renders templates from `src/resources/` into `.dist/` using parameters. Templates use `{{ ... }}` delimiters for provider switching and `{ ... }` for filter expressions.
@@ -130,11 +135,11 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 ### Naming
 - **Namespaces**: `io.github.amiorin.once.*`
 - **Keywords**: Fully namespaced (`::workflow/params`, `::bc/env`, `::render/profile`)
-- **Entry points**: Functions ending with `*` are CLI/REPL entry points (`tofu*`, `ansible*`, `once*`)
+- **Entry points**: Functions ending with `*` are CLI/REPL entry points (`tofu*`, `ansible*`, `once*`); `validation/validate` and `describe/describe` are workflow step functions, while `validate-report` / `describe-report` are pure report builders
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use
 
 ### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb validate` enforces this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
+Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb once validate` enforces this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
 ```clojure
 (def space (merge-with merge resend cloudflare r2 oci deploy
                        {::render/profile "space"
@@ -183,7 +188,7 @@ To use `big-config` from local source during development, swap in `deps.edn`:
 ;; comment out:
 io.github.amiorin/big-config {:git/sha "364fe1f..."}
 ;; uncomment:
-io.github.amiorin/big-config {:local/root "../big-config/main"}
+io.github.amiorin/big-config {:local/root "../../big-config/main"}
 ```
 
 ## Git Conventions

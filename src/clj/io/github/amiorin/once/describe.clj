@@ -1,19 +1,20 @@
 (ns io.github.amiorin.once.describe
-  "Describe the active profile (`options/bb`) after provisioning.
+  "Describe the active profile after provisioning.
 
-  `describe*` is the `bb describe` entry point. It prints a human-readable
-  report with configured provider names, SSH reachability for the computed host,
-  and deployed ONCE applications discovered from the remote server. Most live
-  checks are soft failures; a missing remote `once` command is fatal so the CLI
-  exits non-zero when the server has not been provisioned with ONCE."
+  `describe` is the big-config workflow step behind `bb once describe`. It
+  prints a human-readable report with configured provider names, SSH
+  reachability for the computed host, and deployed ONCE applications discovered
+  from the remote server. Most live checks are soft failures; a missing remote
+  `once` command marks the step as failed."
   (:require
    [babashka.process :as p]
+   [big-config :as bc]
+   [big-config.core :as core]
    [big-config.render :as render]
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]
    [cheshire.core :as json]
    [clojure.string :as str]
-   [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.params :as params]))
 
 ;;; -------------------------------------------------------------- command helpers
@@ -360,14 +361,14 @@
       {:opts opts
        :detail (str "could not resolve OpenTofu parameters: " (.getMessage e))})))
 
-(defn describe
-  "Describe `opts` (default caller passes `options/bb`).
+(defn describe-report
+  "Build a describe report from `opts`.
 
   Returns a map with provider names, compute reachability, and deployed remote
   applications. Live failures are represented in the return value instead of
   thrown. Optional arities allow tests to inject a command runner and params
   resolver."
-  ([opts] (describe opts run params/once-opts))
+  ([opts] (describe-report opts run params/once-opts))
   ([opts run-fn once-opts-fn]
    (let [{opts' :opts resolve-detail :detail} (resolve-once-opts opts once-opts-fn)
          profile       (::render/profile opts')
@@ -442,18 +443,22 @@
         (when registry-detail
           (println (format "    registry check: %s" registry-detail)))))))
 
-(defn describe*
-  "CLI entry point. Describes `opts` (defaulting to `options/bb`) and prints a
-  human-readable report. Unreachable infrastructure is reported without exiting
-  non-zero, but a missing remote `once` command exits with failure."
-  [_args & [opts]]
-  (let [result (describe (or opts options/bb))]
+(defn describe
+  "big-config workflow step for `bb once describe`.
+
+  Unreachable infrastructure is reported without failing the step, but a missing
+  remote `once` command returns a non-zero workflow exit."
+  [_step-fns opts]
+  (let [result (describe-report opts)]
     (print-report result)
-    (when (:fatal-error? result)
-      (System/exit 1))
-    result))
+    (merge opts
+           {::result result}
+           (if (:fatal-error? result)
+             {::bc/exit 1
+              ::bc/err (or (:applications-error result) "describe failed")}
+             (core/ok)))))
 
 (comment
   (debug tap-values
-    (describe options/bb))
+    (describe-report {}))
   (-> tap-values))

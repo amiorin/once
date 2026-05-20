@@ -95,7 +95,7 @@ In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profi
 `online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `digitalocean`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
 
 All four profiles also merge in the `deploy` sub-profile, which carries two SSH public keys:
-- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb validate` checks this).
+- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb once validate` checks this).
 - `deploy-pubkey` — the key authorized on the remote `deploy` user with `ForceCommand` (CI-driven redeploys).
 
 Override either per-environment via `BC_PAR_COMPUTE_PUBKEY` and `BC_PAR_DEPLOY_PUBKEY`.
@@ -107,18 +107,20 @@ Note: If you are using the `no-infra` profile, ensure your parameters are correc
 Before provisioning, run a quick check that the active profile is well-formed, the required CLIs are installed, the credentials work, the referenced Docker images exist, and (for cloud compute profiles) `:compute-pubkey` is loaded in `ssh-agent` so Ansible can connect to the new host:
 
 ```bash
-bb validate
+bb once validate
 ```
 
 For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
 
 #### 3. Main Workflow
 
-The `once` task handles the full lifecycle. You can pass multiple commands:
+The `once` task handles the full lifecycle. `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`. You can pass multiple commands:
 
+- **Pre-flight Validation**: `bb once validate`
 - **Full Setup**: `bb once create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible Local -> Ansible)
 - **Tear Down**: `bb once delete` (Tofu SMTP Post Destroy -> Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
-- **Sequential**: `bb once delete create` (Clean slate redeploy)
+- **Sequential**: `bb once validate create` (Validate, then create only if validation passes)
+- **Clean slate**: `bb once delete create` (Clean slate redeploy)
 
 Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb once delete`, first override it:
 
@@ -128,10 +130,10 @@ export BC_PAR_COMPUTE_PREVENT_DESTROY=false
 
 #### 4. Post-provisioning Report
 
-Once a stack is up, `bb describe` prints a human-readable status for the active profile: configured providers (compute, backend, SMTP, DNS), SSH reachability of the compute host, and every ONCE application discovered on the server with image, tag, running digest, registry digest, and whether an update is available. Most checks are soft failures; only a missing remote `once` command causes a non-zero exit.
+Once a stack is up, `bb once describe` prints a human-readable status for the active profile: configured providers (compute, backend, SMTP, DNS), SSH reachability of the compute host, and every ONCE application discovered on the server with image, tag, running digest, registry digest, and whether an update is available. Most checks are soft failures; only a missing remote `once` command causes a non-zero exit.
 
 ```bash
-bb describe
+bb once describe
 ```
 
 #### 5. Targeted Tools
@@ -140,27 +142,27 @@ You can also run the underlying tools individually. Most tasks require a `render
 
 - **OpenTofu (Infrastructure)**:
   ```bash
-  bb tofu render tofu:init tofu:apply:-auto-approve
+  bb -tofu render tofu:init tofu:apply:-auto-approve
   ```
 - **OpenTofu (SMTP)**:
   ```bash
-  bb tofu-smtp render tofu:init tofu:apply:-auto-approve
+  bb -tofu-smtp render tofu:init tofu:apply:-auto-approve
   ```
 - **OpenTofu (DNS)**:
   ```bash
-  bb tofu-dns render tofu:init tofu:apply:-auto-approve
+  bb -tofu-dns render tofu:init tofu:apply:-auto-approve
   ```
 - **OpenTofu (SMTP Post-Verification)**:
   ```bash
-  bb tofu-smtp-post render tofu:init tofu:apply:-auto-approve
+  bb -tofu-smtp-post render tofu:init tofu:apply:-auto-approve
   ```
 - **Remote Ansible**:
   ```bash
-  bb ansible render -- ansible-playbook main.yml
+  bb -ansible render -- ansible-playbook main.yml
   ```
 - **Local Ansible**:
   ```bash
-  bb ansible-local render -- ansible-playbook main.yml
+  bb -ansible-local render -- ansible-playbook main.yml
   ```
 
 ### Programmatic Usage
@@ -171,8 +173,20 @@ You can trigger workflows directly from a Clojure REPL:
 (require '[io.github.amiorin.once.package :as once])
 (require '[io.github.amiorin.once.options :as options])
 
-;; Run the "create" workflow using OCI profile
-(once/once* "create" options/oci)
+;; Run workflow steps using the active profile
+(once/once* "validate" options/bb)
+(once/once* "create" options/bb)
+(once/once* "describe" options/bb)
+```
+
+The pure report builders remain available for tests and tooling:
+
+```clojure
+(require '[io.github.amiorin.once.validation :as validation])
+(require '[io.github.amiorin.once.describe :as describe])
+
+(validation/validate-report options/bb)
+(describe/describe-report options/bb)
 ```
 
 ## How It Works
@@ -187,11 +201,11 @@ You can trigger workflows directly from a Clojure REPL:
 
 - `src/clj/.../once/`:
   - `options.clj`: Where you define your cloud profiles and credentials.
-  - `package.clj`: Defines the high-level `create`/`delete` workflows.
+  - `package.clj`: Defines the high-level `create`/`delete` workflows and wires the `validate`/`describe` workflow steps.
   - `params.clj`: Logic for extracting parameters from Tofu outputs.
   - `tools.clj`: Implementation details for Tofu, Tofu SMTP, Tofu DNS, and Ansible wrappers.
-  - `validation.clj`: Profile schema, tool, credential, image, and ssh-agent checks (`bb validate`).
-  - `describe.clj`: Post-provisioning report (`bb describe`).
+  - `validation.clj`: Profile schema, tool, credential, image, and ssh-agent checks (`validate` workflow step + `validate-report`).
+  - `describe.clj`: Post-provisioning report (`describe` workflow step + `describe-report`).
 - `src/resources/.../once/tools/`:
   - `tofu/`: Multi-cloud `.tf` templates.
   - `tofu-backend/`: OpenTofu backend templates (S3, Cloudflare R2, local).

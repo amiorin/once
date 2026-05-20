@@ -405,9 +405,9 @@
       <div class="group">CLI Reference</div>
       <ul>
         <li><a href="#once-cmd">bb once</a></li>
-        <li><a href="#validate">bb validate</a></li>
-        <li><a href="#describe">bb describe</a></li>
-        <li><a href="#tools-cmd">bb tofu / ansible</a></li>
+        <li><a href="#validate">bb once validate</a></li>
+        <li><a href="#describe">bb once describe</a></li>
+        <li><a href="#tools-cmd">bb -tofu / -ansible</a></li>
         <li><a href="#tidy">bb -tidy</a></li>
       </ul>
 
@@ -498,7 +498,7 @@ $EDITOR src/clj/io/github/amiorin/once/options.clj</code></pre>
 <span class="kw">export</span> BC_PAR_R2_SECRET_ACCESS_KEY=<span class="str">"…"</span></code></pre>
 
     <h3>3. Pre-flight</h3>
-<pre><code><span class="kw">bb</span> validate</code></pre>
+<pre><code><span class="kw">bb</span> once validate</code></pre>
     <p>Verifies schema, required CLIs, credentials (live API calls including a Cloudflare zone lookup), that every <code>:image</code> resolves on its registry, and that <code>:compute-pubkey</code> is loaded in <code>ssh-agent</code> for cloud compute profiles.</p>
 
     <h3>4. Provision</h3>
@@ -506,7 +506,7 @@ $EDITOR src/clj/io/github/amiorin/once/options.clj</code></pre>
     <p>Runs all six stages. On success, your apps are reachable at the hosts in <code>:once :applications</code>.</p>
 
     <h3>5. Describe</h3>
-<pre><code><span class="kw">bb</span> describe</code></pre>
+<pre><code><span class="kw">bb</span> once describe</code></pre>
     <p>Verify what's actually running on the new host: configured providers, SSH reachability, and every ONCE application with its image, tag, running digest, and an <em>update-available?</em> flag derived from comparing against the live registry.</p>
 
     <h3>6. Tear down</h3>
@@ -518,7 +518,7 @@ $EDITOR src/clj/io/github/amiorin/once/options.clj</code></pre>
   <!-- ============================================================ -->
   <section id="prereqs">
     <h2>Prerequisites</h2>
-    <p>The exact list of CLIs depends on your active profile. <code>bb validate</code> tells you which ones are missing.</p>
+    <p>The exact list of CLIs depends on your active profile. <code>bb once validate</code> tells you which ones are missing.</p>
     <table>
       <thead><tr><th>Tool</th><th>Required for</th><th>Install hint</th></tr></thead>
       <tbody>
@@ -762,7 +762,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
 
     <h3>The active profile</h3>
 <pre><code>(<span class="kw">def</span> bb website)  <span class="com">;; change this line to switch</span></code></pre>
-    <p><code>options/bb</code> is the value <code>bb.edn</code> tasks pass to <code>package/once*</code> and <code>validation/validate*</code>.</p>
+    <p><code>options/bb</code> is the value <code>bb.edn</code> passes to <code>package/once*</code>, which wires the <code>create</code>, <code>delete</code>, <code>validate</code>, and <code>describe</code> workflow steps.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -891,7 +891,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
                       :deploy-pubkey
                       <span class="str">"ssh-ed25519 AAAAC3… deploy@bigconfig.ai"</span>}})</code></pre>
     <ul>
-      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb once create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb validate</code> rejects the run if it isn't loaded (for cloud compute profiles).</li>
+      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb once create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb once validate</code> rejects the run if it isn't loaded (for cloud compute profiles).</li>
       <li><code>:deploy-pubkey</code> — the key authorized on the remote <code>deploy</code> user with <code>ForceCommand</code>. See <a href="#deploy-user">Restricted deploy SSH</a>.</li>
     </ul>
     <p>Override either per-environment:</p>
@@ -927,18 +927,21 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   <!-- ============================================================ -->
   <section id="once-cmd">
     <h2><code>bb once</code></h2>
-<pre><code><span class="kw">bb</span> once create           <span class="com"># full 6-stage pipeline</span>
+<pre><code><span class="kw">bb</span> once validate         <span class="com"># opt-in pre-flight checks</span>
+<span class="kw">bb</span> once describe         <span class="com"># opt-in post-provisioning report</span>
+<span class="kw">bb</span> once create           <span class="com"># full 6-stage pipeline</span>
 <span class="kw">bb</span> once delete           <span class="com"># reverse 4 Tofu stages</span>
+<span class="kw">bb</span> once validate create  <span class="com"># validate, then create if validation passes</span>
 <span class="kw">bb</span> once delete create    <span class="com"># clean-slate redeploy</span></code></pre>
-    <p>Defined in <code>bb.edn</code> as <code>(package/once* *command-line-args* options/bb)</code>. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:create</code>, <code>:delete</code>, or both), and dispatches to the <code>create</code> / <code>delete</code> workflow defined in <code>package.clj</code>.</p>
+    <p>Defined in <code>bb.edn</code> as <code>(package/once* *command-line-args* options/bb)</code>. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested.</p>
     <h3>Step skipping &amp; partial runs</h3>
-    <p>You can pass tool-level args to override what each stage does. For example, replace the default <code>render tofu:init tofu:apply:-auto-approve</code> sequence by editing <code>package.clj</code>'s pipeline — or by invoking individual stage tasks (see <a href="#tools-cmd">bb tofu / ansible</a>).</p>
+    <p>You can pass tool-level args to override what each stage does. For example, replace the default <code>render tofu:init tofu:apply:-auto-approve</code> sequence by editing <code>package.clj</code>'s pipeline — or by invoking individual stage tasks (see <a href="#tools-cmd">bb -tofu / -ansible</a>).</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="validate">
-    <h2><code>bb validate</code></h2>
-    <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> never short-circuits.</p>
+    <h2><code>bb once validate</code></h2>
+    <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> is an opt-in workflow step and never short-circuits internally.</p>
     <ol>
       <li><strong>Schema</strong> (<code>malli</code>): every required key is present and well-typed; every <code>:once :applications :host</code> equals or is a subdomain of <code>:domain</code>; both <code>:compute-pubkey</code> and <code>:deploy-pubkey</code> look like SSH public keys.</li>
       <li><strong>Tools</strong>: required CLIs are on <code>PATH</code> (base + per-provider).</li>
@@ -967,12 +970,12 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   Credentials:
     - Cloudflare zone: example.com not found or not active
     - SSH agent: :compute-pubkey is not loaded in ssh-agent at SSH_AUTH_SOCK=/tmp/ssh-…/agent.123</code></pre>
-    <p>Programmatic API: <code>(validation/validate options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests).</p>
+    <p>Programmatic API: <code>(validation/validate-report options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests). <code>validation/validate</code> is the workflow step function used by <code>bb once validate</code>.</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="describe">
-    <h2><code>bb describe</code></h2>
+    <h2><code>bb once describe</code></h2>
     <p>Post-provisioning report. Given the active profile, <code>describe</code> renders the params, queries the live infrastructure, and prints a human-readable summary:</p>
     <ul>
       <li><strong>Profile</strong>: <code>::render/profile</code> (e.g. <code>website</code>, <code>space</code>).</li>
@@ -981,7 +984,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
       <li><strong>Applications</strong>: for every host returned by <code>sudo once list</code>, the matching Docker container's status, image, tag, running digest (from <code>docker image inspect</code>'s <code>RepoDigests</code>), the live registry digest (via <code>skopeo inspect</code> against the matching OS/arch), and an <em>update-available?</em> flag derived from comparing the two.</li>
     </ul>
     <p>Most checks are soft failures (unreachable host, no apps yet, registry hiccup) and don't change the exit code — only a missing remote <code>once</code> command (the server has not been provisioned with ONCE) is fatal.</p>
-<pre><code><span class="kw">bb</span> describe</code></pre>
+<pre><code><span class="kw">bb</span> once describe</code></pre>
     <p>Sample output:</p>
 <pre><code>Profile: website
 
@@ -1004,12 +1007,12 @@ Applications:
     digest: sha256:1a2b…
     registry digest: sha256:1a2b…
     update available: no</code></pre>
-    <p>Programmatic API: <code>(describe/describe options/bb)</code> returns the same shape as a map (<code>:profile</code>, <code>:providers</code>, <code>:compute</code>, <code>:applications</code>, <code>:applications-error</code>, <code>:fatal-error?</code>) so tests and tooling can consume it directly. The 3-arg arity <code>(describe opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and stubbed params resolver.</p>
+    <p>Programmatic API: <code>(describe/describe-report options/bb)</code> returns the same shape as a map (<code>:profile</code>, <code>:providers</code>, <code>:compute</code>, <code>:applications</code>, <code>:applications-error</code>, <code>:fatal-error?</code>) so tests and tooling can consume it directly. The 3-arg arity <code>(describe-report opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and stubbed params resolver. <code>describe/describe</code> is the workflow step function used by <code>bb once describe</code>.</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="tools-cmd">
-    <h2><code>bb tofu</code> / <code>bb ansible</code> (individual stages)</h2>
+    <h2><code>bb -tofu</code> / <code>bb -ansible</code> (individual stages)</h2>
     <p>Each stage exposes a Babashka task (<code>-tofu</code>, <code>-tofu-smtp</code>, <code>-tofu-dns</code>, <code>-tofu-smtp-post</code>, <code>-ansible</code>, <code>-ansible-local</code>). The leading hyphen is intentional — they are scoped tasks for granular work, not the primary entry point.</p>
 <pre><code><span class="kw">bb</span> -tofu render tofu:init tofu:apply:-auto-approve
 <span class="kw">bb</span> -tofu-smtp render tofu:init tofu:apply:-auto-approve
@@ -1131,7 +1134,7 @@ Applications:
         </tr>
         <tr>
           <td><code>package</code></td>
-          <td><code>create</code> (workflow), <code>delete</code> (workflow), <code>once</code>, <code>once*</code> (CLI entry)</td>
+          <td><code>create</code> (workflow), <code>delete</code> (workflow), <code>once</code>, <code>once*</code> (CLI entry), <code>::workflow/validate-fn</code> / <code>::workflow/describe-fn</code> wiring</td>
         </tr>
         <tr>
           <td><code>params</code></td>
@@ -1143,15 +1146,15 @@ Applications:
         </tr>
         <tr>
           <td><code>validation</code></td>
-          <td><code>schema:profile</code>, <code>validate</code>, <code>validate*</code>, <code>tool-errors</code>, <code>credential-errors</code>, <code>image-errors</code></td>
+          <td><code>schema:profile</code>, <code>validate-report</code>, <code>validate</code> (workflow step), <code>tool-errors</code>, <code>credential-errors</code>, <code>image-errors</code></td>
         </tr>
         <tr>
           <td><code>describe</code></td>
-          <td><code>describe</code>, <code>describe*</code>, <code>provider-summary</code>, <code>parse-once-list</code>, <code>image-&gt;repository+tag</code>, <code>matching-repo-digest</code>, <code>strip-ansi</code></td>
+          <td><code>describe-report</code>, <code>describe</code> (workflow step), <code>provider-summary</code>, <code>parse-once-list</code>, <code>image-&gt;repository+tag</code>, <code>matching-repo-digest</code>, <code>strip-ansi</code></td>
         </tr>
       </tbody>
     </table>
-    <p>Functions ending in <code>*</code> are CLI/REPL entry points: they accept a string of args and merge default <code>::bc/env :shell</code>.</p>
+    <p>Functions ending in <code>*</code> are CLI/REPL entry points: they accept a string of args and merge default <code>::bc/env :shell</code>. Validation and description are now exposed as <code>bb once validate</code> / <code>bb once describe</code> workflow steps rather than standalone star wrappers.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1228,8 +1231,10 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
   <section id="api">
     <h2>Programmatic API</h2>
     <h3><code>package/once*</code></h3>
-<pre><code>(once/once* <span class="str">"create"</span> options/oci)
-(once/once* <span class="str">"delete create"</span> options/website)
+<pre><code>(once/once* <span class="str">"validate"</span> options/bb)
+(once/once* <span class="str">"create"</span> options/bb)
+(once/once* <span class="str">"describe"</span> options/bb)
+(once/once* <span class="str">"delete create"</span> options/bb)
 (once/once* <span class="str">"create"</span> (<span class="fn">merge</span> options/space {::bc/env :repl}))</code></pre>
     <p>First arg is a single string of space-separated step names. Second arg is the active opts map.</p>
 
@@ -1238,13 +1243,13 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
              (params/once-opts options/website))</code></pre>
     <p><code>params/once-opts</code> attaches the <code>::workflow/start</code> prefix and runs the <code>opts-fn</code> pipeline.</p>
 
-    <h3><code>validation/validate</code></h3>
-<pre><code>(validation/validate options/bb)
+    <h3><code>validation/validate-report</code></h3>
+<pre><code>(validation/validate-report options/bb)
 ;; =&gt; {:ok? false :errors [{:check :tool :detail "..."} ...]}</code></pre>
-    <p>Pass an env map as a second arg to inject custom env vars (used by tests).</p>
+    <p>Pass an env map as a second arg to inject custom env vars (used by tests). <code>validation/validate</code> is the workflow step function with shape <code>[step-fns opts] -&gt; opts</code>.</p>
 
-    <h3><code>describe/describe</code></h3>
-<pre><code>(describe/describe options/bb)
+    <h3><code>describe/describe-report</code></h3>
+<pre><code>(describe/describe-report options/bb)
 ;; =&gt; {:profile "website"
 ;;     :providers {:compute "digitalocean" :backend "r2" :smtp "resend" :dns "cloudflare"}
 ;;     :compute {:ip "203.0.113.42" :user "root" :running? true :detail "ssh ok"}
@@ -1252,7 +1257,7 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
 ;;                     :registry-digest … :new-version? false}]
 ;;     :applications-error nil
 ;;     :fatal-error? false}</code></pre>
-    <p>The 3-arg arity <code>(describe opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and a stubbed params resolver. <code>describe*</code> is the CLI wrapper that prints the report and exits non-zero on <code>:fatal-error?</code>.</p>
+    <p>The 3-arg arity <code>(describe-report opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and a stubbed params resolver. <code>describe/describe</code> is the workflow step function with shape <code>[step-fns opts] -&gt; opts</code>.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1316,7 +1321,7 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
     </table>
 
     <h3>Compute (provider-specific keys)</h3>
-    <p>See the <a href="#compute">Compute providers</a> cards above. All listed keys are <em>required</em> per provider; <code>bb validate</code> lists the missing ones.</p>
+    <p>See the <a href="#compute">Compute providers</a> cards above. All listed keys are <em>required</em> per provider; <code>bb once validate</code> lists the missing ones.</p>
   </section>
 
   <!-- ============================================================ -->

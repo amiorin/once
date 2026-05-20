@@ -1,10 +1,11 @@
 (ns io.github.amiorin.once.describe-test
   (:require
+   [big-config :as bc]
    [big-config.render :as render]
    [big-config.workflow :as workflow]
    [cheshire.core :as json]
    [clojure.string :as str]
-   [clojure.test :refer [deftest is]]
+   [clojure.test :refer [deftest is testing]]
    [io.github.amiorin.once.describe :as d]))
 
 (def ^:private base-opts
@@ -100,7 +101,7 @@
                  (when (some #{"once"} args)
                    (throw (ex-info "remote apps should not be checked" {})))
                  (fail "Permission denied"))
-        result (d/describe base-opts run-fn identity)]
+        result (d/describe-report base-opts run-fn identity)]
     (is (false? (get-in result [:compute :running?])))
     (is (= [] (:applications result)))
     (is (str/includes? (:applications-error result) "not checked"))
@@ -114,7 +115,7 @@
                      (= (once-command-check) cmd) (ok)
                      (= ["sudo" "-n" "once" "list"] cmd) (fail "once missing")
                      :else (throw (ex-info "unexpected command" {:args args})))))
-        result (d/describe base-opts run-fn identity)]
+        result (d/describe-report base-opts run-fn identity)]
     (is (true? (get-in result [:compute :running?])))
     (is (= [] (:applications result)))
     (is (false? (:fatal-error? result)))
@@ -130,11 +131,35 @@
                                                    :out ""
                                                    :err "once: command not found"}
                      :else (throw (ex-info "unexpected command" {:args args})))))
-        result (d/describe base-opts run-fn identity)]
+        result (d/describe-report base-opts run-fn identity)]
     (is (true? (get-in result [:compute :running?])))
     (is (= [] (:applications result)))
     (is (true? (:fatal-error? result)))
     (is (str/includes? (:applications-error result) "once command check failed"))))
+
+(deftest describe-workflow-step-sets-exit-status
+  (testing "soft report succeeds"
+    (with-redefs [d/describe-report (constantly {:profile "test"
+                                                 :providers {}
+                                                 :compute {}
+                                                 :applications []
+                                                 :fatal-error? false})]
+      (let [result (atom nil)]
+        (with-out-str
+          (reset! result (d/describe [] base-opts)))
+        (is (= 0 (::bc/exit @result)))
+        (is (false? (get-in @result [::d/result :fatal-error?]))))))
+  (testing "fatal report fails"
+    (with-redefs [d/describe-report (constantly {:profile "test"
+                                                 :providers {}
+                                                 :compute {}
+                                                 :applications []
+                                                 :fatal-error? true})]
+      (let [result (atom nil)]
+        (with-out-str
+          (reset! result (d/describe [] base-opts)))
+        (is (= 1 (::bc/exit @result)))
+        (is (= "describe failed" (::bc/err @result)))))))
 
 (deftest describe-success-reports-image-digests-and-update-status
   (let [container {:Id "container-1"
@@ -166,7 +191,7 @@
                           (= ["sudo" "-n" "docker" "image" "inspect" "sha256:local-image" "ghcr.io/org/app:latest"] cmd)
                           (ok (json/generate-string [image]))
                           :else (throw (ex-info "unexpected command" {:args args}))))))
-        result    (d/describe base-opts run-fn identity)
+        result    (d/describe-report base-opts run-fn identity)
         app       (first (:applications result))]
     (is (nil? (:applications-error result)))
     (is (= "www.example.com" (:host app)))

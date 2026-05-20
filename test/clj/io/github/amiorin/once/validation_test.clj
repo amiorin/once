@@ -1,5 +1,6 @@
 (ns io.github.amiorin.once.validation-test
   (:require
+   [big-config :as bc]
    [big-config.workflow :as workflow]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
@@ -96,6 +97,24 @@
                           {:host "www.alpha.example.com"
                            :image "ghcr.io/foo/bar:latest"}]))]
     (is (nil? (v/schema-errors ok)))))
+
+(deftest validate-workflow-step-sets-exit-status
+  (testing "valid report succeeds"
+    (with-redefs [v/validate-report (constantly {:ok? true :errors []})]
+      (let [result (atom nil)]
+        (with-out-str
+          (reset! result (v/validate [] {})))
+        (is (= 0 (::bc/exit @result)))
+        (is (= {:ok? true :errors []} (::v/result @result))))))
+  (testing "invalid report fails"
+    (with-redefs [v/validate-report (constantly {:ok? false
+                                                 :errors [{:check :schema
+                                                           :detail "bad"}]})]
+      (let [result (atom nil)]
+        (with-out-str
+          (reset! result (v/validate [] {})))
+        (is (= 1 (::bc/exit @result)))
+        (is (= "validation failed" (::bc/err @result)))))))
 
 (deftest provider-tools-picks-right-clis
   (testing "hcloud + s3"

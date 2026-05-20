@@ -1,5 +1,5 @@
 (ns io.github.amiorin.once.validation
-  "Validate the active profile (`options/bb`) before running `bb once create`.
+  "Validate the active profile before running `bb once create`.
 
   Four phases run in a single pass and their errors are collected into a flat
   list:
@@ -16,16 +16,17 @@
     4. Images    — every image referenced by :once :applications resolves on
                    its registry via `skopeo inspect`.
 
-  `validate*` is the `bb validate` entry point: prints a grouped report and
-  exits non-zero on failure."
+  `validate` is the big-config workflow step behind `bb once validate`: it
+  prints a grouped report and returns a non-zero workflow exit on failure."
   (:require
    [babashka.process :as p]
+   [big-config :as bc]
+   [big-config.core :as core]
    [big-config.render :as render]
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]
    [cheshire.core :as json]
    [clojure.string :as str]
-   [io.github.amiorin.once.options :as options]
    [malli.core :as m]
    [malli.error :as me])
   (:import
@@ -549,12 +550,12 @@
 
 ;;; -------------------------------------------------------------- top-level
 
-(defn validate
+(defn validate-report
   "Validate the merged active profile.
 
   `env` defaults to the process env. Returns
   `{:ok? boolean :errors [{:check kw :detail string}]}`."
-  ([opts] (validate opts (System/getenv)))
+  ([opts] (validate-report opts (System/getenv)))
   ([opts env]
    (let [opts'  (workflow/read-bc-pars opts env)
          params (::workflow/params opts')
@@ -590,17 +591,19 @@
         (doseq [{:keys [detail]} es]
           (println (str "    - " detail)))))))
 
-(defn validate*
-  "CLI entry point. Validates `opts` (defaulting to `options/bb`), prints a
-  grouped report, and exits non-zero on failure."
-  [_args & [opts]]
-  (let [result (validate (or opts options/bb))]
+(defn validate
+  "big-config workflow step for `bb once validate`."
+  [_step-fns opts]
+  (let [result (validate-report opts)]
     (print-report result)
-    (when-not (:ok? result)
-      (System/exit 1))
-    result))
+    (merge opts
+           {::result result}
+           (if (:ok? result)
+             (core/ok)
+             {::bc/exit 1
+              ::bc/err "validation failed"}))))
 
 (comment
   (debug tap-values
-    (validate options/bb))
+    (validate-report {}))
   (-> tap-values))
