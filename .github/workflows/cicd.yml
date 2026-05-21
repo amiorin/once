@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
       - name: Runs tests
         id: run_tests
-        run: devenv shell clojure -X:test
+        run: devenv shell -- bash -c "npm ci && npm test"
 
   tag:
     needs: test

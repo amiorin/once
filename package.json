@@ -1,0 +1,26 @@
+{
+  "name": "once",
+  "version": "1.0.0",
+  "description": "Automated provisioning and configuration of cloud infrastructure with OpenTofu and Ansible.",
+  "type": "module",
+  "bin": {
+    "once": "./dist/src/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "once": "tsx src/cli.ts",
+    "validate": "tsx src/cli.ts validate"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

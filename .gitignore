@@ -3,13 +3,6 @@
 !.github
 !.envrc
 !.envrc.private.example
-!.dir-locals.el
-!.projectile
 
-/.clj-kondo/*
-!/.clj-kondo
-!/.clj-kondo/config.edn
-
-/.lsp/*
-!/.lsp
-!/.lsp/config.edn
+/node_modules
+/dist
