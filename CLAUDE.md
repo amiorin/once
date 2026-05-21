@@ -4,206 +4,152 @@ This file describes the `once` codebase for AI assistants. Read it before making
 
 ## Project Overview
 
-`once` is a Clojure library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment via [Basecamp's ONCE](https://github.com/basecamp/once).
+`once` is a TypeScript library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment via [Basecamp's ONCE](https://github.com/basecamp/once).
 
-Built on top of [big-config](https://github.com/amiorin/big-config), which provides workflow orchestration, template rendering, and step execution primitives.
+It was originally a Clojure project built on the `big-config` library. The workflow engine, template renderer, step runner and plugin system that `big-config` provided have been ported to TypeScript and live under `src/bc/` — there is no longer any JVM/Clojure dependency.
 
 ## Tech Stack
 
-- **Language**: Clojure 1.12.4 (JVM)
-- **CLI runner**: Babashka (`bb.edn` tasks)
+- **Language**: TypeScript (ES2022, ESM, `NodeNext` module resolution)
+- **Runtime**: Node.js 20+
+- **Test runner**: [Vitest](https://vitest.dev/)
 - **Infrastructure**: OpenTofu (Terraform fork)
 - **Config management**: Ansible
-- **Key libraries**: `big-config`, `big-tofu`, `cheshire` (JSON), `babashka/process`, `com.rpl/specter`
 - **Dev environment**: Nix via `devenv` + `direnv`
+
+The CLI shells out to external tools at runtime: `tofu`, `ansible-playbook`, `ssh`, `curl`, `skopeo`, and per-provider CLIs. The remote `deploy` ForceCommand script and the `once` Ansible module are Babashka scripts that run on the provisioned host (not part of the TypeScript code).
 
 ## Repository Structure
 
 ```
 once/
 ├── src/
-│   ├── clj/io/github/amiorin/once/
-│   │   ├── options.clj      # Cloud profiles & active profile (def bb ...)
-│   │   ├── package.clj      # High-level create/delete workflows + validate/describe step wiring
-│   │   ├── params.clj       # Parameter extraction from OpenTofu outputs
-│   │   ├── tools.clj        # Tofu/Ansible tool implementations
-│   │   ├── validation.clj   # Profile schema (malli), tool/credential/image/ssh-agent checks
-│   │   └── describe.clj     # Post-provisioning report (providers, SSH, deployed apps)
-│   └── resources/io/github/amiorin/once/tools/
-│       ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
-│       ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
-│       ├── tofu-smtp/       # SMTP (Resend) setup templates
-│       ├── tofu-dns/        # DNS (Cloudflare) templates
-│       ├── tofu-smtp-post/  # SMTP post-verification templates
-│       ├── ansible/         # Remote host playbooks (incl. files/deploy bb script)
-│       └── ansible-local/   # Local machine playbooks
-├── test/clj/io/github/amiorin/once/
-│   ├── deploy_test.clj      # Tests for the deploy ForceCommand script
-│   ├── describe_test.clj    # Tests for the describe report (parsing + assembly)
-│   ├── utils_test.clj       # Utility tests
-│   └── validation_test.clj  # Tests for the malli profile schema and tool selection
-├── env/dev/clj/user.clj     # REPL dev namespace
-├── deps.edn                 # Clojure CLI deps and aliases
-├── bb.edn                   # Babashka task definitions
+│   ├── bc/                  # Ported "big-config" engine (no external deps)
+│   │   ├── core.ts          # Workflow engine: toWorkflow, ok, choice, toStepFn
+│   │   ├── pluggable.ts     # handleStep registry + toWorkflowStar
+│   │   ├── workflow.ts      # runSteps, toCompWorkflow, parseArgs, prepare, params helpers
+│   │   ├── render.ts        # Template engine (selmer-subset renderer)
+│   │   ├── run.ts           # Command execution + the `exec` workflow
+│   │   ├── step-fns.ts      # exitStepFn / printErrorStepFn middleware
+│   │   ├── big-tofu.ts      # Terraform construct helpers
+│   │   └── utils.ts         # deepMerge, sortNestedMap, keyword/path helpers
+│   ├── once/
+│   │   ├── options.ts       # Cloud profiles & active profile (`bb`)
+│   │   ├── package.ts       # High-level create/delete workflows + validate/describe wiring
+│   │   ├── params.ts        # Parameter extraction from OpenTofu outputs
+│   │   ├── tools.ts         # Tofu/Ansible tool workflows
+│   │   ├── validation.ts    # Profile schema, tool/credential/image/ssh-agent checks
+│   │   ├── describe.ts      # Post-provisioning report
+│   │   └── utils.ts         # stripAnsi
+│   ├── resources/io/github/amiorin/once/tools/
+│   │   ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
+│   │   ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
+│   │   ├── tofu-smtp/       # SMTP (Resend) setup templates
+│   │   ├── tofu-dns/        # DNS (Cloudflare) templates
+│   │   ├── tofu-smtp-post/  # SMTP post-verification templates
+│   │   ├── ansible/         # Remote host playbooks (incl. files/deploy bb script)
+│   │   └── ansible-local/   # Local machine playbooks
+│   └── cli.ts               # CLI entry point
+├── test/                    # Vitest tests (*.test.ts)
+├── package.json
+├── tsconfig.json
+├── vitest.config.ts
 ├── devenv.nix               # Nix dev environment
 └── .envrc                   # direnv config (loads devenv, sources .envrc.private)
 ```
 
+Templates under `src/resources/` are not TypeScript and are rendered verbatim (with placeholder substitution); do not treat them as code to refactor.
+
 ## Development Commands
 
-### Code Maintenance
 ```bash
-bb -tidy          # clean-ns + format via clojure-lsp
+npm install          # install dev dependencies
+npm run build        # tsc -> dist/
+npm run typecheck    # tsc --noEmit
+npm test             # vitest run
+npm run once -- ...  # run the CLI from source via tsx
 ```
 
-### Running Tests
+### CLI Usage
+
 ```bash
-clojure -M:test   # runs cognitect test-runner against test/clj
+once once validate          # pre-flight checks for the active profile
+once once describe          # providers + SSH reachability + deployed apps
+once once create            # provision everything (all 6 stages)
+once once delete            # tear down (reverse 4 Tofu stages)
+once once validate create   # validate, then create only if validation passes
+once validate               # shortcut for `once once validate` (accepts no args)
 ```
 
-### Pre-flight Validation
+Individual tools (each requires `render` first):
+
 ```bash
-bb validate       # shortcut for `bb once validate`; accepts no extra args
-                  # checks active profile schema, required CLIs, credentials, image refs,
-                  # and that :compute-pubkey is loaded in ssh-agent (cloud providers only)
+once tofu render tofu:init tofu:apply:-auto-approve
+once tofu-smtp render tofu:init tofu:apply:-auto-approve
+once tofu-dns render tofu:init tofu:apply:-auto-approve
+once tofu-smtp-post render tofu:init tofu:apply:-auto-approve
+once ansible render -- ansible-playbook main.yml
+once ansible-local render -- ansible-playbook main.yml
 ```
 
-### Post-provisioning Report
-```bash
-bb once describe  # configured providers + SSH reachability + deployed ONCE applications
-                  # (image, tag, running digest, registry digest, update-available?)
-```
-
-### Full Lifecycle
-```bash
-bb validate                 # opt-in pre-flight checks (strict shortcut for `bb once validate`)
-bb once validate            # same validation via workflow step; can be chained
-bb once describe            # opt-in post-provisioning report
-bb once create              # provision everything (all 6 stages)
-bb once delete              # tear down (reverse 4 Tofu stages)
-bb once validate create     # validate, then create only if validation passes
-bb once delete create       # clean slate redeploy
-```
-
-### Individual Tools (each requires `render` first)
-```bash
-bb -tofu render tofu:init tofu:apply:-auto-approve
-bb -tofu-smtp render tofu:init tofu:apply:-auto-approve
-bb -tofu-dns render tofu:init tofu:apply:-auto-approve
-bb -tofu-smtp-post render tofu:init tofu:apply:-auto-approve
-bb -ansible render -- ansible-playbook main.yml
-bb -ansible-local render -- ansible-playbook main.yml
-```
-
-The active profile is selected by editing `(def bb ...)` in `options.clj` (see Configuration Profiles below).
+During development, prefix with `npm run once --` (e.g. `npm run once -- once validate`).
 
 ## Key Architecture Concepts
 
-### The Six-Stage Create Pipeline (`package.clj`)
+### The Six-Stage Create Pipeline (`src/once/package.ts`)
 1. **tofu** — provision compute (DigitalOcean / hcloud / OCI / no-infra)
 2. **tofu-smtp** — set up SMTP (Resend)
 3. **tofu-dns** — configure DNS (Cloudflare), injecting SMTP records
 4. **tofu-smtp-post** — finalize SMTP after DNS verification
-5. **ansible-local** — local config: update `~/.ssh/config` so the remote host is reachable as `Host once` for the next stage
-6. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, provision the restricted `deploy` user (NOPASSWD sudo for `/usr/local/bin/once *` + `ForceCommand` Babashka script at `/usr/local/bin/deploy` authorized by `:deploy-pubkey`), deploy applications listed under `:once {:applications [...]}`
+5. **ansible-local** — local config: update `~/.ssh/config` so the remote host is reachable for the next stage
+6. **ansible** — remote host config: install Docker, ONCE, s-nail; provision the restricted `deploy` user; deploy applications listed under `once.applications`
 
-Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb once delete`.
+`delete` reverses the Tofu stages (4→3→2→1 destroy order). Compute resources render with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `once once delete`.
 
-`validate` and `describe` are opt-in `big-config.workflow/run-steps` steps exposed through `bb once validate` and `bb once describe`. Validation is also exposed as a top-level `bb validate` shortcut, which accepts no extra args and exits non-zero when `*command-line-args*` is non-empty. These steps do not run automatically before `create`.
+`validate` and `describe` are opt-in workflow steps exposed through `once once validate` / `once once describe`. They do not run automatically before `create`.
 
-### Template Rendering
-`big-config` renders templates from `src/resources/` into `.dist/` using parameters. Templates use `{{ ... }}` delimiters for provider switching and `{ ... }` for filter expressions.
+### The Workflow Engine (`src/bc/`)
+An `opts` object (`Record<string, any>`) is threaded through a series of steps. `toWorkflow` builds a step machine; `toWorkflowStar` adds the `handleStep` plugin layer; `runSteps` is the dynamic "workflow of workflows" that runs the steps named under `opts.steps`; `toCompWorkflow` builds composite pipelines like `create` / `delete`. Step functions return a new `opts` with `exit` (a non-negative integer) and `err`.
+
+### Template Rendering (`src/bc/render.ts`)
+Templates are copied from `src/resources/` into `.dist/` with placeholder substitution. File content uses `<{ var }>` delimiters; directory selection (e.g. picking `tofu/oci` vs `tofu/hcloud`) uses `{{ var }}`. The render data is the merged `params` plus `target-object` / `module` / `profile`.
 
 ### Parameter Flow
-1. Options maps in `options.clj` define base params under `::workflow/params`
-2. `params/opts-fn` composes three transformations: `workflow/read-bc-pars` (reads `BC_PAR_*` env vars) → `tofu-smtp-params` (extracts SMTP records from Tofu output) → `tofu-params` (extracts IP from Tofu output)
-3. Each later stage inherits outputs from earlier stages
+1. Profiles in `options.ts` define base `params`.
+2. `params.optsFn` composes `readBcPars` (reads `BC_PAR_*` env vars) → `tofuSmtpParams` (extracts SMTP records from Tofu output) → `tofuParams` (extracts IP from Tofu output).
+3. Each later stage inherits outputs from earlier stages.
+
+Note: the `create` / `delete` pipelines pass only the global options into each tool stage — template params there come from `BC_PAR_*` env vars and Tofu outputs, not directly from `options.ts`. The `options.ts` profile params are used by `validate` / `describe` and the individual `once tofu ...` runners.
 
 ### `BC_PAR_*` Environment Variable Overrides
-Any `::workflow/params` key can be overridden at runtime:
+Any param can be overridden at runtime. The variable name is uppercased; hyphens/dots become underscores:
 ```bash
 export BC_PAR_DOMAIN="example.com"
 export BC_PAR_PROVIDER_BACKEND="s3"   # or "r2" / "local"
-export BC_PAR_S3_BUCKET="my-tf-state-bucket"
 export BC_PAR_HCLOUD_TOKEN="xxx"
 ```
-Variable names are uppercased; hyphens become underscores. Sensitive credentials go in `.envrc.private` (gitignored).
+Sensitive credentials go in `.envrc.private` (gitignored).
 
 ### Plugin System
-`tools.clj` uses `pluggable/handle-step` for the remote-state backend plugin (`::render-tofu-backend`). After each `render` step, the plugin injects the backend configuration (S3, R2, or local) based on `:provider-backend` — this is done via `run-steps-with-plugin`.
+`tools.ts` registers a `render-tofu-backend` step via `pluggable.registerStep`. After each `render` step, it injects the remote-state backend config (S3, R2, or local) based on `provider-backend`.
 
 ## Code Conventions
 
-### Naming
-- **Namespaces**: `io.github.amiorin.once.*`
-- **Keywords**: Fully namespaced (`::workflow/params`, `::bc/env`, `::render/profile`)
-- **Entry points**: Functions ending with `*` are CLI/REPL entry points (`tofu*`, `ansible*`, `once*`); `validation/validate` and `describe/describe` are workflow step functions, while `validate-report` / `describe-report` are pure report builders
-- **Private defs**: Use `^:private` metadata for implementation details not intended for external use
+- **Modules**: `src/bc/*` is the engine; `src/once/*` is the application. Keep that separation.
+- **`opts` keys**: camelCase for engine/structural keys (`exit`, `err`, `params`, `steps`, `profile`, `prefix`). Profile/template parameter keys are kebab-case strings matching the template variable names (`provider-compute`, `do-token`, `oci-shape`).
+- **Entry points**: `*Star` functions (`onceStar`, `tofuStar`, …) are the CLI-ready wrappers; `validate` / `describe` are workflow steps, while `validateReport` / `describeReport` are the pure report builders (and accept injected dependencies for testing).
+- **Configuration Profiles (`options.ts`)**: private sub-profile maps (`oci`, `hcloud`, `digitalocean`, `noInfraCompute`, `resend`, `cloudflare`, `r2`, `deploy`, …) compose into public application profiles (`profileAlpha`, `profileBeta`, `profileGamma`, `profileNoInfra`) via `compose`. Each application profile pins a `domain`, `package`, and the `once.applications` list. `profileAlpha` rides on DigitalOcean; `profileBeta` / `profileGamma` ride on OCI; `profileNoInfra` targets an existing server. The active profile is `export const bb = profileAlpha;` — change it to switch profiles.
+- **Templates**: `.dist/` is generated output, not source — do not edit it.
 
-### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb validate` / `bb once validate` enforce this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
-```clojure
-(def space (merge-with merge resend cloudflare r2 oci deploy
-                       {::render/profile "space"
-                        ::workflow/params {:domain "bigconfig.space"
-                                           :package "space"
-                                           :once {:applications [{:host "marketplace-api.bigconfig.space"
-                                                                  :image "ghcr.io/amiorin/once-pocketbase"
-                                                                  :env ["SUPERUSER_PASSWORD=<{ superuser-password }>"]}]}}}))
-```
-`online` and `space` ride on `oci`; `website` rides on `digitalocean`; `no-infra` targets an existing server. The `bb` var sets the active profile for Babashka tasks:
-```clojure
-(def bb website)  ; change this to switch profiles
-```
+## Testing
 
-### REPL Development Pattern
-All source files contain `comment` blocks with live evaluation examples:
-```clojure
-(comment
-  (debug tap-values
-    (once* "create" options/oci))
-  (-> tap-values))
-```
-These are documentation-as-tests — use them to understand expected behavior and to test interactively. Use CIDER with `:dev` alias.
+`npm test` runs Vitest against `test/*.test.ts`. Tests cover the validation schema/credential checks, the describe report, the `stripAnsi` helper, and the `deploy` ForceCommand script. The deploy tests require `babashka` (`bb`) on PATH and are skipped automatically when it is missing.
 
-### Data Transformation Pattern
-Functions follow a pipeline pattern where each function takes and returns an `opts` map:
-```clojure
-(def opts-fn (comp tofu-params tofu-smtp-params workflow/read-bc-pars))
-```
-
-## Supported Cloud Providers
-
-| Profile | Provider | Key params |
-|---------|----------|------------|
-| `oci` | Oracle Cloud | `oci-subnet-id`, `oci-compartment-id`, `oci-availability-domain`, `oci-shape` |
-| `hcloud` | Hetzner Cloud | `hcloud-name`, `hcloud-image`, `hcloud-server-type`, `hcloud-location` |
-| `digitalocean` | DigitalOcean | `digitalocean-name`, `digitalocean-region`, `digitalocean-size`, `digitalocean-image` |
-| `no-infra` | Existing server | `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-compute-sudoer` |
-
-All cloud profiles combine with `resend` (SMTP) and `cloudflare` (DNS) sub-profiles. The Cloudflare DNS template (provider `~> 5.0`) creates apex (`@`) and wildcard (`*`) A records proxied through Cloudflare and applies a fixed bundle of zone settings (TLS 1.3, strict SSL, always-use-HTTPS, brotli, etc.). Outgoing mail is sent from `info@notifications.<domain>`.
-
-## Dependencies
-
-To use `big-config` from local source during development, swap in `deps.edn`:
-```clojure
-;; comment out:
-io.github.amiorin/big-config {:git/sha "364fe1f..."}
-;; uncomment:
-io.github.amiorin/big-config {:local/root "../../big-config/main"}
-```
-
-## Git Conventions
-
-Commit messages use [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` new feature
-- `refactor:` code restructuring
-- `deps:` dependency updates
-- `docs:` documentation changes
+Functions designed for testing take their side-effecting collaborators as injectable parameters: `describeReport(opts, runFn, onceOptsFn)`, `credentialErrors(params, env, runFn)`, `sshAgentErrors(params, env, runFn)`, `validate(stepFns, opts, reportFn)`, `describe(stepFns, opts, reportFn)`.
 
 ## What to Avoid
 
-- Do not add error handling for cases that cannot happen (big-config handles step failure via `::bc/exit` and `::bc/err`)
-- Do not create new namespaces unless a genuine new concern arises; the six existing namespaces (`options`, `package`, `params`, `tools`, `validation`, `describe`) map cleanly to their responsibilities
-- Do not modify `.dist/` — it is generated output, not source
-- Credentials and tokens never go in source files; use `.envrc.private` (already gitignored via the whitelist `.gitignore`)
+- Do not add error handling for cases that cannot happen — the workflow engine reports step failure via `exit` / `err`.
+- Do not edit `.dist/` — it is generated output.
+- Credentials and tokens never go in source files; use `.envrc.private` (gitignored).
+- Keep imports using explicit `.js` extensions (required by `NodeNext` module resolution).
