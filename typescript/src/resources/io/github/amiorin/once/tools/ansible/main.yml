@@ -1,0 +1,102 @@
+---
+- name: Managed Server Configuration
+  hosts: all
+  tasks:
+    - name: Install docker
+      ansible.builtin.shell: >-
+        curl -fsSL https://get.docker.com -o install-docker.sh
+        && sudo sh install-docker.sh
+        && rm install-docker.sh
+      args:
+        creates: /usr/bin/docker
+      register: docker_install_result
+      until: docker_install_result.rc == 0
+      retries: 10
+      delay: 10
+
+    - name: Install ONCE
+      ansible.builtin.shell: >-
+        curl -fsSL https://get.once.com -o install-once.sh
+        && ONCE_INTERACTIVE=false sh install-once.sh
+        && rm install-once.sh
+      args:
+        creates: /usr/local/bin/once
+      register: once_install_result
+      until: once_install_result.rc == 0
+      retries: 10
+      delay: 10
+
+    - name: Copy .mailrc
+      ansible.builtin.copy:
+        src: ../tofu-smtp/mailrc
+        dest: .mailrc
+        mode: "0600"
+
+    - name: Update cache and install s-nail
+      apt:
+        name: s-nail
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+      become: yes
+
+    - name: Install babashka
+      ansible.builtin.shell: >-
+        curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
+        && chmod +x install
+        && sudo ./install
+        && rm install
+      args:
+        creates: /usr/local/bin/bb
+      register: bb_install_result
+      until: bb_install_result.rc == 0
+      retries: 10
+      delay: 10
+
+    - name: Create deploy user
+      ansible.builtin.user:
+        name: deploy
+        shell: /bin/bash
+        create_home: yes
+        state: present
+      become: yes
+
+    - name: Grant deploy NOPASSWD sudo for once
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/deploy
+        content: "deploy ALL=(ALL) NOPASSWD: /usr/local/bin/once *\n"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+      become: yes
+
+    - name: Install deploy ForceCommand script
+      ansible.builtin.copy:
+        src: files/deploy
+        dest: /usr/local/bin/deploy
+        owner: root
+        group: root
+        mode: "0755"
+      become: yes
+
+    - name: Ensure deploy .ssh directory
+      ansible.builtin.file:
+        path: /home/deploy/.ssh
+        state: directory
+        owner: deploy
+        group: deploy
+        mode: "0700"
+      become: yes
+
+    - name: Authorize deploy key with ForceCommand
+      ansible.builtin.copy:
+        dest: /home/deploy/.ssh/authorized_keys
+        content: "restrict,command=\"/usr/local/bin/deploy\" <{ deploy-pubkey }>\n"
+        owner: deploy
+        group: deploy
+        mode: "0600"
+      become: yes
+
+    - name: Import ONCE tasks
+      import_tasks: once.yml

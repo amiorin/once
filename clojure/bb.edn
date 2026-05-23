@@ -1,0 +1,58 @@
+{:deps {io.github.amiorin/once {:local/root "."}}
+ :tasks
+ {:requires ([io.github.amiorin.once.params :as params]
+             [io.github.amiorin.once.options :as options]
+             [io.github.amiorin.once.package :as package]
+             [io.github.amiorin.once.tools :as tools])
+  help {:doc "the workflow help"
+        :override-builtin true
+        :task (println "Usage: bb <task> [args...]
+
+Tasks:
+  validate  Shortcut for `bb once validate`.
+            Usage:
+              bb validate              Run pre-flight checks for the active profile.
+
+  once      Provision or tear down infrastructure for the active profile.
+            Usage:
+              bb once validate         Run pre-flight checks for the active profile.
+              bb once describe         Show providers, SSH reachability, and deployed apps.
+              bb once create           Run the full 6-stage create pipeline:
+                                         tofu -> tofu-smtp -> tofu-dns ->
+                                         tofu-smtp-post -> ansible-local -> ansible
+              bb once delete           Reverse the 4 Tofu stages (destroy order 4->3->2->1).
+              bb once validate create  Validate, then create only if validation passes.
+              bb once delete create    Clean-slate redeploy.
+            Notes:
+              * validate/describe run only when explicitly requested.
+              * Compute resources render with prevent_destroy = true by default.
+                Override with: BC_PAR_COMPUTE_PREVENT_DESTROY=false bb once delete
+              * The active profile is selected by (def bb ...) in options.clj.
+
+See:
+* https://www.bigconfig.ai/manual")}
+  once {:doc "bb once validate | bb once describe | bb once create | bb once delete"
+        :task (package/once* *command-line-args* options/bb)}
+  validate {:doc "Shortcut for bb once validate"
+            :task (if (seq *command-line-args*)
+                    (do
+                      (binding [*out* *err*]
+                        (println "Error: bb validate does not accept arguments.")
+                        (println "Usage: bb validate"))
+                      (System/exit 1))
+                    (package/once* ["validate"] options/bb))}
+  -tofu {:doc "bb tofu render tofu:init tofu:apply:-auto-approve"
+        :task (tools/tofu* *command-line-args* (params/once-opts options/bb))}
+  -tofu-dns {:doc "bb tofu-dns render tofu:init tofu:apply:-auto-approve"
+            :task (tools/tofu-dns* *command-line-args* (params/once-opts options/bb))}
+  -tofu-smtp {:doc "bb tofu-smtp render tofu:init tofu:apply:-auto-approve"
+             :task (tools/tofu-smtp* *command-line-args* (params/once-opts options/bb))}
+  -tofu-smtp-post {:doc "bb tofu-smtp-post render tofu:init tofu:apply:-auto-approve"
+                  :task (tools/tofu-smtp-post* *command-line-args* (params/once-opts options/bb))}
+  -ansible {:doc "bb ansible render -- ansible-playbook main.yml"
+           :task (tools/ansible* *command-line-args* (params/once-opts options/bb))}
+  -ansible-local {:doc "bb ansible render -- ansible-playbook main.yml"
+                 :task (tools/ansible-local* *command-line-args* (params/once-opts options/bb))}
+  -tidy {:doc "tidy clojure files"
+         :task (do (shell "clojure-lsp clean-ns")
+                   (shell "clojure-lsp format"))}}}

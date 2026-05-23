@@ -6,6 +6,7 @@
     npm.enable = true;
   };
   languages.ansible.enable = true;
+  languages.typescript.enable = true;
   languages.opentofu.enable = true;
   packages = [
     pkgs.nodejs_22
