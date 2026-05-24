@@ -1,0 +1,9 @@
+/home/ubuntu/code/bigconfig/once/python/.devenv/bootstrap/bootstrapLib.nix
+/home/ubuntu/code/bigconfig/once/python/.devenv/bootstrap/default.nix
+/home/ubuntu/code/bigconfig/once/python/.devenv/bootstrap/resolve-lock.nix
+/home/ubuntu/code/bigconfig/once/python/devenv.local.nix
+/home/ubuntu/code/bigconfig/once/python/devenv.lock
+/home/ubuntu/code/bigconfig/once/python/devenv.nix
+/home/ubuntu/.config/nixpkgs/overlays
+/home/ubuntu/.config/nixpkgs/overlays.nix
+/home/ubuntu/code/bigconfig/once/python/.env

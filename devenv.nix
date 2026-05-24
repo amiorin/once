@@ -4,6 +4,10 @@
   languages.clojure.enable = true;
   languages.ansible.enable = true;
   languages.opentofu.enable = true;
+  languages.python = {
+    enable = true;
+    uv.enable = true;
+  };
   packages = [
     pkgs.babashka
     pkgs.jet
