@@ -26,6 +26,29 @@
                                     ::tools/ansible-local ["render ansible-playbook:main.yml" params/opts-fn]
                                     ::tools/ansible ["render ansible-playbook:main.yml" params/opts-fn]]}))
 
+(def build
+  (workflow/->workflow* {:first-step ::start-create-or-delete
+                         :last-step :end-create-or-delete
+                         :pipeline [::tools/tofu ["render" params/opts-fn]
+                                    ::tools/tofu-smtp ["render" params/opts-fn]
+                                    ::tools/tofu-dns ["render" params/opts-fn]
+                                    ::tools/tofu-smtp-post ["render" params/opts-fn]
+                                    ::tools/ansible-local ["render" params/opts-fn]
+                                    ::tools/ansible ["render" params/opts-fn]]}))
+
+(def ^:private tool-workflows
+  {::tools/tofu tools/tofu
+   ::tools/tofu-smtp tools/tofu-smtp
+   ::tools/tofu-dns tools/tofu-dns
+   ::tools/tofu-smtp-post tools/tofu-smtp-post
+   ::tools/ansible-local tools/ansible-local
+   ::tools/ansible tools/ansible})
+
+(when-let [register-workflow (ns-resolve 'big-config.workflow 'register-workflow)]
+  (run! (fn [[step f]]
+          (register-workflow step f))
+        tool-workflows))
+
 (comment
   (debug tap-values
     (create [(fn [f step opts]
@@ -53,10 +76,11 @@
   [step-fns {:keys [::workflow/params] :as opts}]
   (let [opts (->> opts
                   (merge {::workflow/create-fn create
+                          ::workflow/build-fn build
                           ::workflow/delete-fn delete
                           ::workflow/validate-fn validation/validate
                           ::workflow/describe-fn describe/describe})
-                  (workflow/merge-params [::tools/tofu-opts ::tools/tofu-smtp-opts ::tools/tofu-dns-opts ::tools/tofu-smtp-post-opts ::tools/ansible-opts] params))
+                  (workflow/merge-params [::tools/tofu-opts ::tools/tofu-smtp-opts ::tools/tofu-dns-opts ::tools/tofu-smtp-post-opts ::tools/ansible-local-opts ::tools/ansible-opts] params))
         wf (core/->workflow {:first-step ::start
                              :wire-fn (fn [step step-fns]
                                         (case step

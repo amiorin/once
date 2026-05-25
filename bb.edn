@@ -13,10 +13,13 @@ Tasks:
             Usage:
               bb validate              Run pre-flight checks for the active profile.
 
-  once      Provision or tear down infrastructure for the active profile.
+  once      Build, provision, or tear down infrastructure for the active profile.
             Usage:
               bb once validate         Run pre-flight checks for the active profile.
               bb once describe         Show providers, SSH reachability, and deployed apps.
+              bb once build            Render all 6 stages without applying/provisioning:
+                                         tofu -> tofu-smtp -> tofu-dns ->
+                                         tofu-smtp-post -> ansible-local -> ansible
               bb once create           Run the full 6-stage create pipeline:
                                          tofu -> tofu-smtp -> tofu-dns ->
                                          tofu-smtp-post -> ansible-local -> ansible
@@ -31,7 +34,7 @@ Tasks:
 
 See:
 * https://www.bigconfig.ai/manual")}
-  once {:doc "bb once validate | bb once describe | bb once create | bb once delete"
+  once {:doc "bb once validate | bb once describe | bb once build | bb once create | bb once delete"
         :task (package/once* *command-line-args* options/bb)}
   validate {:doc "Shortcut for bb once validate"
             :task (if (seq *command-line-args*)
