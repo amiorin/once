@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Opts } from "../src/bc/core.js";
+import type { Opts } from "big-config";
 import {
   profileAlpha,
   profileBeta,

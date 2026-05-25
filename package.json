@@ -17,6 +17,9 @@
     "once": "tsx src/cli.ts",
     "validate": "tsx src/cli.ts validate"
   },
+  "dependencies": {
+    "big-config": "file:../../big-config/typescript"
+  },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",

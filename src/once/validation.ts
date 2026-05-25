@@ -9,9 +9,9 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
-import type { Opts } from "../bc/core.js";
-import { ok } from "../bc/core.js";
-import { readBcPars } from "../bc/workflow.js";
+import type { Opts } from "big-config";
+import { readBcPars } from "big-config/workflow";
+import { okAlias, paramsOf, profileOf, status, toBcOpts } from "./interop.js";
 
 export interface CheckError {
   check: "schema" | "tool" | "credential" | "image";
@@ -296,10 +296,10 @@ export function schemaErrors(opts: Opts): CheckError[] | undefined {
   const emit: Emit = (path, msg) =>
     errors.push({ check: "schema", detail: `${path}: ${msg}` });
 
-  const profileMsg = stringValue(opts.profile);
+  const profileMsg = stringValue(profileOf(opts));
   if (profileMsg) emit("render/profile", profileMsg);
 
-  const params = opts.params;
+  const params = paramsOf(opts);
   if (params == null || typeof params !== "object") {
     emit("workflow/params", "missing required key");
   } else {
@@ -758,8 +758,8 @@ export function validateReport(
   opts: Opts,
   env: Record<string, string | undefined> = process.env,
 ): ValidateResult {
-  const merged = readBcPars(opts, env);
-  const params = merged.params ?? {};
+  const merged = readBcPars(toBcOpts(opts), env);
+  const params = paramsOf(merged);
   const errors: CheckError[] = [
     ...(schemaErrors(merged) ?? []),
     ...toolErrors(params),
@@ -808,9 +808,6 @@ export function validate(
 ): Opts {
   const result = reportFn(opts);
   printReport(result);
-  return {
-    ...opts,
-    "validation/result": result,
-    ...(result.ok ? ok() : { exit: 1, err: "validation failed" }),
-  };
+  const base = { ...opts, "validation/result": result };
+  return result.ok ? okAlias(base) : status(base, 1, "validation failed");
 }

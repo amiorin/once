@@ -15,12 +15,13 @@ import {
 const HELP = `Usage: once <command> [args...]
 
 Commands:
-  once <step>...    Provision or tear down infrastructure for the active profile.
-                      once once validate    Run pre-flight checks.
-                      once once describe    Show providers, SSH and deployed apps.
-                      once once create      Run the full 6-stage create pipeline.
-                      once once delete      Reverse the 4 Tofu stages.
-  validate          Shortcut for \`once once validate\`.
+  package <step>...  Build, provision, or tear down infrastructure for the active profile.
+                       once package validate
+                       once package describe
+                       once package build
+                       once package create
+                       once package delete
+  validate           Shortcut for \`once package validate\`.
 
   Individual tools (each requires \`render\` first):
   tofu <args>             e.g. once tofu render tofu:init tofu:apply:-auto-approve
@@ -36,8 +37,14 @@ Notes:
 
 See: https://www.bigconfig.ai/manual`;
 
+const PACKAGE_COMMANDS = new Set(["describe", "build", "create", "delete"]);
+
 function main(argv: string[]): void {
   const [command, ...rest] = argv;
+  if (command && PACKAGE_COMMANDS.has(command)) {
+    onceStar(argv, bb);
+    return;
+  }
   switch (command) {
     case undefined:
     case "help":
@@ -45,16 +52,12 @@ function main(argv: string[]): void {
     case "-h":
       console.log(HELP);
       return;
-    case "once":
+    case "package":
+    case "once": // Backwards-compatible alias for the old nested form.
       onceStar(rest, bb);
       return;
     case "validate":
-      if (rest.length > 0) {
-        console.error("Error: validate does not accept arguments.");
-        console.error("Usage: once validate");
-        process.exit(1);
-      }
-      onceStar(["validate"], bb);
+      onceStar(rest.length > 0 ? argv : ["validate"], bb);
       return;
     case "tofu":
       tofuStar(rest, onceOpts(bb));

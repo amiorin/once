@@ -6,7 +6,7 @@ This file describes the `once` codebase for AI assistants. Read it before making
 
 `once` is a TypeScript library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment via [Basecamp's ONCE](https://github.com/basecamp/once).
 
-It was originally a Clojure project built on the `big-config` library. The workflow engine, template renderer, step runner and plugin system that `big-config` provided have been ported to TypeScript and live under `src/bc/` — there is no longer any JVM/Clojure dependency.
+It uses the shared local `big-config` TypeScript package (`../../big-config/typescript`) for the workflow engine, template renderer, step runner, and plugin system.
 
 ## Tech Stack
 
@@ -73,12 +73,13 @@ npm run once -- ...  # run the CLI from source via tsx
 ### CLI Usage
 
 ```bash
-once once validate          # pre-flight checks for the active profile
-once once describe          # providers + SSH reachability + deployed apps
-once once create            # provision everything (all 6 stages)
-once once delete            # tear down (reverse 4 Tofu stages)
-once once validate create   # validate, then create only if validation passes
-once validate               # shortcut for `once once validate` (accepts no args)
+once package validate       # pre-flight checks for the active profile
+once package describe       # providers + SSH reachability + deployed apps
+once package build          # render everything without applying/provisioning
+once package create         # provision everything (all 6 stages)
+once package delete         # tear down (reverse 4 Tofu stages)
+once package validate create # validate, then create only if validation passes
+once validate               # shortcut for `once package validate`
 ```
 
 Individual tools (each requires `render` first):
@@ -92,7 +93,7 @@ once ansible render -- ansible-playbook main.yml
 once ansible-local render -- ansible-playbook main.yml
 ```
 
-During development, prefix with `npm run once --` (e.g. `npm run once -- once validate`).
+During development, prefix with `npm run once --` (e.g. `npm run once -- package validate`).
 
 ## Key Architecture Concepts
 
@@ -104,14 +105,14 @@ During development, prefix with `npm run once --` (e.g. `npm run once -- once va
 5. **ansible-local** — local config: update `~/.ssh/config` so the remote host is reachable for the next stage
 6. **ansible** — remote host config: install Docker, ONCE, s-nail; provision the restricted `deploy` user; deploy applications listed under `once.applications`
 
-`delete` reverses the Tofu stages (4→3→2→1 destroy order). Compute resources render with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `once once delete`.
+`delete` reverses the Tofu stages (4→3→2→1 destroy order). Compute resources render with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `once package delete`.
 
-`validate` and `describe` are opt-in workflow steps exposed through `once once validate` / `once once describe`. They do not run automatically before `create`.
+`validate` and `describe` are opt-in workflow steps exposed through `once package validate` / `once package describe`. They do not run automatically before `create`.
 
-### The Workflow Engine (`src/bc/`)
-An `opts` object (`Record<string, any>`) is threaded through a series of steps. `toWorkflow` builds a step machine; `toWorkflowStar` adds the `handleStep` plugin layer; `runSteps` is the dynamic "workflow of workflows" that runs the steps named under `opts.steps`; `toCompWorkflow` builds composite pipelines like `create` / `delete`. Step functions return a new `opts` with `exit` (a non-negative integer) and `err`.
+### The Workflow Engine (`../../big-config/typescript`)
+ONCE uses the shared `big-config` TypeScript package for the workflow engine and template rendering. An `opts` object (`Record<string, any>`) is threaded through a series of steps; BigConfig's `createWorkflow`, `createWorkflowStar`, `runSteps`, and `createWorkflowStar` composition support build/create/delete pipelines.
 
-### Template Rendering (`src/bc/render.ts`)
+### Template Rendering (`../../big-config/typescript/src/render.ts`)
 Templates are copied from `src/resources/` into `.dist/` with placeholder substitution. File content uses `<{ var }>` delimiters; directory selection (e.g. picking `tofu/oci` vs `tofu/hcloud`) uses `{{ var }}`. The render data is the merged `params` plus `target-object` / `module` / `profile`.
 
 ### Parameter Flow
@@ -131,12 +132,12 @@ export BC_PAR_HCLOUD_TOKEN="xxx"
 Sensitive credentials go in `.envrc.private` (gitignored).
 
 ### Plugin System
-`tools.ts` registers a `render-tofu-backend` step via `pluggable.registerStep`. After each `render` step, it injects the remote-state backend config (S3, R2, or local) based on `provider-backend`.
+`tools.ts` registers a `render-tofu-backend` step via BigConfig's pluggable step registry. After each `render` step, it injects the remote-state backend config (S3, R2, or local) based on `provider-backend`.
 
 ## Code Conventions
 
-- **Modules**: `src/bc/*` is the engine; `src/once/*` is the application. Keep that separation.
-- **`opts` keys**: camelCase for engine/structural keys (`exit`, `err`, `params`, `steps`, `profile`, `prefix`). Profile/template parameter keys are kebab-case strings matching the template variable names (`provider-compute`, `do-token`, `oci-shape`).
+- **Modules**: `../../big-config/typescript` is the engine; `src/once/*` is the application. Keep that separation.
+- **`opts` keys**: BigConfig engine keys are namespaced strings (`big-config/exit`, `big-config.workflow/params`, etc.). ONCE also mirrors friendly aliases (`exit`, `err`, `params`, `profile`) at the CLI/test boundary. Profile/template parameter keys are kebab-case strings matching the template variable names (`provider-compute`, `do-token`, `oci-shape`).
 - **Entry points**: `*Star` functions (`onceStar`, `tofuStar`, …) are the CLI-ready wrappers; `validate` / `describe` are workflow steps, while `validateReport` / `describeReport` are the pure report builders (and accept injected dependencies for testing).
 - **Configuration Profiles (`options.ts`)**: private sub-profile maps (`oci`, `hcloud`, `digitalocean`, `noInfraCompute`, `resend`, `cloudflare`, `r2`, `deploy`, …) compose into public application profiles (`profileAlpha`, `profileBeta`, `profileGamma`, `profileNoInfra`) via `compose`. Each application profile pins a `domain`, `package`, and the `once.applications` list. `profileAlpha` rides on DigitalOcean; `profileBeta` / `profileGamma` ride on OCI; `profileNoInfra` targets an existing server. The active profile is `export const bb = profileAlpha;` — change it to switch profiles.
 - **Templates**: `.dist/` is generated output, not source — do not edit it.

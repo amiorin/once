@@ -3,8 +3,8 @@
  * reachability, and deployed ONCE applications discovered from the remote host.
  */
 import { spawnSync } from "node:child_process";
-import type { Opts } from "../bc/core.js";
-import { ok } from "../bc/core.js";
+import type { Opts } from "big-config";
+import { okAlias, paramsOf, profileOf, status, syncAliases } from "./interop.js";
 import { onceOpts } from "./params.js";
 
 const RUN_TIMEOUT_MS = 30000;
@@ -566,7 +566,8 @@ export function describeReport(
   onceOptsFn: (opts: Opts) => Opts = onceOpts,
 ): DescribeResult {
   const resolved = resolveOnceOpts(opts, onceOptsFn);
-  const params = resolved.opts.params ?? {};
+  const resolvedOpts = syncAliases(resolved.opts);
+  const params = paramsOf(resolvedOpts);
   const providers = providerSummary(params);
   let compute = computeStatus(runFn, params);
   if (resolved.detail) {
@@ -576,7 +577,7 @@ export function describeReport(
     ? remoteApplications(runFn, compute)
     : { ok: false, detail: "not checked because compute is not reachable" };
   return {
-    profile: resolved.opts.profile,
+    profile: profileOf(resolvedOpts),
     providers,
     compute,
     applications: appResult.applications ?? [],
@@ -652,11 +653,8 @@ export function describe(
 ): Opts {
   const result = reportFn(opts);
   printReport(result);
-  return {
-    ...opts,
-    "describe/result": result,
-    ...(result.fatalError
-      ? { exit: 1, err: result.applicationsError ?? "describe failed" }
-      : ok()),
-  };
+  const base = { ...syncAliases(opts), "describe/result": result };
+  return result.fatalError
+    ? status(base, 1, result.applicationsError ?? "describe failed")
+    : okAlias(base);
 }

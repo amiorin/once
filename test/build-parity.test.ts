@@ -1,0 +1,50 @@
+import { spawnSync } from "node:child_process";
+import { existsSync, rmSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const root = resolve("../..");
+const clojureDir = join(root, "once/clojure");
+const typeScriptDir = join(root, "once/typescript");
+const profileDir = ".dist/profile-alpha-d2264632";
+const hasBb = spawnSync("bb", ["--version"], { encoding: "utf8" }).status === 0;
+
+function run(cmd: string, args: string[], cwd: string): void {
+  const res = spawnSync(cmd, args, { cwd, encoding: "utf8", env: process.env });
+  expect(res.status, `${cmd} ${args.join(" ")} failed\nstdout:\n${res.stdout}\nstderr:\n${res.stderr}`).toBe(0);
+}
+
+function clean(project: string): void {
+  rmSync(join(project, ".dist"), { recursive: true, force: true });
+}
+
+function files(base: string): string[] {
+  const out: string[] = [];
+  function walk(dir: string): void {
+    for (const entry of readdirSync(dir)) {
+      const p = join(dir, entry);
+      const st = statSync(p);
+      if (st.isDirectory()) walk(p);
+      else if (st.isFile()) out.push(relative(base, p));
+    }
+  }
+  if (existsSync(base)) walk(base);
+  return out.sort();
+}
+
+describe.skipIf(!hasBb)("build parity", () => {
+  it("TypeScript build matches Clojure byte-for-byte", () => {
+    clean(clojureDir);
+    clean(typeScriptDir);
+
+    run("bb", ["once", "package", "build"], clojureDir);
+    run("npm", ["run", "once", "--", "package", "build"], typeScriptDir);
+
+    const cljOut = join(clojureDir, profileDir);
+    const tsOut = join(typeScriptDir, profileDir);
+    expect(files(tsOut)).toEqual(files(cljOut));
+    for (const rel of files(cljOut)) {
+      expect(readFileSync(join(tsOut, rel)), rel).toEqual(readFileSync(join(cljOut, rel)));
+    }
+  });
+});

@@ -5,7 +5,8 @@
  * and public application profiles that pin a domain, package name and the list
  * of applications deployed by Ansible.
  */
-import type { Opts } from "../bc/core.js";
+import type { Opts } from "big-config";
+import { PARAMS, PROFILE, syncAliases } from "./interop.js";
 
 export interface Application {
   host: string;
@@ -26,7 +27,7 @@ function compose(...layers: Profile[]): Opts {
     if (layer.profile !== undefined) profile = layer.profile;
     params = { ...params, ...layer.params };
   }
-  return { profile, params };
+  return syncAliases({ [PROFILE]: profile, [PARAMS]: params });
 }
 
 const deploy: Profile = {

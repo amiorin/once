@@ -2,7 +2,7 @@
 
 `once` is an infrastructure automation tool for [ONCE](https://github.com/basecamp/once). It simplifies the provisioning and configuration of cloud resources using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). The audience is the vibe coder who wants to deploy a vibe-coded application with a "one-click" experience.
 
-It is a TypeScript application. The workflow engine, template renderer and step runner (originally provided by the Clojure `big-config` library) have been ported to TypeScript and live under `src/bc/`.
+It is a TypeScript application built on the shared local `big-config` TypeScript package (`../../big-config/typescript`) for the workflow engine, template renderer, and step runner.
 
 ![Demo](.github/media/demo.gif)
 
@@ -92,15 +92,16 @@ export const bb = profileAlpha;
 `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`.
 
 ```bash
-once once validate          # pre-flight checks for the active profile
-once once describe          # providers, SSH reachability, deployed apps
-once once create            # full 6-stage create pipeline
-once once delete            # reverse the 4 Tofu stages
-once once validate create   # validate, then create only if validation passes
-once validate               # shortcut for `once once validate` (no extra args)
+once package validate       # pre-flight checks for the active profile
+once package describe       # providers, SSH reachability, deployed apps
+once package build          # render all stages without applying/provisioning
+once package create         # full 6-stage create pipeline
+once package delete         # reverse the 4 Tofu stages
+once package validate create # validate, then create only if validation passes
+once validate               # shortcut for `once package validate`
 ```
 
-Compute resources render with `lifecycle { prevent_destroy = true }` by default. To run `once once delete`, first override it:
+Compute resources render with `lifecycle { prevent_destroy = true }` by default. To run `once package delete`, first override it:
 
 ```bash
 export BC_PAR_COMPUTE_PREVENT_DESTROY=false
@@ -142,7 +143,7 @@ describeReport(bb);
 
 ## How It Works
 
-1. **Template Rendering**: The engine in `src/bc/` takes templates from `src/resources/` and the merged parameters to generate valid Tofu and Ansible files in `.dist/`.
+1. **Template Rendering**: `big-config` takes templates from `src/resources/` and the merged parameters to generate valid Tofu and Ansible files in `.dist/`.
 2. **Infrastructure Hook**: `create` first runs OpenTofu to provision resources.
 3. **Inventory & Config Bridging**: Tofu output (the new server IP, SMTP records) is captured with `tofu output --json` and injected into the DNS configuration and Ansible inventory.
 4. **Local Finalization**: The local Ansible playbook updates `~/.ssh/config` so the new server is reachable before the remote stage runs.
