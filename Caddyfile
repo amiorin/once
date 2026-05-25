@@ -1,0 +1,18 @@
+{
+	# Explicit defaults for HTTP/HTTPS.
+	http_port 80
+	https_port 443
+}
+
+docs.bigconfig.website {
+	root * /home/ubuntu/code/bigconfig/once/main
+	encode zstd gzip
+
+	@siteFiles path / /index.html /changes.html
+	handle @siteFiles {
+		try_files {path} /index.html
+		file_server
+	}
+
+	respond 404
+}

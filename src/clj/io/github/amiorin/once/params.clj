@@ -12,7 +12,8 @@
   [opts]
   (let [dir (workflow/path opts :io.github.amiorin.once.tools/tofu)]
     (merge-with merge opts {::workflow/params (try (-> (p/shell {:dir dir
-                                                                 :out :string} "tofu output --json")
+                                                                 :out :string
+                                                                 :err :string} "tofu output --json")
                                                        :out
                                                        (json/parse-string keyword)
                                                        (->> (s/select-one [:params :value])))
@@ -23,7 +24,8 @@
   [opts]
   (let [dir (workflow/path opts :io.github.amiorin.once.tools/tofu-smtp)]
     (merge-with merge opts {::workflow/params (try (-> (p/shell {:dir dir
-                                                                 :out :string} "tofu output --json")
+                                                                 :out :string
+                                                                 :err :string} "tofu output --json")
                                                        :out
                                                        (json/parse-string keyword)
                                                        (->> (s/select-one [:params :value])))

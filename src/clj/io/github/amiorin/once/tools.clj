@@ -7,9 +7,9 @@
    [big-config.step-fns :as step-fns]
    [big-config.utils :as utils :refer [debug keyword->path]]
    [big-config.workflow :as workflow]
-   [big-tofu.core :refer [->Construct add-suffix construct]]
    [cheshire.core :as json]
    [clj-yaml.core :as yaml]
+   [clojure.string :as str]
    [com.rpl.specter :as s]
    [io.github.amiorin.once.options :as options]
    [io.github.amiorin.once.params :as params]))
@@ -33,14 +33,27 @@
 
 (def plugin-step ::render-tofu-backend)
 
-(defmethod pluggable/handle-step plugin-step
+(defn- provider-param
+  [opts k default]
+  (or (get-in opts [::workflow/params k]) default))
+
+(defn- register-plugin-handler!
+  [step handler]
+  (if (instance? clojure.lang.MultiFn pluggable/handle-step)
+    (.addMethod ^clojure.lang.MultiFn pluggable/handle-step step handler)
+    (if-let [register (ns-resolve 'big-config.pluggable 'register-handle-step)]
+      (@register step handler)
+      (throw (ex-info "Unsupported big-config.pluggable API" {:step step})))))
+
+(defn- handle-render-tofu-backend
   [_f _step step-fns {:keys [::workflow/name] :as opts}]
-  (let [prepare-keys [::workflow/name ::workflow/path-fn ::workflow/prefix ::workflow/object-fn ::workflow/object-prefix ::workflow/params]
+  (let [provider-backend (provider-param opts :provider-backend "s3")
+        prepare-keys [::workflow/name ::workflow/path-fn ::workflow/prefix ::workflow/object-fn ::workflow/object-prefix ::workflow/params]
         plugin-opts (-> (workflow/prepare {::workflow/name name
                                            ::render/templates [{:template (keyword->path ::tofu-backend)
                                                                 :overwrite true
-                                                                :provider-backend "s3"
-                                                                :transform [["{{ provider-backend }}"
+                                                                :provider-backend provider-backend
+                                                                :transform [[provider-backend
                                                                              delimiters]]}]}
                                           (select-keys opts prepare-keys))
                         (->> (render/templates step-fns)))]
@@ -48,14 +61,17 @@
         (merge (select-keys plugin-opts [::bc/exit ::bc/err]))
         (update plugin-step (fnil conj []) plugin-opts))))
 
+(register-plugin-handler! plugin-step handle-render-tofu-backend)
+
 (defn tofu
   [step-fns opts]
-  (let [opts (workflow/prepare {::workflow/name ::tofu
+  (let [provider-compute (provider-param opts :provider-compute "hcloud")
+        opts (workflow/prepare {::workflow/name ::tofu
                                 ::render/templates [{:template (keyword->path ::tofu)
                                                      :overwrite true
-                                                     :provider-compute "hcloud"
+                                                     :provider-compute provider-compute
                                                      :compute-prevent-destroy true
-                                                     :transform [["{{ provider-compute }}"
+                                                     :transform [[provider-compute
                                                                   delimiters]]}]}
                                opts)]
     (run-steps-with-plugin plugin-step step-fns opts)))
@@ -78,13 +94,14 @@
 
 (defn tofu-smtp
   [step-fns opts]
-  (let [opts (workflow/prepare {::workflow/name ::tofu-smtp
+  (let [provider-smtp (provider-param opts :provider-smtp "resend")
+        opts (workflow/prepare {::workflow/name ::tofu-smtp
                                 ::render/templates [{:template (keyword->path ::tofu-smtp)
                                                      :overwrite true
                                                      :data-fn (fn [{:keys [ip] :as data} _]
                                                                 (assoc data :ip (or ip "192.168.0.1")))
-                                                     :provider-smtp "resend"
-                                                     :transform [["{{ provider-smtp }}"
+                                                     :provider-smtp provider-smtp
+                                                     :transform [[provider-smtp
                                                                   delimiters]]}]}
                                opts)]
     (run-steps-with-plugin plugin-step step-fns opts)))
@@ -105,23 +122,39 @@
                                                             :out *err*}}))))
   (-> tap-values))
 
+(defn- add-fqn-suffix
+  [fqn suffix]
+  (if-let [ns (namespace fqn)]
+    (keyword ns (str (name fqn) suffix))
+    (keyword (str (name fqn) suffix))))
+
+(defn- tofu-fqn->name
+  [fqn]
+  (let [sanitize #(str/replace % #"[-\.]" "_")
+        ns (some-> (namespace fqn) sanitize)
+        n (sanitize (name fqn))]
+    (str ns (when ns "_") n)))
+
+(defn- tofu-construct
+  [group type fqn block]
+  {group {type {(tofu-fqn->name fqn) block}}})
+
 (defn render-fn
   [src {:keys [records]}]
   (case src
-    :smtp (let [cloudflare-recores (for [{:keys [name priority record type value]} records]
-                                     (->Construct :resource
-                                                  :cloudflare_dns_record
-                                                  (add-suffix ::smtp-dns (format "-%s-%s" record type))
-                                                  (cond-> {:zone_id "${data.cloudflare_zone.domain.id}"
-                                                           :name name
-                                                           :ttl "1"
-                                                           :type type
-                                                           :proxied false}
-                                                    (= type "TXT") (merge {:content (format "\"%s\"" value)})
-                                                    (= type "MX") (merge {:priority priority
-                                                                          :content value}))))
-                m (or (->> cloudflare-recores
-                           (map construct)
+    :smtp (let [cloudflare-records (for [{:keys [name priority record type value]} records]
+                                     (tofu-construct :resource
+                                                     :cloudflare_dns_record
+                                                     (add-fqn-suffix ::smtp-dns (format "-%s-%s" record type))
+                                                     (cond-> {:zone_id "${data.cloudflare_zone.domain.id}"
+                                                              :name name
+                                                              :ttl "1"
+                                                              :type type
+                                                              :proxied false}
+                                                       (= type "TXT") (merge {:content (format "\"%s\"" value)})
+                                                       (= type "MX") (merge {:priority priority
+                                                                             :content value}))))
+                m (or (->> cloudflare-records
                            (apply utils/deep-merge)
                            utils/sort-nested-map) {})]
             (json/generate-string m {:pretty true}))))
@@ -138,13 +171,14 @@
 
 (defn tofu-dns
   [step-fns opts]
-  (let [opts (workflow/prepare {::workflow/name ::tofu-dns
+  (let [provider-dns (provider-param opts :provider-dns "cloudflare")
+        opts (workflow/prepare {::workflow/name ::tofu-dns
                                 ::render/templates [{:template (keyword->path ::tofu-dns)
                                                      :overwrite true
                                                      :data-fn (fn [{:keys [ip] :as data} _]
                                                                 (assoc data :ip (or ip "192.168.0.1")))
-                                                     :provider-dns "cloudflare"
-                                                     :transform [["{{ provider-dns }}"
+                                                     :provider-dns provider-dns
+                                                     :transform [[provider-dns
                                                                   delimiters]
                                                                  [render-fn
                                                                   {:smtp "smtp.tf.json"}
@@ -170,11 +204,12 @@
 
 (defn tofu-smtp-post
   [step-fns opts]
-  (let [opts (workflow/prepare {::workflow/name ::tofu-smtp-post
+  (let [provider-smtp (provider-param opts :provider-smtp "resend")
+        opts (workflow/prepare {::workflow/name ::tofu-smtp-post
                                 ::render/templates [{:template (keyword->path ::tofu-smtp-post)
                                                      :overwrite true
-                                                     :provider-smtp "resend"
-                                                     :transform [["{{ provider-smtp }}"
+                                                     :provider-smtp provider-smtp
+                                                     :transform [[provider-smtp
                                                                   delimiters]]}]}
                                opts)]
     (run-steps-with-plugin plugin-step step-fns opts)))
