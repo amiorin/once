@@ -1,68 +1,128 @@
 """Tofu / Ansible tool workflows."""
 from __future__ import annotations
 
-import json
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
-from .bc.big_tofu import add_suffix, construct, make_construct
-from .bc.core import Opts, StepFn
-from .bc.pluggable import register_step
-from .bc.render import Delimiters, render_templates
-from .bc.step_fns import exit_step_fn, print_error_step_fn
-from .bc.utils import deep_merge, keyword_to_path, sort_nested_map
-from .bc.workflow import parse_args, prepare, print_step_fn, run_steps
+from big_config import ERR, EXIT
+from big_config import pluggable
+from big_config import render as bc_render
+from big_config import workflow as bc_workflow
+from big_config.core import Opts, StepFn
+from big_config.step_fns import exit_step_fn, print_error_step_fn
+from big_config.utils import deep_merge, keyword_to_path, sort_nested_map
+from big_tofu.core import Construct, add_suffix, construct
+
+from .interop import PARAMS
 
 END = "big-config.workflow/end"
 
-step_fns: list[StepFn] = [print_step_fn, exit_step_fn(END), print_error_step_fn(END)]
+step_fns: list[StepFn] = [bc_workflow.print_step_fn, exit_step_fn(END), print_error_step_fn(END)]
 
-# Custom delimiters for file content: <{ var }>.
-delimiters = Delimiters(tag_open="<", tag_close=">", filter_open="{", filter_close="}")
+delimiters = {"tag-open": "<", "tag-close": ">", "filter-open": "{", "filter-close": "}"}
+
+TOFU = "io.github.amiorin.once.tools/tofu"
+TOFU_SMTP = "io.github.amiorin.once.tools/tofu-smtp"
+TOFU_DNS = "io.github.amiorin.once.tools/tofu-dns"
+TOFU_SMTP_POST = "io.github.amiorin.once.tools/tofu-smtp-post"
+ANSIBLE_LOCAL = "io.github.amiorin.once.tools/ansible-local"
+ANSIBLE = "io.github.amiorin.once.tools/ansible"
 
 plugin_step = "io.github.amiorin.once.tools/render-tofu-backend"
 
 
 def run_steps_with_plugin(plugin: str, sfns: list[StepFn], opts: Opts) -> Opts:
     steps: list[str] = []
-    for step in opts.get("steps") or []:
+    for step in opts.get(bc_workflow.STEPS) or []:
         if step == "render":
             steps.extend([step, plugin])
         else:
             steps.append(step)
-    return run_steps(sfns, {**opts, "steps": steps})
+    return bc_workflow.run_steps(sfns, {**opts, bc_workflow.STEPS: steps})
+
+
+def _provider_param(opts: Opts, key: str, default: Any) -> Any:
+    return (opts.get(PARAMS) or {}).get(key, default)
 
 
 def _render_tofu_backend(_f, _step: str, sfns: list[StepFn], opts: Opts) -> Opts:
-    prepare_keys = ["name", "pathFn", "prefix", "objectFn", "objectPrefix", "params"]
+    provider_backend = _provider_param(opts, "provider-backend", "s3")
+    prepare_keys = [
+        bc_workflow.NAME,
+        bc_workflow.PATH_FN,
+        bc_workflow.PREFIX,
+        bc_workflow.OBJECT_FN,
+        bc_workflow.OBJECT_PREFIX,
+        bc_workflow.PARAMS,
+    ]
     overrides = {k: opts[k] for k in prepare_keys if k in opts}
-    prepared = prepare(
+    prepared = bc_workflow.prepare(
         {
-            "name": opts.get("name"),
-            "templates": [
+            bc_workflow.NAME: opts.get(bc_workflow.NAME),
+            bc_render.TEMPLATES: [
                 {
                     "template": keyword_to_path("io.github.amiorin.once.tools/tofu-backend"),
                     "overwrite": True,
-                    "provider-backend": "s3",
-                    "transform": [["{{ provider-backend }}", delimiters]],
+                    "provider-backend": provider_backend,
+                    "transform": [[provider_backend, delimiters]],
                 }
             ],
         },
         overrides,
     )
-    plugin_opts = render_templates(sfns, prepared)
+    plugin_opts = bc_render.templates(sfns, prepared)
     return {
         **opts,
-        "exit": plugin_opts.get("exit"),
-        "err": plugin_opts.get("err"),
+        EXIT: plugin_opts.get(EXIT),
+        ERR: plugin_opts.get(ERR),
         plugin_step: [*(opts.get(plugin_step) or []), plugin_opts],
     }
 
 
-register_step(plugin_step, _render_tofu_backend)
+pluggable.defmethod(plugin_step, _render_tofu_backend)
 
 
 def _ip_data_fn(data: dict[str, Any], _opts: Opts | None = None) -> dict[str, Any]:
     return {**data, "ip": data.get("ip") or "192.168.0.1"}
+
+
+def _json_string(value: str) -> str:
+    import json
+
+    return json.dumps(value, ensure_ascii=False)
+
+
+def clj_json(value: Any, indent: int = 0) -> str:
+    """Pretty JSON with Cheshire's spacing for the rendered fixtures."""
+    sp = " " * indent
+    child = " " * (indent + 2)
+    if isinstance(value, dict):
+        if not value:
+            return "{ }"
+        items = list(value.items())
+        lines = ["{"]
+        for i, (k, v) in enumerate(items):
+            comma = "," if i < len(items) - 1 else ""
+            lines.append(f"{child}{_json_string(str(k))} : {clj_json(v, indent + 2)}{comma}")
+        lines.append(f"{sp}}}")
+        return "\n".join(lines)
+    if isinstance(value, list):
+        if not value:
+            return "[ ]"
+        lines = ["["]
+        for i, v in enumerate(value):
+            comma = "," if i < len(value) - 1 else ""
+            lines.append(f"{child}{clj_json(v, indent + 2)}{comma}")
+        lines.append(f"{sp}]")
+        return "\n".join(lines)
+    if isinstance(value, str):
+        return _json_string(value)
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if value is None:
+        return "null"
+    return str(value)
 
 
 def render_fn(src: str, data: dict[str, Any]) -> str:
@@ -89,7 +149,7 @@ def render_fn(src: str, data: dict[str, Any]) -> str:
             block = {**block, "priority": priority, "content": value}
         constructs.append(
             construct(
-                make_construct(
+                Construct(
                     "resource",
                     "cloudflare_dns_record",
                     add_suffix("io.github.amiorin.once.tools/smtp-dns", f"-{record}-{type_}"),
@@ -98,7 +158,7 @@ def render_fn(src: str, data: dict[str, Any]) -> str:
             )
         )
     merged = sort_nested_map(deep_merge(*constructs)) if constructs else {}
-    return json.dumps(merged, indent=2)
+    return clj_json(merged)
 
 
 def ansible_data_fn(data: dict[str, Any], _opts: Opts | None = None) -> dict[str, Any]:
@@ -127,7 +187,7 @@ def inventory(data: dict[str, Any]) -> str:
         for a in admins
     }
     inv = {"all": {"children": {"admin": {"hosts": admins_hosts}, "users": {"hosts": users_hosts}}}}
-    return json.dumps(inv, indent=2)
+    return clj_json(inv)
 
 
 def _yaml_scalar(v: Any) -> str:
@@ -135,9 +195,7 @@ def _yaml_scalar(v: Any) -> str:
         return "null"
     if isinstance(v, bool):
         return "true" if v else "false"
-    if isinstance(v, (int, float)) and not isinstance(v, bool):
-        return str(v)
-    return json.dumps(str(v))
+    return str(v)
 
 
 def _yaml_lines(value: Any, indent: str = "") -> list[str]:
@@ -192,7 +250,6 @@ def ansible_once(data: dict[str, Any]) -> str:
 
 
 def render(target: str, data: dict[str, Any]) -> str:
-    """Multi-target render function for inventory and ONCE task file."""
     if target == "inventory":
         return inventory(data)
     if target == "ansible-once":
@@ -201,16 +258,17 @@ def render(target: str, data: dict[str, Any]) -> str:
 
 
 def tofu(sfns: list[StepFn], opts: Opts) -> Opts:
-    prepared = prepare(
+    provider_compute = _provider_param(opts, "provider-compute", "hcloud")
+    prepared = bc_workflow.prepare(
         {
-            "name": "io.github.amiorin.once.tools/tofu",
-            "templates": [
+            bc_workflow.NAME: TOFU,
+            bc_render.TEMPLATES: [
                 {
-                    "template": keyword_to_path("io.github.amiorin.once.tools/tofu"),
+                    "template": keyword_to_path(TOFU),
                     "overwrite": True,
-                    "provider-compute": "hcloud",
+                    "provider-compute": provider_compute,
                     "compute-prevent-destroy": True,
-                    "transform": [["{{ provider-compute }}", delimiters]],
+                    "transform": [[provider_compute, delimiters]],
                 }
             ],
         },
@@ -220,16 +278,17 @@ def tofu(sfns: list[StepFn], opts: Opts) -> Opts:
 
 
 def tofu_smtp(sfns: list[StepFn], opts: Opts) -> Opts:
-    prepared = prepare(
+    provider_smtp = _provider_param(opts, "provider-smtp", "resend")
+    prepared = bc_workflow.prepare(
         {
-            "name": "io.github.amiorin.once.tools/tofu-smtp",
-            "templates": [
+            bc_workflow.NAME: TOFU_SMTP,
+            bc_render.TEMPLATES: [
                 {
-                    "template": keyword_to_path("io.github.amiorin.once.tools/tofu-smtp"),
+                    "template": keyword_to_path(TOFU_SMTP),
                     "overwrite": True,
-                    "dataFn": _ip_data_fn,
-                    "provider-smtp": "resend",
-                    "transform": [["{{ provider-smtp }}", delimiters]],
+                    "data-fn": _ip_data_fn,
+                    "provider-smtp": provider_smtp,
+                    "transform": [[provider_smtp, delimiters]],
                 }
             ],
         },
@@ -239,17 +298,18 @@ def tofu_smtp(sfns: list[StepFn], opts: Opts) -> Opts:
 
 
 def tofu_dns(sfns: list[StepFn], opts: Opts) -> Opts:
-    prepared = prepare(
+    provider_dns = _provider_param(opts, "provider-dns", "cloudflare")
+    prepared = bc_workflow.prepare(
         {
-            "name": "io.github.amiorin.once.tools/tofu-dns",
-            "templates": [
+            bc_workflow.NAME: TOFU_DNS,
+            bc_render.TEMPLATES: [
                 {
-                    "template": keyword_to_path("io.github.amiorin.once.tools/tofu-dns"),
+                    "template": keyword_to_path(TOFU_DNS),
                     "overwrite": True,
-                    "dataFn": _ip_data_fn,
-                    "provider-dns": "cloudflare",
+                    "data-fn": _ip_data_fn,
+                    "provider-dns": provider_dns,
                     "transform": [
-                        ["{{ provider-dns }}", delimiters],
+                        [provider_dns, delimiters],
                         [render_fn, {"smtp": "smtp.tf.json"}, delimiters],
                     ],
                 }
@@ -261,15 +321,16 @@ def tofu_dns(sfns: list[StepFn], opts: Opts) -> Opts:
 
 
 def tofu_smtp_post(sfns: list[StepFn], opts: Opts) -> Opts:
-    prepared = prepare(
+    provider_smtp = _provider_param(opts, "provider-smtp", "resend")
+    prepared = bc_workflow.prepare(
         {
-            "name": "io.github.amiorin.once.tools/tofu-smtp-post",
-            "templates": [
+            bc_workflow.NAME: TOFU_SMTP_POST,
+            bc_render.TEMPLATES: [
                 {
-                    "template": keyword_to_path("io.github.amiorin.once.tools/tofu-smtp-post"),
+                    "template": keyword_to_path(TOFU_SMTP_POST),
                     "overwrite": True,
-                    "provider-smtp": "resend",
-                    "transform": [["{{ provider-smtp }}", delimiters]],
+                    "provider-smtp": provider_smtp,
+                    "transform": [[provider_smtp, delimiters]],
                 }
             ],
         },
@@ -279,14 +340,14 @@ def tofu_smtp_post(sfns: list[StepFn], opts: Opts) -> Opts:
 
 
 def ansible(sfns: list[StepFn], opts: Opts) -> Opts:
-    prepared = prepare(
+    prepared = bc_workflow.prepare(
         {
-            "name": "io.github.amiorin.once.tools/ansible",
-            "templates": [
+            bc_workflow.NAME: ANSIBLE,
+            bc_render.TEMPLATES: [
                 {
-                    "template": keyword_to_path("io.github.amiorin.once.tools/ansible"),
+                    "template": keyword_to_path(ANSIBLE),
                     "overwrite": True,
-                    "dataFn": ansible_data_fn,
+                    "data-fn": ansible_data_fn,
                     "transform": [
                         [".", delimiters],
                         [render, {"inventory": "inventory.json", "ansible-once": "once.yml"}, delimiters],
@@ -296,16 +357,16 @@ def ansible(sfns: list[StepFn], opts: Opts) -> Opts:
         },
         opts,
     )
-    return run_steps(sfns, prepared)
+    return bc_workflow.run_steps(sfns, prepared)
 
 
 def ansible_local(sfns: list[StepFn], opts: Opts) -> Opts:
-    prepared = prepare(
+    prepared = bc_workflow.prepare(
         {
-            "name": "io.github.amiorin.once.tools/ansible-local",
-            "templates": [
+            bc_workflow.NAME: ANSIBLE_LOCAL,
+            bc_render.TEMPLATES: [
                 {
-                    "template": keyword_to_path("io.github.amiorin.once.tools/ansible-local"),
+                    "template": keyword_to_path(ANSIBLE_LOCAL),
                     "overwrite": True,
                     "transform": [["."]],
                 }
@@ -313,13 +374,13 @@ def ansible_local(sfns: list[StepFn], opts: Opts) -> Opts:
         },
         opts,
     )
-    return run_steps(sfns, prepared)
+    return bc_workflow.run_steps(sfns, prepared)
 
 
 def tool_star(fn: Callable[[list[StepFn], Opts], Opts]):
     def star(args: str | list[str], opts: Opts | None = None) -> Opts:
-        parsed = parse_args(args)
-        return fn(step_fns, {**parsed, "env": "shell", **(opts or {})})
+        parsed = bc_workflow.parse_args(args)
+        return fn(step_fns, {**parsed, "big-config/env": "shell", **(opts or {})})
 
     return star
 

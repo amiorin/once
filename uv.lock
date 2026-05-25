@@ -1,6 +1,20 @@
 version = 1
 revision = 3
-requires-python = ">=3.11"
+requires-python = ">=3.12"
+
+[[package]]
+name = "big-config"
+version = "0.3.0"
+source = { directory = "/home/ubuntu/code/bigconfig/big-config/python" }
+dependencies = [
+    { name = "selmer" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "selmer", directory = "/home/ubuntu/code/bigconfig/Selmer/python" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]
 name = "colorama"
@@ -24,6 +38,9 @@ wheels = [
 name = "once"
 version = "1.0.0"
 source = { editable = "." }
+dependencies = [
+    { name = "big-config" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -31,6 +48,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "big-config", directory = "/home/ubuntu/code/bigconfig/big-config/python" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.0" }]
@@ -77,3 +95,13 @@ sdist = { url = "https://files.pythonhosted.org/packages/7d/0d/549bd94f1a0a402dc
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249, upload-time = "2026-04-07T17:16:16.13Z" },
 ]
+
+[[package]]
+name = "selmer"
+version = "1.13.1.post0"
+source = { directory = "/home/ubuntu/code/bigconfig/Selmer/python" }
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0" }]

@@ -11,12 +11,13 @@ from .tools import ansible_local_star, ansible_star, tofu_dns_star, tofu_smtp_po
 HELP = """Usage: once <command> [args...]
 
 Commands:
-  once <step>...    Provision or tear down infrastructure for the active profile.
-                      once once validate    Run pre-flight checks.
-                      once once describe    Show providers, SSH and deployed apps.
-                      once once create      Run the full 6-stage create pipeline.
-                      once once delete      Reverse the 4 Tofu stages.
-  validate          Shortcut for `once once validate`.
+  package <step>...  Build, provision, or tear down infrastructure for the active profile.
+                       once package validate
+                       once package describe
+                       once package build
+                       once package create
+                       once package delete
+  validate           Shortcut for `once package validate`.
 
   Individual tools (each requires `render` first):
   tofu <args>             e.g. once tofu render tofu:init tofu:apply:-auto-approve
@@ -32,6 +33,8 @@ Notes:
 
 See: https://www.bigconfig.ai/manual"""
 
+PACKAGE_COMMANDS = {"validate", "describe", "build", "create", "delete"}
+
 
 def main(argv: list[str] | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -41,15 +44,14 @@ def main(argv: list[str] | None = None) -> None:
     if command in {None, "help", "--help", "-h"}:
         print(HELP)
         return
-    if command == "once":
+    if command in {"package", "once"}:  # "once" kept as a backwards-compatible alias.
         once_star(rest, bb)
         return
     if command == "validate":
-        if rest:
-            print("Error: validate does not accept arguments.", file=sys.stderr)
-            print("Usage: once validate", file=sys.stderr)
-            raise SystemExit(1)
-        once_star(["validate"], bb)
+        once_star(argv if rest else ["validate"], bb)
+        return
+    if command in PACKAGE_COMMANDS:
+        once_star(argv, bb)
         return
     if command == "tofu":
         tofu_star(rest, once_opts(bb))

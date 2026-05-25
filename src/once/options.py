@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .bc.core import Opts
+from big_config.core import Opts
+
+from .interop import PARAMS, PROFILE, sync_aliases
 
 Profile = dict[str, Any]
 
@@ -16,7 +18,7 @@ def compose(*layers: Profile) -> Opts:
         if "profile" in layer:
             profile = layer["profile"]
         params = {**params, **(layer.get("params") or {})}
-    return {"profile": profile, "params": params}
+    return sync_aliases({PROFILE: profile, PARAMS: params})
 
 
 deploy: Profile = {

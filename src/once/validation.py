@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Any, Callable, Literal, TypedDict
 from urllib.parse import quote
 
-from .bc.core import Opts, ok
-from .bc.workflow import read_bc_pars
+from big_config import workflow as bc_workflow
+from big_config.core import Opts
+
+from .interop import ok_alias, params_of, profile_of, status, to_bc_opts
 
 CheckKind = Literal["schema", "tool", "credential", "image"]
 
@@ -254,11 +256,11 @@ def schema_errors(opts: Opts) -> list[CheckError] | None:
     def emit(path: str, msg: str) -> None:
         errors.append({"check": "schema", "detail": f"{path}: {msg}"})
 
-    profile_msg = string_value(opts.get("profile"))
+    profile_msg = string_value(profile_of(opts))
     if profile_msg:
         emit("render/profile", profile_msg)
 
-    params = opts.get("params")
+    params = params_of(opts)
     if not isinstance(params, dict):
         emit("workflow/params", "missing required key")
     else:
@@ -543,8 +545,8 @@ def image_errors(params: dict[str, Any], run_fn: Runner = run) -> list[CheckErro
 def validate_report(opts: Opts, env: dict[str, str | None] | None = None) -> ValidateResult:
     """Validate the merged active profile."""
     env = os.environ if env is None else env
-    merged = read_bc_pars(opts, env)
-    params = merged.get("params") or {}
+    merged = bc_workflow.read_bc_pars(to_bc_opts(opts), env)
+    params = params_of(merged)
     errors = [
         *(schema_errors(merged) or []),
         *tool_errors(params),
@@ -578,7 +580,8 @@ def validate(_step_fns: Any, opts: Opts, report_fn: Callable[[Opts], ValidateRes
     """Workflow step for ``once validate``."""
     result = report_fn(opts)
     print_report(result)
-    return {**opts, "validation/result": result, **(ok() if result["ok"] else {"exit": 1, "err": "validation failed"})}
+    base = {**opts, "validation/result": result}
+    return ok_alias(base) if result["ok"] else status(base, 1, "validation failed")
 
 
 # TypeScript-style aliases.

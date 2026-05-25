@@ -3,8 +3,10 @@ name = "once"
 version = "1.0.0"
 description = "Automated provisioning and configuration of cloud infrastructure with OpenTofu and Ansible."
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = []
+requires-python = ">=3.12"
+dependencies = [
+  "big-config @ file:///home/ubuntu/code/bigconfig/big-config/python",
+]
 
 [project.scripts]
 once = "once.cli:main"
@@ -13,6 +15,9 @@ once = "once.cli:main"
 dev = [
   "pytest>=8.0",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]

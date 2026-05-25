@@ -5,55 +5,106 @@ import json
 import subprocess
 from typing import Any
 
-from .bc.core import Opts
-from .bc.workflow import new_prefix, path, read_bc_pars
+from big_config import workflow as bc_workflow
+from big_config.core import Opts
+
+from .interop import PARAMS, sync_aliases, to_bc_opts
 
 START_STEP = "io.github.amiorin.once.package/start-create-or-delete"
+TOFU = "io.github.amiorin.once.tools/tofu"
+TOFU_SMTP = "io.github.amiorin.once.tools/tofu-smtp"
 
 
-def tofu_output(directory: str) -> dict[str, Any]:
-    res = subprocess.run(
-        ["tofu", "output", "--json"],
-        cwd=directory,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if res.returncode != 0:
-        raise RuntimeError(res.stderr or "tofu output failed")
-    return json.loads(res.stdout)
+def tofu_output(directory: str) -> dict[str, Any] | None:
+    try:
+        res = subprocess.run(
+            ["tofu", "output", "--json"],
+            cwd=directory,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if res.returncode != 0:
+            return None
+        parsed = json.loads(res.stdout or "{}")
+        value = (parsed.get("params") or {}).get("value")
+        return value if isinstance(value, dict) else None
+    except Exception:  # noqa: BLE001 - Clojure implementation silently falls back.
+        return None
+
+
+def fallback_compute_params(params: dict[str, Any]) -> dict[str, Any]:
+    name = params.get("package") or "once"
+    provider = params.get("provider-compute")
+    if provider == "oci":
+        return {"ip": "192.168.0.1", "sudoer": "ubuntu", "uid": "1001", "name": name, "user": "ubuntu"}
+    if provider == "no-infra":
+        out = {
+            "ip": params.get("no-infra-compute-ip") or "192.168.0.1",
+            "sudoer": params.get("no-infra-compute-sudoer") or "root",
+            "name": name,
+            "user": params.get("no-infra-compute-user") or "root",
+        }
+        if params.get("no-infra-compute-uid") is not None:
+            out["uid"] = params["no-infra-compute-uid"]
+        return out
+    return {"ip": "192.168.0.1", "sudoer": "root", "name": name, "user": "root"}
+
+
+def fallback_smtp_params(params: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {"id": "domain-id-not-defined", "records": []}
+    provider = params.get("provider-smtp")
+    if provider == "no-infra":
+        out.update(
+            {
+                "smtp_username": params.get("no-infra-smtp-username"),
+                "smtp_password": params.get("no-infra-smtp-password"),
+                "smtp_server": params.get("no-infra-smtp-server"),
+                "smtp_port": params.get("no-infra-smtp-port"),
+                "smtp_use_starttls": True,
+            }
+        )
+    elif provider == "resend":
+        out.update(
+            {
+                "smtp_username": params.get("resend-username"),
+                "smtp_password": params.get("resend-password"),
+                "smtp_server": params.get("resend-server"),
+                "smtp_port": params.get("resend-port"),
+                "smtp_use_starttls": True,
+            }
+        )
+    return out
+
+
+def _merge_params(opts: Opts, new_params: dict[str, Any]) -> Opts:
+    params = dict(opts.get(PARAMS) or {})
+    return {**opts, PARAMS: {**params, **new_params}}
 
 
 def tofu_params(opts: Opts) -> Opts:
-    """Merge the IP (and other compute outputs) from the ``tofu`` stage."""
-    directory = path(opts, "io.github.amiorin.once.tools/tofu")
-    try:
-        value = tofu_output(directory).get("params", {}).get("value") or {"ip": "192.168.0.1"}
-    except Exception:
-        value = {"ip": "192.168.0.1"}
-    return {**opts, "params": {**(opts.get("params") or {}), **value}}
+    opts = to_bc_opts(opts)
+    params = dict(opts.get(PARAMS) or {})
+    directory = bc_workflow.path(opts, TOFU)
+    return sync_aliases(_merge_params(opts, {**fallback_compute_params(params), **(tofu_output(directory) or {})}))
 
 
 def tofu_smtp_params(opts: Opts) -> Opts:
-    """Merge SMTP records / domain id from the ``tofu-smtp`` stage."""
-    directory = path(opts, "io.github.amiorin.once.tools/tofu-smtp")
-    default = {"id": "domain-id-not-defined", "records": []}
-    try:
-        value = tofu_output(directory).get("params", {}).get("value") or default
-    except Exception:
-        value = default
-    return {**opts, "params": {**(opts.get("params") or {}), **value}}
+    opts = to_bc_opts(opts)
+    params = dict(opts.get(PARAMS) or {})
+    directory = bc_workflow.path(opts, TOFU_SMTP)
+    return sync_aliases(_merge_params(opts, {**fallback_smtp_params(params), **(tofu_output(directory) or {})}))
 
 
 def opts_fn(opts: Opts) -> Opts:
     """Compose env overrides with SMTP and compute Tofu outputs."""
-    return tofu_params(tofu_smtp_params(read_bc_pars(opts)))
+    return sync_aliases(tofu_params(tofu_smtp_params(bc_workflow.read_bc_pars(to_bc_opts(opts)))))
 
 
 def once_opts(opts: Opts) -> Opts:
     """``opts_fn`` after stamping the deterministic create/delete prefix."""
-    return opts_fn(new_prefix(opts, START_STEP))
+    return opts_fn(bc_workflow.new_prefix(to_bc_opts(opts), START_STEP))
 
 
 tofuParams = tofu_params

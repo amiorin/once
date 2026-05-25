@@ -7,7 +7,9 @@ import re
 import subprocess
 from typing import Any, Callable, TypedDict
 
-from .bc.core import Opts, ok
+from big_config.core import Opts
+
+from .interop import ok_alias, params_of, profile_of, status, sync_aliases
 from .params import once_opts
 
 RUN_TIMEOUT_MS = 30000
@@ -411,15 +413,15 @@ def resolve_once_opts(opts: Opts, once_opts_fn: Callable[[Opts], Opts]) -> dict[
 def describe_report(opts: Opts, run_fn: RunFn = run, once_opts_fn: Callable[[Opts], Opts] = once_opts) -> dict[str, Any]:
     """Build a describe report from opts."""
     resolved = resolve_once_opts(opts, once_opts_fn)
-    resolved_opts = resolved["opts"]
-    params = resolved_opts.get("params") or {}
+    resolved_opts = sync_aliases(resolved["opts"])
+    params = params_of(resolved_opts)
     providers = provider_summary(params)
     compute = compute_status(run_fn, params)
     if resolved.get("detail"):
         compute = {**compute, "detail": f"{compute.get('detail')}; {resolved['detail']}"}
     app_result = remote_applications(run_fn, compute) if compute.get("running") else {"ok": False, "detail": "not checked because compute is not reachable"}
     return {
-        "profile": resolved_opts.get("profile"),
+        "profile": profile_of(resolved_opts),
         "providers": providers,
         "compute": compute,
         "applications": app_result.get("applications") or [],
@@ -485,11 +487,10 @@ def describe(_step_fns: Any, opts: Opts, report_fn: Callable[[Opts], dict[str, A
     """Workflow step for ``once describe``."""
     result = report_fn(opts)
     print_report(result)
-    return {
-        **opts,
-        "describe/result": result,
-        **({"exit": 1, "err": result.get("applicationsError") or "describe failed"} if result.get("fatalError") else ok()),
-    }
+    base = {**sync_aliases(opts), "describe/result": result}
+    if result.get("fatalError"):
+        return status(base, 1, result.get("applicationsError") or "describe failed")
+    return ok_alias(base)
 
 
 # TypeScript-style aliases.
