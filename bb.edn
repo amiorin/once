@@ -1,6 +1,7 @@
 {:deps {io.github.amiorin/once {:local/root "."}}
  :tasks
- {:requires ([io.github.amiorin.once.params :as params]
+ {:requires ([io.github.amiorin.once.cli :as cli]
+             [io.github.amiorin.once.params :as params]
              [io.github.amiorin.once.options :as options]
              [io.github.amiorin.once.package :as package]
              [io.github.amiorin.once.tools :as tools])
@@ -9,34 +10,36 @@
         :task (println "Usage: bb <task> [args...]
 
 Tasks:
-  validate  Shortcut for `bb once validate`.
+  validate  Shortcut for `bb once package validate`.
             Usage:
               bb validate              Run pre-flight checks for the active profile.
 
   once      Build, provision, or tear down infrastructure for the active profile.
             Usage:
-              bb once validate         Run pre-flight checks for the active profile.
-              bb once describe         Show providers, SSH reachability, and deployed apps.
-              bb once build            Render all 6 stages without applying/provisioning:
+              bb once package validate Run pre-flight checks for the active profile.
+              bb once package describe Show providers, SSH reachability, and deployed apps.
+              bb once package build    Render all 6 stages without applying/provisioning:
                                          tofu -> tofu-smtp -> tofu-dns ->
                                          tofu-smtp-post -> ansible-local -> ansible
-              bb once create           Run the full 6-stage create pipeline:
+              bb once package create   Run the full 6-stage create pipeline:
                                          tofu -> tofu-smtp -> tofu-dns ->
                                          tofu-smtp-post -> ansible-local -> ansible
-              bb once delete           Reverse the 4 Tofu stages (destroy order 4->3->2->1).
-              bb once validate create  Validate, then create only if validation passes.
-              bb once delete create    Clean-slate redeploy.
+              bb once package delete   Reverse the 4 Tofu stages (destroy order 4->3->2->1).
+              bb once package validate create
+                                       Validate, then create only if validation passes.
+              bb once package delete create
+                                       Clean-slate redeploy.
             Notes:
               * validate/describe run only when explicitly requested.
               * Compute resources render with prevent_destroy = true by default.
-                Override with: BC_PAR_COMPUTE_PREVENT_DESTROY=false bb once delete
+                Override with: BC_PAR_COMPUTE_PREVENT_DESTROY=false bb once package delete
               * The active profile is selected by (def bb ...) in options.clj.
 
 See:
 * https://www.bigconfig.ai/manual")}
-  once {:doc "bb once validate | bb once describe | bb once build | bb once create | bb once delete"
-        :task (package/once* *command-line-args* options/bb)}
-  validate {:doc "Shortcut for bb once validate"
+  once {:doc "bb once package validate | describe | build | create | delete"
+        :task (cli/main* *command-line-args*)}
+  validate {:doc "Shortcut for bb once package validate"
             :task (if (seq *command-line-args*)
                     (do
                       (binding [*out* *err*]
