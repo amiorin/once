@@ -4,9 +4,9 @@ import type { Opts } from "big-config";
 import * as bcWorkflow from "big-config/workflow";
 import { PARAMS, syncAliases, toBcOpts } from "./interop.js";
 
-const START_STEP = "io.github.amiorin.once.package/start-create-or-delete";
-const TOFU = "io.github.amiorin.once.tools/tofu";
-const TOFU_SMTP = "io.github.amiorin.once.tools/tofu-smtp";
+const START_STEP = "io.github.bigconig-ai.once.package/start-create-or-delete";
+const TOFU = "io.github.bigconig-ai.once.tools/tofu";
+const TOFU_SMTP = "io.github.bigconig-ai.once.tools/tofu-smtp";
 
 function tofuOutput(dir: string): Record<string, any> | undefined {
   try {

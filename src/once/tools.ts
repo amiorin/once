@@ -36,14 +36,14 @@ export const delimiters = {
   "filter-close": "}",
 };
 
-export const TOFU = "io.github.amiorin.once.tools/tofu";
-export const TOFU_SMTP = "io.github.amiorin.once.tools/tofu-smtp";
-export const TOFU_DNS = "io.github.amiorin.once.tools/tofu-dns";
-export const TOFU_SMTP_POST = "io.github.amiorin.once.tools/tofu-smtp-post";
-export const ANSIBLE_LOCAL = "io.github.amiorin.once.tools/ansible-local";
-export const ANSIBLE = "io.github.amiorin.once.tools/ansible";
+export const TOFU = "io.github.bigconig-ai.once.tools/tofu";
+export const TOFU_SMTP = "io.github.bigconig-ai.once.tools/tofu-smtp";
+export const TOFU_DNS = "io.github.bigconig-ai.once.tools/tofu-dns";
+export const TOFU_SMTP_POST = "io.github.bigconig-ai.once.tools/tofu-smtp-post";
+export const ANSIBLE_LOCAL = "io.github.bigconig-ai.once.tools/ansible-local";
+export const ANSIBLE = "io.github.bigconig-ai.once.tools/ansible";
 
-export const pluginStep = "io.github.amiorin.once.tools/render-tofu-backend";
+export const pluginStep = "io.github.bigconig-ai.once.tools/render-tofu-backend";
 
 function runStepsWithPlugin(plugin: string, sfns: StepFn[], opts: Opts): Opts {
   const steps: string[] = [];
@@ -68,7 +68,7 @@ registerHandleStep(pluginStep, (_f, _step, sfns, opts) => {
       [WF_NAME]: opts[WF_NAME],
       [RENDER_TEMPLATES]: [
         {
-          template: keywordToPath("io.github.amiorin.once.tools/tofu-backend"),
+          template: keywordToPath("io.github.bigconig-ai.once.tools/tofu-backend"),
           overwrite: true,
           "provider-backend": providerBackend,
           transform: [[providerBackend, delimiters]],
@@ -134,7 +134,7 @@ export function renderFn(src: string, data: Record<string, any>): string {
     return construct(new Construct(
       "resource",
       "cloudflare_dns_record",
-      addSuffix("io.github.amiorin.once.tools/smtp-dns", `-${record}-${type}`),
+      addSuffix("io.github.bigconig-ai.once.tools/smtp-dns", `-${record}-${type}`),
       block,
     ));
   });

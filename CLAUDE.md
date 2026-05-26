@@ -41,7 +41,7 @@ once/
 │   │   ├── validation.ts    # Profile schema, tool/credential/image/ssh-agent checks
 │   │   ├── describe.ts      # Post-provisioning report
 │   │   └── utils.ts         # stripAnsi
-│   ├── resources/io/github/amiorin/once/tools/
+│   ├── resources/io/github/bigconig-ai/once/tools/
 │   │   ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
 │   │   ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
 │   │   ├── tofu-smtp/       # SMTP (Resend) setup templates
