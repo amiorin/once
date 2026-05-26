@@ -37,7 +37,7 @@ describe.skipIf(!hasBb)("build parity", () => {
     clean(clojureDir);
     clean(typeScriptDir);
 
-    run("bb", ["once", "package", "build"], clojureDir);
+    run("bb", ["run", "once", "package", "build"], clojureDir);
     run("npm", ["run", "once", "--", "package", "build"], typeScriptDir);
 
     const cljOut = join(clojureDir, profileDir);
