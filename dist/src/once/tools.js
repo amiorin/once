@@ -1,4 +1,7 @@
 /** Tofu / Ansible tool workflows. */
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ERR, EXIT, RENDER_TEMPLATES, WF_NAME, WF_OBJECT_FN, WF_OBJECT_PREFIX, WF_PARAMS, WF_PATH_FN, WF_PREFIX, WF_STEPS, } from "big-config";
 import { Construct, addSuffix, construct } from "big-config/big-tofu/core";
 import { registerHandleStep } from "big-config/pluggable";
@@ -18,13 +21,23 @@ export const delimiters = {
     "filter-open": "{",
     "filter-close": "}",
 };
-export const TOFU = "io.github.amiorin.once.tools/tofu";
-export const TOFU_SMTP = "io.github.amiorin.once.tools/tofu-smtp";
-export const TOFU_DNS = "io.github.amiorin.once.tools/tofu-dns";
-export const TOFU_SMTP_POST = "io.github.amiorin.once.tools/tofu-smtp-post";
-export const ANSIBLE_LOCAL = "io.github.amiorin.once.tools/ansible-local";
-export const ANSIBLE = "io.github.amiorin.once.tools/ansible";
-export const pluginStep = "io.github.amiorin.once.tools/render-tofu-backend";
+export const TOFU = "io.github.bigconig-ai.once.tools/tofu";
+export const TOFU_SMTP = "io.github.bigconig-ai.once.tools/tofu-smtp";
+export const TOFU_DNS = "io.github.bigconig-ai.once.tools/tofu-dns";
+export const TOFU_SMTP_POST = "io.github.bigconig-ai.once.tools/tofu-smtp-post";
+export const ANSIBLE_LOCAL = "io.github.bigconig-ai.once.tools/ansible-local";
+export const ANSIBLE = "io.github.bigconig-ai.once.tools/ansible";
+const HERE = dirname(fileURLToPath(import.meta.url));
+function templatePath(template) {
+    const rel = keywordToPath(template);
+    const candidates = [
+        join(HERE, "..", "resources", rel),
+        join(HERE, "..", "..", "resources", rel),
+        join(HERE, "..", "..", "..", "src", "resources", rel),
+    ];
+    return candidates.find((candidate) => existsSync(candidate)) ?? rel;
+}
+export const pluginStep = "io.github.bigconig-ai.once.tools/render-tofu-backend";
 function runStepsWithPlugin(plugin, sfns, opts) {
     const steps = [];
     for (const step of opts[WF_STEPS] ?? []) {
@@ -49,7 +62,7 @@ registerHandleStep(pluginStep, (_f, _step, sfns, opts) => {
         [WF_NAME]: opts[WF_NAME],
         [RENDER_TEMPLATES]: [
             {
-                template: keywordToPath("io.github.amiorin.once.tools/tofu-backend"),
+                template: templatePath("io.github.bigconig-ai.once.tools/tofu-backend"),
                 overwrite: true,
                 "provider-backend": providerBackend,
                 transform: [[providerBackend, delimiters]],
@@ -116,7 +129,7 @@ export function renderFn(src, data) {
             block = { ...block, content: `"${value}"` };
         if (type === "MX")
             block = { ...block, priority, content: value };
-        return construct(new Construct("resource", "cloudflare_dns_record", addSuffix("io.github.amiorin.once.tools/smtp-dns", `-${record}-${type}`), block));
+        return construct(new Construct("resource", "cloudflare_dns_record", addSuffix("io.github.bigconig-ai.once.tools/smtp-dns", `-${record}-${type}`), block));
     });
     const merged = constructs.length ? sortNestedMap(deepMerge(...constructs)) : {};
     return cljJson(merged);
@@ -231,7 +244,7 @@ export function tofu(sfns, opts) {
         [WF_NAME]: TOFU,
         [RENDER_TEMPLATES]: [
             {
-                template: keywordToPath(TOFU),
+                template: templatePath(TOFU),
                 overwrite: true,
                 "provider-compute": providerCompute,
                 "compute-prevent-destroy": true,
@@ -247,7 +260,7 @@ export function tofuSmtp(sfns, opts) {
         [WF_NAME]: TOFU_SMTP,
         [RENDER_TEMPLATES]: [
             {
-                template: keywordToPath(TOFU_SMTP),
+                template: templatePath(TOFU_SMTP),
                 overwrite: true,
                 "data-fn": ipDataFn,
                 "provider-smtp": providerSmtp,
@@ -263,7 +276,7 @@ export function tofuDns(sfns, opts) {
         [WF_NAME]: TOFU_DNS,
         [RENDER_TEMPLATES]: [
             {
-                template: keywordToPath(TOFU_DNS),
+                template: templatePath(TOFU_DNS),
                 overwrite: true,
                 "data-fn": ipDataFn,
                 "provider-dns": providerDns,
@@ -282,7 +295,7 @@ export function tofuSmtpPost(sfns, opts) {
         [WF_NAME]: TOFU_SMTP_POST,
         [RENDER_TEMPLATES]: [
             {
-                template: keywordToPath(TOFU_SMTP_POST),
+                template: templatePath(TOFU_SMTP_POST),
                 overwrite: true,
                 "provider-smtp": providerSmtp,
                 transform: [[providerSmtp, delimiters]],
@@ -296,7 +309,7 @@ export function ansible(sfns, opts) {
         [WF_NAME]: ANSIBLE,
         [RENDER_TEMPLATES]: [
             {
-                template: keywordToPath(ANSIBLE),
+                template: templatePath(ANSIBLE),
                 overwrite: true,
                 "data-fn": ansibleDataFn,
                 transform: [
@@ -313,7 +326,7 @@ export function ansibleLocal(sfns, opts) {
         [WF_NAME]: ANSIBLE_LOCAL,
         [RENDER_TEMPLATES]: [
             {
-                template: keywordToPath(ANSIBLE_LOCAL),
+                template: templatePath(ANSIBLE_LOCAL),
                 overwrite: true,
                 transform: [["."]],
             },

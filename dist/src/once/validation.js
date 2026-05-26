@@ -10,7 +10,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { readBcPars } from "big-config/workflow";
-import { okAlias, paramsOf, profileOf, status, toBcOpts } from "./interop.js";
+import { okAlias, paramsOf, profileOf, status, syncAliases, toBcOpts } from "./interop.js";
 // -------------------------------------------------------------- regexes
 const domainRx = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 const hostnameRx = domainRx;
@@ -582,7 +582,7 @@ function imageErrors(params, runFn = run) {
 // -------------------------------------------------------------- top-level
 /** Validate the merged active profile. */
 export function validateReport(opts, env = process.env) {
-    const merged = readBcPars(toBcOpts(opts), env);
+    const merged = syncAliases(readBcPars(toBcOpts(opts), env));
     const params = paramsOf(merged);
     const errors = [
         ...(schemaErrors(merged) ?? []),

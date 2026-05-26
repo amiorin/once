@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -31,6 +32,18 @@ function files(base: string): string[] {
   if (existsSync(base)) walk(base);
   return out.sort();
 }
+
+describe("built CLI", () => {
+  it("renders package templates outside the package root", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "once-typescript-"));
+    try {
+      run("node", [join(typeScriptDir, "dist/src/cli.js"), "package", "build"], tmp);
+      expect(existsSync(join(tmp, ".dist"))).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
 
 describe.skipIf(!hasBb)("build parity", () => {
   it("TypeScript build matches Clojure byte-for-byte", () => {

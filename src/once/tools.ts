@@ -1,4 +1,7 @@
 /** Tofu / Ansible tool workflows. */
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   ERR,
   EXIT,
@@ -43,6 +46,18 @@ export const TOFU_SMTP_POST = "io.github.bigconig-ai.once.tools/tofu-smtp-post";
 export const ANSIBLE_LOCAL = "io.github.bigconig-ai.once.tools/ansible-local";
 export const ANSIBLE = "io.github.bigconig-ai.once.tools/ansible";
 
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+function templatePath(template: string): string {
+  const rel = keywordToPath(template);
+  const candidates = [
+    join(HERE, "..", "resources", rel),
+    join(HERE, "..", "..", "resources", rel),
+    join(HERE, "..", "..", "..", "src", "resources", rel),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? rel;
+}
+
 export const pluginStep = "io.github.bigconig-ai.once.tools/render-tofu-backend";
 
 function runStepsWithPlugin(plugin: string, sfns: StepFn[], opts: Opts): Opts {
@@ -68,7 +83,7 @@ registerHandleStep(pluginStep, (_f, _step, sfns, opts) => {
       [WF_NAME]: opts[WF_NAME],
       [RENDER_TEMPLATES]: [
         {
-          template: keywordToPath("io.github.bigconig-ai.once.tools/tofu-backend"),
+          template: templatePath("io.github.bigconig-ai.once.tools/tofu-backend"),
           overwrite: true,
           "provider-backend": providerBackend,
           transform: [[providerBackend, delimiters]],
@@ -253,7 +268,7 @@ export function tofu(sfns: StepFn[], opts: Opts): Opts {
       [WF_NAME]: TOFU,
       [RENDER_TEMPLATES]: [
         {
-          template: keywordToPath(TOFU),
+          template: templatePath(TOFU),
           overwrite: true,
           "provider-compute": providerCompute,
           "compute-prevent-destroy": true,
@@ -273,7 +288,7 @@ export function tofuSmtp(sfns: StepFn[], opts: Opts): Opts {
       [WF_NAME]: TOFU_SMTP,
       [RENDER_TEMPLATES]: [
         {
-          template: keywordToPath(TOFU_SMTP),
+          template: templatePath(TOFU_SMTP),
           overwrite: true,
           "data-fn": ipDataFn,
           "provider-smtp": providerSmtp,
@@ -293,7 +308,7 @@ export function tofuDns(sfns: StepFn[], opts: Opts): Opts {
       [WF_NAME]: TOFU_DNS,
       [RENDER_TEMPLATES]: [
         {
-          template: keywordToPath(TOFU_DNS),
+          template: templatePath(TOFU_DNS),
           overwrite: true,
           "data-fn": ipDataFn,
           "provider-dns": providerDns,
@@ -316,7 +331,7 @@ export function tofuSmtpPost(sfns: StepFn[], opts: Opts): Opts {
       [WF_NAME]: TOFU_SMTP_POST,
       [RENDER_TEMPLATES]: [
         {
-          template: keywordToPath(TOFU_SMTP_POST),
+          template: templatePath(TOFU_SMTP_POST),
           overwrite: true,
           "provider-smtp": providerSmtp,
           transform: [[providerSmtp, delimiters]],
@@ -334,7 +349,7 @@ export function ansible(sfns: StepFn[], opts: Opts): Opts {
       [WF_NAME]: ANSIBLE,
       [RENDER_TEMPLATES]: [
         {
-          template: keywordToPath(ANSIBLE),
+          template: templatePath(ANSIBLE),
           overwrite: true,
           "data-fn": ansibleDataFn,
           transform: [
@@ -355,7 +370,7 @@ export function ansibleLocal(sfns: StepFn[], opts: Opts): Opts {
       [WF_NAME]: ANSIBLE_LOCAL,
       [RENDER_TEMPLATES]: [
         {
-          template: keywordToPath(ANSIBLE_LOCAL),
+          template: templatePath(ANSIBLE_LOCAL),
           overwrite: true,
           transform: [["."]],
         },

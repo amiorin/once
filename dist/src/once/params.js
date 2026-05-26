@@ -2,9 +2,9 @@
 import { spawnSync } from "node:child_process";
 import * as bcWorkflow from "big-config/workflow";
 import { PARAMS, syncAliases, toBcOpts } from "./interop.js";
-const START_STEP = "io.github.amiorin.once.package/start-create-or-delete";
-const TOFU = "io.github.amiorin.once.tools/tofu";
-const TOFU_SMTP = "io.github.amiorin.once.tools/tofu-smtp";
+const START_STEP = "io.github.bigconig-ai.once.package/start-create-or-delete";
+const TOFU = "io.github.bigconig-ai.once.tools/tofu";
+const TOFU_SMTP = "io.github.bigconig-ai.once.tools/tofu-smtp";
 function tofuOutput(dir) {
     try {
         const res = spawnSync("tofu", ["output", "--json"], {
@@ -84,7 +84,8 @@ export function tofuSmtpParams(opts0) {
 }
 /** Compose env overrides with the SMTP and compute Tofu outputs. */
 export function optsFn(opts) {
-    return syncAliases(tofuParams(tofuSmtpParams(bcWorkflow.readBcPars(toBcOpts(opts)))));
+    const withEnv = syncAliases(bcWorkflow.readBcPars(toBcOpts(opts)));
+    return syncAliases(tofuParams(tofuSmtpParams(withEnv)));
 }
 /** `optsFn` after stamping the deterministic prefix for the create/delete workflow. */
 export function onceOpts(opts) {

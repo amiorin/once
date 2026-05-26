@@ -8,10 +8,10 @@ import { syncAliases, toBcOpts } from "./interop.js";
 import { optsFn } from "./params.js";
 import * as tools from "./tools.js";
 import { validate } from "./validation.js";
-const START = "io.github.amiorin.once.package/start";
-const END = "io.github.amiorin.once.package/end";
-const PIPELINE_START = "io.github.amiorin.once.package/start-create-or-delete";
-const PIPELINE_END = "io.github.amiorin.once.package/end-create-or-delete";
+const START = "io.github.bigconig-ai.once.package/start";
+const END = "io.github.bigconig-ai.once.package/end";
+const PIPELINE_START = "io.github.bigconig-ai.once.package/start-create-or-delete";
+const PIPELINE_END = "io.github.bigconig-ai.once.package/end-create-or-delete";
 export const stepFns = [
     printStepFn,
     createExitStepFn(END),
