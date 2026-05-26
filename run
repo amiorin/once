@@ -1,0 +1,5 @@
+#!/usr/bin/env bb
+
+(require '[io.github.bigconig-ai.once.cli :as cli])
+
+(cli/main* *command-line-args*)

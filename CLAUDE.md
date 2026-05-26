@@ -11,7 +11,7 @@ Built on top of [big-config](https://github.com/amiorin/big-config), which provi
 ## Tech Stack
 
 - **Language**: Clojure 1.12.4 (JVM)
-- **CLI runner**: Babashka (`bb.edn` tasks)
+- **CLI runner**: Babashka (`run` script; `bb.edn` only supplies deps)
 - **Infrastructure**: OpenTofu (Terraform fork)
 - **Config management**: Ansible
 - **Key libraries**: `big-config`, `big-tofu`, `cheshire` (JSON), `babashka/process`, `com.rpl/specter`
@@ -44,7 +44,8 @@ once/
 │   └── validation_test.clj  # Tests for the malli profile schema and tool selection
 ├── env/dev/clj/user.clj     # REPL dev namespace
 ├── deps.edn                 # Clojure CLI deps and aliases
-├── bb.edn                   # Babashka task definitions
+├── bb.edn                   # Babashka dependency config
+├── run                      # Babashka command entrypoint (`bb run ...`)
 ├── devenv.nix               # Nix dev environment
 └── .envrc                   # direnv config (loads devenv, sources .envrc.private)
 ```
@@ -53,7 +54,8 @@ once/
 
 ### Code Maintenance
 ```bash
-bb -tidy          # clean-ns + format via clojure-lsp
+clojure-lsp clean-ns
+clojure-lsp format
 ```
 
 ### Running Tests
@@ -63,37 +65,37 @@ clojure -M:test   # runs cognitect test-runner against test/clj
 
 ### Pre-flight Validation
 ```bash
-bb validate       # shortcut for `bb once package validate`; accepts no extra args
+bb run validate   # shortcut for `bb run once package validate`; accepts no extra args
                   # checks active profile schema, required CLIs, credentials, image refs,
                   # and that :compute-pubkey is loaded in ssh-agent (cloud providers only)
 ```
 
 ### Post-provisioning Report
 ```bash
-bb once package describe  # configured providers + SSH reachability + deployed ONCE applications
+bb run once package describe  # configured providers + SSH reachability + deployed ONCE applications
                   # (image, tag, running digest, registry digest, update-available?)
 ```
 
 ### Full Lifecycle
 ```bash
-bb validate                         # strict shortcut for `bb once package validate`
-bb once package validate            # same validation via workflow step; can be chained
-bb once package describe            # opt-in post-provisioning report
-bb once package build               # render everything without applying/provisioning
-bb once package create              # provision everything (all 6 stages)
-bb once package delete              # tear down (reverse 4 Tofu stages)
-bb once package validate create     # validate, then create only if validation passes
-bb once package delete create       # clean slate redeploy
+bb run validate                         # strict shortcut for `bb run once package validate`
+bb run once package validate            # same validation via workflow step; can be chained
+bb run once package describe            # opt-in post-provisioning report
+bb run once package build               # render everything without applying/provisioning
+bb run once package create              # provision everything (all 6 stages)
+bb run once package delete              # tear down (reverse 4 Tofu stages)
+bb run once package validate create     # validate, then create only if validation passes
+bb run once package delete create       # clean slate redeploy
 ```
 
 ### Individual Tools (each requires `render` first)
 ```bash
-bb -tofu render tofu:init tofu:apply:-auto-approve
-bb -tofu-smtp render tofu:init tofu:apply:-auto-approve
-bb -tofu-dns render tofu:init tofu:apply:-auto-approve
-bb -tofu-smtp-post render tofu:init tofu:apply:-auto-approve
-bb -ansible render -- ansible-playbook main.yml
-bb -ansible-local render -- ansible-playbook main.yml
+bb run tofu render tofu:init tofu:apply:-auto-approve
+bb run tofu-smtp render tofu:init tofu:apply:-auto-approve
+bb run tofu-dns render tofu:init tofu:apply:-auto-approve
+bb run tofu-smtp-post render tofu:init tofu:apply:-auto-approve
+bb run ansible render -- ansible-playbook main.yml
+bb run ansible-local render -- ansible-playbook main.yml
 ```
 
 The active profile is selected by editing `(def bb ...)` in `options.clj` (see Configuration Profiles below).
@@ -108,9 +110,9 @@ The active profile is selected by editing `(def bb ...)` in `options.clj` (see C
 5. **ansible-local** — local config: update `~/.ssh/config` so the remote host is reachable as `Host once` for the next stage
 6. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, provision the restricted `deploy` user (NOPASSWD sudo for `/usr/local/bin/once *` + `ForceCommand` Babashka script at `/usr/local/bin/deploy` authorized by `:deploy-pubkey`), deploy applications listed under `:once {:applications [...]}`
 
-Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb once package delete`.
+Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb run once package delete`.
 
-`validate` and `describe` are opt-in `big-config.workflow/run-steps` steps exposed through `bb once package validate` and `bb once package describe`. Validation is also exposed as a top-level `bb validate` shortcut, which accepts no extra args and exits non-zero when `*command-line-args*` is non-empty. These steps do not run automatically before `create`.
+`validate` and `describe` are opt-in `big-config.workflow/run-steps` steps exposed through `bb run once package validate` and `bb run once package describe`. Validation is also exposed as a top-level `bb run validate` shortcut, which accepts no extra args and exits non-zero when `*command-line-args*` is non-empty. These steps do not run automatically before `create`.
 
 ### Template Rendering
 `big-config` renders templates from `src/resources/` into `.dist/` using parameters. The Selmer parser is configured in `tools.clj` with custom delimiters (`:tag-open \<`, `:tag-close \>`, `:filter-open \{`, `:filter-close \}`), so variables in template file content are written as `<{ var }>` — this leaves literal `{{ ... }}` untouched so downstream tools like Ansible can interpret them. Provider switching is directory-level: each render step passes a `:transform [[<provider> delimiters]]` entry (e.g., `[["digitalocean" delimiters]]`) and the renderer copies only the matching subdirectory under `tools/<step>/`.
@@ -142,7 +144,7 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use
 
 ### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`profile-alpha`, `profile-beta`, `profile-gamma`, `profile-no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb validate` / `bb once package validate` enforce this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
+Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`profile-alpha`, `profile-beta`, `profile-gamma`, `profile-no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb run validate` / `bb run once package validate` enforce this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
 ```clojure
 (def profile-alpha (merge-with merge resend cloudflare r2 digitalocean deploy
                                {::render/profile "profile-alpha"
@@ -151,11 +153,11 @@ Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud
                                                    :once {:applications [{:host "www.alpha.example.com"
                                                                           :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"}]}}}))
 ```
-`profile-alpha` rides on `digitalocean`; `profile-beta` and `profile-gamma` ride on `oci`; `profile-no-infra` targets an existing server. The `bb` var sets the active profile for Babashka tasks:
+`profile-alpha` rides on `digitalocean`; `profile-beta` and `profile-gamma` ride on `oci`; `profile-no-infra` targets an existing server. The `bb` var sets the active profile for the Babashka `run` script:
 ```clojure
 (def bb profile-alpha)  ; change this to switch profiles
 ```
-The profile names match the TypeScript implementation (`profileAlpha`, `profileBeta`, …) and are what `bb once build` uses to name its output directory (`.dist/profile-alpha-<hash>/`).
+The profile names match the TypeScript implementation (`profileAlpha`, `profileBeta`, …) and are what `bb run once package build` uses to name its output directory (`.dist/profile-alpha-<hash>/`).
 
 ### REPL Development Pattern
 All source files contain `comment` blocks with live evaluation examples:

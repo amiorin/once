@@ -32,7 +32,7 @@ It is built on top of [big-config](https://github.com/amiorin/big-config), lever
 To use `once`, you need the following tools installed:
 
 - **[Clojure](https://clojure.org/guides/install_clojure)**: The core engine.
-- **[Babashka](https://babashka.org/)**: Recommended for running CLI tasks.
+- **[Babashka](https://babashka.org/)**: Recommended for running the root `run` script.
 - **[OpenTofu](https://opentofu.org/docs/intro/install/)**: For infrastructure management.
 - **[Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html)**: For configuration management.
 - **[AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)**: Required for S3 backend management.
@@ -71,7 +71,7 @@ These will be automatically merged into the workflow parameters.
 
 ### Via Babashka (Recommended)
 
-The easiest way to interact with `once` is through the provided Babashka tasks.
+The easiest way to interact with `once` is through the root Babashka `run` script.
 
 #### 1. Setup
 
@@ -95,7 +95,7 @@ In `src/clj/io/github/bigconig_ai/once/options.clj`, you can switch the active p
 `online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `digitalocean`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
 
 All four profiles also merge in the `deploy` sub-profile, which carries two SSH public keys:
-- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb validate` / `bb once package validate` check this).
+- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb run validate` / `bb run once package validate` check this).
 - `deploy-pubkey` — the key authorized on the remote `deploy` user with `ForceCommand` (CI-driven redeploys).
 
 Override either per-environment via `BC_PAR_COMPUTE_PUBKEY` and `BC_PAR_DEPLOY_PUBKEY`.
@@ -107,23 +107,23 @@ Note: If you are using the `no-infra` profile, ensure your parameters are correc
 Before provisioning, run a quick check that the active profile is well-formed, the required CLIs are installed, the credentials work, the referenced Docker images exist, and (for cloud compute profiles) `:compute-pubkey` is loaded in `ssh-agent` so Ansible can connect to the new host:
 
 ```bash
-bb validate
+bb run validate
 ```
 
-`bb validate` is a strict shortcut for `bb once package validate`: it accepts no extra arguments and exits non-zero if any are supplied. For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
+`bb run validate` is a strict shortcut for `bb run once package validate`: it accepts no extra arguments and exits non-zero if any are supplied. For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
 
 #### 3. Main Workflow
 
-The `once` task handles the full lifecycle through the `package` subcommand. `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`. You can pass multiple commands to `bb once package`; use the top-level `bb validate` shortcut only for validation by itself.
+The `run` script handles the full lifecycle through the `once package` command. `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`. You can pass multiple commands to `bb run once package`; use the top-level `bb run validate` shortcut only for validation by itself.
 
-- **Pre-flight Validation**: `bb validate` (same as `bb once package validate`)
-- **Build only**: `bb once package build` (render all stages without applying/provisioning)
-- **Full Setup**: `bb once package create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible Local -> Ansible)
-- **Tear Down**: `bb once package delete` (Tofu SMTP Post Destroy -> Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
-- **Sequential**: `bb once package validate create` (Validate, then create only if validation passes)
-- **Clean slate**: `bb once package delete create` (Clean slate redeploy)
+- **Pre-flight Validation**: `bb run validate` (same as `bb run once package validate`)
+- **Build only**: `bb run once package build` (render all stages without applying/provisioning)
+- **Full Setup**: `bb run once package create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible Local -> Ansible)
+- **Tear Down**: `bb run once package delete` (Tofu SMTP Post Destroy -> Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
+- **Sequential**: `bb run once package validate create` (Validate, then create only if validation passes)
+- **Clean slate**: `bb run once package delete create` (Clean slate redeploy)
 
-Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb once package delete`, first override it:
+Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb run once package delete`, first override it:
 
 ```bash
 export BC_PAR_COMPUTE_PREVENT_DESTROY=false
@@ -131,39 +131,39 @@ export BC_PAR_COMPUTE_PREVENT_DESTROY=false
 
 #### 4. Post-provisioning Report
 
-Once a stack is up, `bb once package describe` prints a human-readable status for the active profile: configured providers (compute, backend, SMTP, DNS), SSH reachability of the compute host, and every ONCE application discovered on the server with image, tag, running digest, registry digest, and whether an update is available. Most checks are soft failures; only a missing remote `once` command causes a non-zero exit.
+Once a stack is up, `bb run once package describe` prints a human-readable status for the active profile: configured providers (compute, backend, SMTP, DNS), SSH reachability of the compute host, and every ONCE application discovered on the server with image, tag, running digest, registry digest, and whether an update is available. Most checks are soft failures; only a missing remote `once` command causes a non-zero exit.
 
 ```bash
-bb once package describe
+bb run once package describe
 ```
 
 #### 5. Targeted Tools
 
-You can also run the underlying tools individually. Most tasks require a `render` step first to generate the necessary config files from templates into the `.dist/` directory.
+You can also run the underlying tools individually. Most commands require a `render` step first to generate the necessary config files from templates into the `.dist/` directory.
 
 - **OpenTofu (Infrastructure)**:
   ```bash
-  bb -tofu render tofu:init tofu:apply:-auto-approve
+  bb run tofu render tofu:init tofu:apply:-auto-approve
   ```
 - **OpenTofu (SMTP)**:
   ```bash
-  bb -tofu-smtp render tofu:init tofu:apply:-auto-approve
+  bb run tofu-smtp render tofu:init tofu:apply:-auto-approve
   ```
 - **OpenTofu (DNS)**:
   ```bash
-  bb -tofu-dns render tofu:init tofu:apply:-auto-approve
+  bb run tofu-dns render tofu:init tofu:apply:-auto-approve
   ```
 - **OpenTofu (SMTP Post-Verification)**:
   ```bash
-  bb -tofu-smtp-post render tofu:init tofu:apply:-auto-approve
+  bb run tofu-smtp-post render tofu:init tofu:apply:-auto-approve
   ```
 - **Remote Ansible**:
   ```bash
-  bb -ansible render -- ansible-playbook main.yml
+  bb run ansible render -- ansible-playbook main.yml
   ```
 - **Local Ansible**:
   ```bash
-  bb -ansible-local render -- ansible-playbook main.yml
+  bb run ansible-local render -- ansible-playbook main.yml
   ```
 
 ### Programmatic Usage
@@ -218,13 +218,14 @@ The pure report builders remain available for tests and tooling:
 
 ## Development
 
-If you are contributing to `once`, you can use the following task to keep the code clean:
+If you are contributing to `once`, use `clojure-lsp` to keep the code clean:
 
 ```bash
-bb -tidy
+clojure-lsp clean-ns
+clojure-lsp format
 ```
 
-This uses `clojure-lsp` to clean namespaces and format the source code.
+This cleans namespaces and formats the source code.
 
 ## License
 

@@ -1,7 +1,7 @@
 (ns io.github.bigconig-ai.once.describe
   "Describe the active profile after provisioning.
 
-  `describe` is the big-config workflow step behind `bb once describe`. It
+  `describe` is the big-config workflow step behind `bb run once package describe`. It
   prints a human-readable report with configured provider names, SSH
   reachability for the computed host, and deployed ONCE applications discovered
   from the remote server. Most live checks are soft failures; a missing remote
@@ -444,7 +444,7 @@
           (println (format "    registry check: %s" registry-detail)))))))
 
 (defn describe
-  "big-config workflow step for `bb once describe`.
+  "big-config workflow step for `bb run once package describe`.
 
   Unreachable infrastructure is reported without failing the step, but a missing
   remote `once` command returns a non-zero workflow exit."

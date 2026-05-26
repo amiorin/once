@@ -380,7 +380,7 @@
       <p>Because <code>workflow/read-bc-pars</code> already maps <code>BC_PAR_*</code> environment variables into <code>::workflow/params</code>, provider switching can now be driven from the environment:</p>
 <pre><code>export BC_PAR_PROVIDER_COMPUTE=digitalocean
 export BC_PAR_PROVIDER_BACKEND=local
-bb once create</code></pre>
+bb run once package create</code></pre>
 
       <h3>Backend plugin registration is API-compatible</h3>
       <p>The old inline <code>defmethod</code> was replaced by a named handler and a registration helper:</p>

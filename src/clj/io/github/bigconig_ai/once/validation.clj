@@ -1,5 +1,5 @@
 (ns io.github.bigconig-ai.once.validation
-  "Validate the active profile before running `bb once create`.
+  "Validate the active profile before running `bb run once package create`.
 
   Four phases run in a single pass and their errors are collected into a flat
   list:
@@ -16,7 +16,7 @@
     4. Images    — every image referenced by :once :applications resolves on
                    its registry via `skopeo inspect`.
 
-  `validate` is the big-config workflow step behind `bb once validate`: it
+  `validate` is the big-config workflow step behind `bb run once package validate`: it
   prints a grouped report and returns a non-zero workflow exit on failure."
   (:require
    [babashka.process :as p]
@@ -592,7 +592,7 @@
           (println (str "    - " detail)))))))
 
 (defn validate
-  "big-config workflow step for `bb once validate`."
+  "big-config workflow step for `bb run once package validate`."
   [_step-fns opts]
   (let [result (validate-report opts)]
     (print-report result)

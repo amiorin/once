@@ -404,11 +404,11 @@
 
       <div class="group">CLI Reference</div>
       <ul>
-        <li><a href="#once-cmd">bb once</a></li>
-        <li><a href="#validate">bb validate / bb once validate</a></li>
-        <li><a href="#describe">bb once describe</a></li>
-        <li><a href="#tools-cmd">bb -tofu / -ansible</a></li>
-        <li><a href="#tidy">bb -tidy</a></li>
+        <li><a href="#once-cmd">bb run once package</a></li>
+        <li><a href="#validate">bb run validate</a></li>
+        <li><a href="#describe">bb run once package describe</a></li>
+        <li><a href="#tools-cmd">bb run tofu / ansible</a></li>
+        <li><a href="#tidy">clojure-lsp</a></li>
       </ul>
 
       <div class="group">Operational</div>
@@ -498,27 +498,27 @@ $EDITOR src/clj/io/github/bigconig_ai/once/options.clj</code></pre>
 <span class="kw">export</span> BC_PAR_R2_SECRET_ACCESS_KEY=<span class="str">"…"</span></code></pre>
 
     <h3>3. Pre-flight</h3>
-<pre><code><span class="kw">bb</span> validate</code></pre>
-    <p><code>bb validate</code> is a strict shortcut for <code>bb once validate</code>: it accepts no extra arguments and exits non-zero if any are supplied. It verifies schema, required CLIs, credentials (live API calls including a Cloudflare zone lookup), that every <code>:image</code> resolves on its registry, and that <code>:compute-pubkey</code> is loaded in <code>ssh-agent</code> for cloud compute profiles.</p>
+<pre><code><span class="kw">bb</span> run validate</code></pre>
+    <p><code>bb run validate</code> is a strict shortcut for <code>bb run once package validate</code>: it accepts no extra arguments and exits non-zero if any are supplied. It verifies schema, required CLIs, credentials (live API calls including a Cloudflare zone lookup), that every <code>:image</code> resolves on its registry, and that <code>:compute-pubkey</code> is loaded in <code>ssh-agent</code> for cloud compute profiles.</p>
 
     <h3>4. Provision</h3>
-<pre><code><span class="kw">bb</span> once create</code></pre>
+<pre><code><span class="kw">bb</span> run once package create</code></pre>
     <p>Runs all six stages. On success, your apps are reachable at the hosts in <code>:once :applications</code>.</p>
 
     <h3>5. Describe</h3>
-<pre><code><span class="kw">bb</span> once describe</code></pre>
+<pre><code><span class="kw">bb</span> run once package describe</code></pre>
     <p>Verify what's actually running on the new host: configured providers, SSH reachability, and every ONCE application with its image, tag, running digest, and an <em>update-available?</em> flag derived from comparing against the live registry.</p>
 
     <h3>6. Tear down</h3>
 <pre><code><span class="kw">export</span> BC_PAR_COMPUTE_PREVENT_DESTROY=<span class="str">false</span>
-<span class="kw">bb</span> once delete</code></pre>
-    <div class="note warn"><span class="label">Warn</span>Compute resources render with <code>lifecycle { prevent_destroy = true }</code> by default. <code>bb once delete</code> will fail until you flip the flag — that is the intended safety net.</div>
+<span class="kw">bb</span> run once package delete</code></pre>
+    <div class="note warn"><span class="label">Warn</span>Compute resources render with <code>lifecycle { prevent_destroy = true }</code> by default. <code>bb run once package delete</code> will fail until you flip the flag — that is the intended safety net.</div>
   </section>
 
   <!-- ============================================================ -->
   <section id="prereqs">
     <h2>Prerequisites</h2>
-    <p>The exact list of CLIs depends on your active profile. <code>bb validate</code> / <code>bb once validate</code> tell you which ones are missing.</p>
+    <p>The exact list of CLIs depends on your active profile. <code>bb run validate</code> / <code>bb run once package validate</code> tell you which ones are missing.</p>
     <table>
       <thead><tr><th>Tool</th><th>Required for</th><th>Install hint</th></tr></thead>
       <tbody>
@@ -619,7 +619,7 @@ source_env_if_exists .envrc.private</code></pre>
     </ul>
 
     <h3>Delete order</h3>
-    <p><code>bb once delete</code> reverses the four Tofu stages in destroy order: <code>tofu-smtp-post → tofu-dns → tofu-smtp → tofu</code>. Ansible stages are not "destroyed" — they were configuration, not resources.</p>
+    <p><code>bb run once package delete</code> reverses the four Tofu stages in destroy order: <code>tofu-smtp-post → tofu-dns → tofu-smtp → tofu</code>. Ansible stages are not "destroyed" — they were configuration, not resources.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -762,7 +762,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
 
     <h3>The active profile</h3>
 <pre><code>(<span class="kw">def</span> bb website)  <span class="com">;; change this line to switch</span></code></pre>
-    <p><code>options/bb</code> is the value <code>bb.edn</code> passes to <code>package/once*</code>, which wires the <code>create</code>, <code>delete</code>, <code>validate</code>, and <code>describe</code> workflow steps.</p>
+    <p><code>options/bb</code> is the active profile the root <code>run</code> script passes through <code>cli/main*</code> into <code>package/once*</code>, which wires the <code>create</code>, <code>delete</code>, <code>validate</code>, and <code>describe</code> workflow steps.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -891,7 +891,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
                       :deploy-pubkey
                       <span class="str">"ssh-ed25519 AAAAC3… deploy@bigconfig.ai"</span>}})</code></pre>
     <ul>
-      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb once create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb validate</code> / <code>bb once validate</code> reject the run if it isn't loaded (for cloud compute profiles).</li>
+      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb run once package create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb run validate</code> / <code>bb run once package validate</code> reject the run if it isn't loaded (for cloud compute profiles).</li>
       <li><code>:deploy-pubkey</code> — the key authorized on the remote <code>deploy</code> user with <code>ForceCommand</code>. See <a href="#deploy-user">Restricted deploy SSH</a>.</li>
     </ul>
     <p>Override either per-environment:</p>
@@ -926,23 +926,23 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
 
   <!-- ============================================================ -->
   <section id="once-cmd">
-    <h2><code>bb once</code></h2>
-<pre><code><span class="kw">bb</span> validate              <span class="com"># strict shortcut for bb once validate</span>
-<span class="kw">bb</span> once validate         <span class="com"># opt-in pre-flight checks; can be chained</span>
-<span class="kw">bb</span> once describe         <span class="com"># opt-in post-provisioning report</span>
-<span class="kw">bb</span> once create           <span class="com"># full 6-stage pipeline</span>
-<span class="kw">bb</span> once delete           <span class="com"># reverse 4 Tofu stages</span>
-<span class="kw">bb</span> once validate create  <span class="com"># validate, then create if validation passes</span>
-<span class="kw">bb</span> once delete create    <span class="com"># clean-slate redeploy</span></code></pre>
-    <p><code>bb once</code> is defined in <code>bb.edn</code> as <code>(package/once* *command-line-args* options/bb)</code>. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested. The top-level <code>bb validate</code> task calls the same validation step with no args, and exits with an error if <code>*command-line-args*</code> is non-empty.</p>
+    <h2><code>bb run once package</code></h2>
+<pre><code><span class="kw">bb</span> run validate                         <span class="com"># strict shortcut for bb run once package validate</span>
+<span class="kw">bb</span> run once package validate            <span class="com"># opt-in pre-flight checks; can be chained</span>
+<span class="kw">bb</span> run once package describe            <span class="com"># opt-in post-provisioning report</span>
+<span class="kw">bb</span> run once package create              <span class="com"># full 6-stage pipeline</span>
+<span class="kw">bb</span> run once package delete              <span class="com"># reverse 4 Tofu stages</span>
+<span class="kw">bb</span> run once package validate create     <span class="com"># validate, then create if validation passes</span>
+<span class="kw">bb</span> run once package delete create       <span class="com"># clean-slate redeploy</span></code></pre>
+    <p><code>bb run</code> executes the root <code>run</code> Babashka script, which delegates to <code>io.github.bigconig-ai.once.cli/main*</code>. The CLI strips the <code>once package</code> prefix and calls <code>package/once*</code> with the remaining workflow steps. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested. The top-level <code>bb run validate</code> command calls the same validation step with no args, and exits with an error if extra args are supplied.</p>
     <h3>Step skipping &amp; partial runs</h3>
-    <p>You can pass tool-level args to override what each stage does. For example, replace the default <code>render tofu:init tofu:apply:-auto-approve</code> sequence by editing <code>package.clj</code>'s pipeline — or by invoking individual stage tasks (see <a href="#tools-cmd">bb -tofu / -ansible</a>).</p>
+    <p>You can pass tool-level args to override what each stage does. For example, replace the default <code>render tofu:init tofu:apply:-auto-approve</code> sequence by editing <code>package.clj</code>'s pipeline — or by invoking individual stage commands (see <a href="#tools-cmd">bb run tofu / ansible</a>).</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="validate">
-    <h2><code>bb validate</code> / <code>bb once validate</code></h2>
-    <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> is an opt-in workflow step and never short-circuits internally. Use <code>bb validate</code> for validation by itself; use <code>bb once validate</code> when chaining with other workflow steps such as <code>create</code>.</p>
+    <h2><code>bb run validate</code> / <code>bb run once package validate</code></h2>
+    <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> is an opt-in workflow step and never short-circuits internally. Use <code>bb run validate</code> for validation by itself; use <code>bb run once package validate</code> when chaining with other workflow steps such as <code>create</code>.</p>
     <ol>
       <li><strong>Schema</strong> (<code>malli</code>): every required key is present and well-typed; every <code>:once :applications :host</code> equals or is a subdomain of <code>:domain</code>; both <code>:compute-pubkey</code> and <code>:deploy-pubkey</code> look like SSH public keys.</li>
       <li><strong>Tools</strong>: required CLIs are on <code>PATH</code> (base + per-provider).</li>
@@ -971,12 +971,12 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   Credentials:
     - Cloudflare zone: example.com not found or not active
     - SSH agent: :compute-pubkey is not loaded in ssh-agent at SSH_AUTH_SOCK=/tmp/ssh-…/agent.123</code></pre>
-    <p>Programmatic API: <code>(validation/validate-report options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests). <code>validation/validate</code> is the workflow step function used by <code>bb once validate</code>; the <code>bb validate</code> task invokes it as a no-argument shortcut.</p>
+    <p>Programmatic API: <code>(validation/validate-report options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests). <code>validation/validate</code> is the workflow step function used by <code>bb run once package validate</code>; the <code>bb run validate</code> command invokes it as a no-argument shortcut.</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="describe">
-    <h2><code>bb once describe</code></h2>
+    <h2><code>bb run once package describe</code></h2>
     <p>Post-provisioning report. Given the active profile, <code>describe</code> renders the params, queries the live infrastructure, and prints a human-readable summary:</p>
     <ul>
       <li><strong>Profile</strong>: <code>::render/profile</code> (e.g. <code>website</code>, <code>space</code>).</li>
@@ -985,7 +985,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
       <li><strong>Applications</strong>: for every host returned by <code>sudo once list</code>, the matching Docker container's status, image, tag, running digest (from <code>docker image inspect</code>'s <code>RepoDigests</code>), the live registry digest (via <code>skopeo inspect</code> against the matching OS/arch), and an <em>update-available?</em> flag derived from comparing the two.</li>
     </ul>
     <p>Most checks are soft failures (unreachable host, no apps yet, registry hiccup) and don't change the exit code — only a missing remote <code>once</code> command (the server has not been provisioned with ONCE) is fatal.</p>
-<pre><code><span class="kw">bb</span> once describe</code></pre>
+<pre><code><span class="kw">bb</span> run once package describe</code></pre>
     <p>Sample output:</p>
 <pre><code>Profile: website
 
@@ -1008,32 +1008,33 @@ Applications:
     digest: sha256:1a2b…
     registry digest: sha256:1a2b…
     update available: no</code></pre>
-    <p>Programmatic API: <code>(describe/describe-report options/bb)</code> returns the same shape as a map (<code>:profile</code>, <code>:providers</code>, <code>:compute</code>, <code>:applications</code>, <code>:applications-error</code>, <code>:fatal-error?</code>) so tests and tooling can consume it directly. The 3-arg arity <code>(describe-report opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and stubbed params resolver. <code>describe/describe</code> is the workflow step function used by <code>bb once describe</code>.</p>
+    <p>Programmatic API: <code>(describe/describe-report options/bb)</code> returns the same shape as a map (<code>:profile</code>, <code>:providers</code>, <code>:compute</code>, <code>:applications</code>, <code>:applications-error</code>, <code>:fatal-error?</code>) so tests and tooling can consume it directly. The 3-arg arity <code>(describe-report opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and stubbed params resolver. <code>describe/describe</code> is the workflow step function used by <code>bb run once package describe</code>.</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="tools-cmd">
-    <h2><code>bb -tofu</code> / <code>bb -ansible</code> (individual stages)</h2>
-    <p>Each stage exposes a Babashka task (<code>-tofu</code>, <code>-tofu-smtp</code>, <code>-tofu-dns</code>, <code>-tofu-smtp-post</code>, <code>-ansible</code>, <code>-ansible-local</code>). The leading hyphen is intentional — they are scoped tasks for granular work, not the primary entry point.</p>
-<pre><code><span class="kw">bb</span> -tofu render tofu:init tofu:apply:-auto-approve
-<span class="kw">bb</span> -tofu-smtp render tofu:init tofu:apply:-auto-approve
-<span class="kw">bb</span> -tofu-dns render tofu:init tofu:apply:-auto-approve
-<span class="kw">bb</span> -tofu-smtp-post render tofu:init tofu:apply:-auto-approve
-<span class="kw">bb</span> -ansible render -- ansible-playbook main.yml
-<span class="kw">bb</span> -ansible-local render -- ansible-playbook main.yml</code></pre>
+    <h2><code>bb run tofu</code> / <code>bb run ansible</code> (individual stages)</h2>
+    <p>Each stage is exposed through the root <code>run</code> script (<code>tofu</code>, <code>tofu-smtp</code>, <code>tofu-dns</code>, <code>tofu-smtp-post</code>, <code>ansible</code>, <code>ansible-local</code>) for granular work.</p>
+<pre><code><span class="kw">bb</span> run tofu render tofu:init tofu:apply:-auto-approve
+<span class="kw">bb</span> run tofu-smtp render tofu:init tofu:apply:-auto-approve
+<span class="kw">bb</span> run tofu-dns render tofu:init tofu:apply:-auto-approve
+<span class="kw">bb</span> run tofu-smtp-post render tofu:init tofu:apply:-auto-approve
+<span class="kw">bb</span> run ansible render -- ansible-playbook main.yml
+<span class="kw">bb</span> run ansible-local render -- ansible-playbook main.yml</code></pre>
     <p>Always start with <code>render</code> — it (re)generates <code>.dist/&lt;stage&gt;/</code> from the templates and the current <code>params</code> map. You can chain Tofu sub-commands as <code>tofu:&lt;cmd&gt;[:&lt;arg&gt;…]</code>.</p>
     <p>Common one-offs:</p>
 <pre><code><span class="com"># inspect plan only</span>
-<span class="kw">bb</span> -tofu render tofu:init tofu:plan
+<span class="kw">bb</span> run tofu render tofu:init tofu:plan
 <span class="com"># target one resource</span>
-<span class="kw">bb</span> -tofu-dns render tofu:init tofu:apply:-auto-approve:-target=cloudflare_zone_setting.tls_1_3</code></pre>
+<span class="kw">bb</span> run tofu-dns render tofu:init tofu:apply:-auto-approve:-target=cloudflare_zone_setting.tls_1_3</code></pre>
   </section>
 
   <!-- ============================================================ -->
   <section id="tidy">
-    <h2><code>bb -tidy</code></h2>
-<pre><code><span class="kw">bb</span> -tidy</code></pre>
-    <p>Runs <code>clojure-lsp clean-ns</code> + <code>clojure-lsp format</code> over the whole repo. Use before committing.</p>
+    <h2><code>clojure-lsp</code></h2>
+<pre><code>clojure-lsp clean-ns
+clojure-lsp format</code></pre>
+    <p>Runs namespace cleanup and formatting over the whole repo. Use before committing.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1067,7 +1068,7 @@ Applications:
     <h2><code>prevent_destroy</code></h2>
     <p>Compute resources render with <code>lifecycle { prevent_destroy = true }</code> by default. To delete:</p>
 <pre><code><span class="kw">export</span> BC_PAR_COMPUTE_PREVENT_DESTROY=<span class="str">false</span>
-<span class="kw">bb</span> once delete</code></pre>
+<span class="kw">bb</span> run once package delete</code></pre>
     <p>The flag is plumbed through <code>tofu</code>'s template via the <code>:compute-prevent-destroy</code> key (see <code>tools/tofu</code> in <code>tools.clj</code>).</p>
   </section>
 
@@ -1087,7 +1088,7 @@ Applications:
     <p>The DNS template uses the v5 API surface (e.g. <code>cloudflare_dns_record</code> instead of <code>cloudflare_record</code>). If <code>tofu init</code> picks an older provider, your <code>~/.terraformrc</code> may be pinning it — clear <code>~/.terraform.d/plugin-cache</code> or update the constraint.</p>
 
     <h3>SMTP not verifying</h3>
-    <p>Resend's domain status updates lazily. Run <code>bb -tofu-smtp-post render tofu:init tofu:apply:-auto-approve</code> a minute after DNS apply.</p>
+    <p>Resend's domain status updates lazily. Run <code>bb run tofu-smtp-post render tofu:init tofu:apply:-auto-approve</code> a minute after DNS apply.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1117,7 +1118,8 @@ Applications:
 │   └── validation_test.clj
 ├── env/dev/clj/user.clj     <span class="com">; REPL dev ns</span>
 ├── deps.edn
-├── bb.edn
+├── bb.edn                   <span class="com">; Babashka deps only</span>
+├── run                      <span class="com">; Babashka command entrypoint</span>
 ├── devenv.nix
 └── .envrc</code></pre>
     <p><code>.dist/</code> is generated output (gitignored). Never edit it by hand.</p>
@@ -1155,7 +1157,7 @@ Applications:
         </tr>
       </tbody>
     </table>
-    <p>Functions ending in <code>*</code> are CLI/REPL entry points: they accept a string of args and merge default <code>::bc/env :shell</code>. Validation and description are exposed as <code>bb once validate</code> / <code>bb once describe</code> workflow steps rather than standalone star wrappers; <code>bb validate</code> is only a strict no-argument Babashka shortcut for the validation step.</p>
+    <p>Functions ending in <code>*</code> are CLI/REPL entry points: they accept a string of args and merge default <code>::bc/env :shell</code>. Validation and description are exposed as <code>bb run once package validate</code> / <code>bb run once package describe</code> workflow steps rather than standalone star wrappers; <code>bb run validate</code> is only a strict no-argument Babashka shortcut for the validation step.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1322,7 +1324,7 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
     </table>
 
     <h3>Compute (provider-specific keys)</h3>
-    <p>See the <a href="#compute">Compute providers</a> cards above. All listed keys are <em>required</em> per provider; <code>bb validate</code> / <code>bb once validate</code> list the missing ones.</p>
+    <p>See the <a href="#compute">Compute providers</a> cards above. All listed keys are <em>required</em> per provider; <code>bb run validate</code> / <code>bb run once package validate</code> list the missing ones.</p>
   </section>
 
   <!-- ============================================================ -->

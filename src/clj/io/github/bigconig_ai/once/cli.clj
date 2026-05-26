@@ -6,23 +6,23 @@
    [io.github.bigconig-ai.once.tools :as tools]))
 
 (def help-text
-  "Usage: once <command> [args...]
+  "Usage: bb run <command> [args...]
 
 Commands:
-  package <step>...  Build, provision, or tear down infrastructure for the active profile.
-                       once package validate
-                       once package describe
-                       once package build
-                       once package create
-                       once package delete
-  validate           Shortcut for `once package validate`.
+  once package <step>...  Build, provision, or tear down infrastructure for the active profile.
+                            bb run once package validate
+                            bb run once package describe
+                            bb run once package build
+                            bb run once package create
+                            bb run once package delete
+  validate                Strict shortcut for `bb run once package validate`.
 
   Individual tools (each requires `render` first):
-  tofu <args>             e.g. once tofu render tofu:init tofu:apply:-auto-approve
+  tofu <args>             e.g. bb run tofu render tofu:init tofu:apply:-auto-approve
   tofu-smtp <args>
   tofu-dns <args>
   tofu-smtp-post <args>
-  ansible <args>          e.g. once ansible render -- ansible-playbook main.yml
+  ansible <args>          e.g. bb run ansible render -- ansible-playbook main.yml
   ansible-local <args>
 
 Notes:
@@ -44,21 +44,38 @@ See: https://www.bigconfig.ai/manual")
   [args]
   (let [args (mapv str args)
         command (first args)
-        rest-args (subvec args 1)]
+        rest-args (if (seq args) (subvec args 1) [])]
     (cond
       (or (nil? command) (#{"help" "--help" "-h"} command))
       (println help-text)
 
-      (#{"package" "once"} command)
-      (package/once* rest-args options/bb)
+      (= command "once")
+      (let [subcommand (first rest-args)
+            package-args (if (seq rest-args) (subvec rest-args 1) [])]
+        (cond
+          (#{"help" "--help" "-h"} subcommand)
+          (println help-text)
+
+          (= subcommand "package")
+          (if (seq package-args)
+            (package/once* package-args options/bb)
+            (die! "Missing package step."
+                  "Usage: bb run once package <validate|describe|build|create|delete>..."))
+
+          (contains? package-commands subcommand)
+          (die! (str "Use `bb run once package " subcommand "`.") "" help-text)
+
+          :else
+          (die! "Usage: bb run once package <validate|describe|build|create|delete>..." "" help-text)))
 
       (= command "validate")
       (if (seq rest-args)
-        (package/once* args options/bb)
+        (die! "Error: bb run validate does not accept arguments."
+              "Usage: bb run validate")
         (package/once* ["validate"] options/bb))
 
-      (contains? package-commands command)
-      (package/once* args options/bb)
+      (or (= command "package") (contains? package-commands command))
+      (die! (str "Use `bb run once package " (if (= command "package") "<step>" command) "`.") "" help-text)
 
       (= command "tofu")
       (tools/tofu* rest-args (params/once-opts options/bb))
