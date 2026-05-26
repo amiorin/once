@@ -10,9 +10,9 @@ from big_config.core import Opts
 
 from .interop import PARAMS, sync_aliases, to_bc_opts
 
-START_STEP = "io.github.amiorin.once.package/start-create-or-delete"
-TOFU = "io.github.amiorin.once.tools/tofu"
-TOFU_SMTP = "io.github.amiorin.once.tools/tofu-smtp"
+START_STEP = "io.github.bigconig-ai.once.package/start-create-or-delete"
+TOFU = "io.github.bigconig-ai.once.tools/tofu"
+TOFU_SMTP = "io.github.bigconig-ai.once.tools/tofu-smtp"
 
 
 def tofu_output(directory: str) -> dict[str, Any] | None:

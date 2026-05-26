@@ -12,10 +12,10 @@ from .interop import PARAMS, sync_aliases, to_bc_opts
 from .params import opts_fn
 from .validation import validate
 
-START = "io.github.amiorin.once.package/start"
-END = "io.github.amiorin.once.package/end"
-PIPELINE_START = "io.github.amiorin.once.package/start-create-or-delete"
-PIPELINE_END = "io.github.amiorin.once.package/end-create-or-delete"
+START = "io.github.bigconig-ai.once.package/start"
+END = "io.github.bigconig-ai.once.package/end"
+PIPELINE_START = "io.github.bigconig-ai.once.package/start-create-or-delete"
+PIPELINE_END = "io.github.bigconig-ai.once.package/end-create-or-delete"
 
 step_fns: list[StepFn] = [bc_workflow.print_step_fn, exit_step_fn(END), print_error_step_fn(END)]
 
