@@ -1,0 +1,271 @@
+import { describe, expect, it } from "vitest";
+import { profileAlpha, profileBeta, profileGamma, profileNoInfra, } from "../src/once/options.js";
+import { credentialErrors, providerTools, schemaErrors, sshAgentErrors, toolErrors, validate, } from "../src/once/validation.js";
+const testComputePubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 test@example.com";
+const testDeployPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII1Lbgxiv2OnDKwc8Wx25SQlGyI+iY1drUii/IMZ3YSh deploy@example.com";
+const creds = {
+    "compute-pubkey": testComputePubkey,
+    "deploy-pubkey": testDeployPubkey,
+    "resend-api-key": "stub",
+    "resend-password": "stub",
+    "cloudflare-api-token": "stub",
+    "hcloud-token": "stub",
+    "hcloud-ssh-keys": "stub-key",
+    "do-token": "stub",
+    "digitalocean-vpc-uuid": "stub-vpc",
+    "digitalocean-ssh-keys": "stub-key",
+    "oci-config-file-profile": "DEFAULT",
+    "oci-subnet-id": "stub-subnet",
+    "oci-compartment-id": "stub-compartment",
+    "oci-availability-domain": "stub-ad",
+    "oci-ssh-authorized-keys": "~/.ssh/id_ed25519.pub",
+    "no-infra-compute-ip": "192.0.2.10",
+    "no-infra-compute-user": "ubuntu",
+    "no-infra-compute-sudoer": "ubuntu",
+    "no-infra-compute-uid": "1000",
+    "no-infra-compute-name": "once",
+    "no-infra-smtp-password": "stub",
+    "r2-bucket": "stub-bucket",
+    "r2-endpoint": "https://stub.r2.cloudflarestorage.com",
+    "r2-access-key-id": "stub",
+    "r2-secret-access-key": "stub",
+    "s3-bucket": "stub-bucket",
+    "s3-region": "eu-west-1",
+};
+/** Replace REPLACE_ME placeholders with schema-valid test values. */
+function withCreds(profile) {
+    return { ...profile, params: { ...profile.params, ...creds } };
+}
+function withParams(profile, overrides) {
+    return { ...profile, params: { ...profile.params, ...overrides } };
+}
+describe("public profiles pass schema with stub creds", () => {
+    const cases = [
+        ["profile-alpha", withCreds(profileAlpha)],
+        ["profile-beta", withCreds(profileBeta)],
+        ["profile-gamma", withCreds(profileGamma)],
+        ["profile-no-infra", withCreds(profileNoInfra)],
+    ];
+    for (const [name, profile] of cases) {
+        it(name, () => {
+            expect(schemaErrors(profile)).toBeUndefined();
+        });
+    }
+});
+describe("schema validation", () => {
+    it("placeholder credential is reported", () => {
+        const errors = schemaErrors(profileAlpha);
+        expect(errors).toBeDefined();
+        expect(errors.some((e) => e.detail.includes("resend-api-key") &&
+            e.detail.includes("REPLACE_ME"))).toBe(true);
+    });
+    it("missing compute-pubkey is reported", () => {
+        const p = withCreds(profileAlpha);
+        const params = { ...p.params };
+        delete params["compute-pubkey"];
+        const errors = schemaErrors({ ...p, params });
+        expect(errors).toBeDefined();
+        expect(errors.some((e) => e.detail.includes("compute-pubkey"))).toBe(true);
+    });
+    it("bad domain format is reported", () => {
+        const bad = withParams(withCreds(profileAlpha), {
+            domain: "not_a_domain",
+            once: { applications: [] },
+        });
+        const errors = schemaErrors(bad);
+        expect(errors).toBeDefined();
+        expect(errors.some((e) => e.detail.includes("domain") && e.detail.includes("valid domain"))).toBe(true);
+    });
+    it("cross-field mismatched host is reported", () => {
+        const bad = withParams(withCreds(profileAlpha), {
+            once: {
+                applications: [
+                    { host: "alien.example.com", image: "ghcr.io/foo/bar:latest" },
+                ],
+            },
+        });
+        const errors = schemaErrors(bad);
+        expect(errors).toBeDefined();
+        expect(errors.some((e) => e.detail.includes("subdomain"))).toBe(true);
+    });
+    it("cross-field apex and subdomain pass", () => {
+        const okProfile = withParams(withCreds(profileAlpha), {
+            once: {
+                applications: [
+                    { host: "alpha.example.com", image: "ghcr.io/foo/bar:latest" },
+                    { host: "www.alpha.example.com", image: "ghcr.io/foo/bar:latest" },
+                ],
+            },
+        });
+        expect(schemaErrors(okProfile)).toBeUndefined();
+    });
+});
+describe("validate workflow step sets exit status", () => {
+    it("valid report succeeds", () => {
+        const result = validate([], {}, () => ({ ok: true, errors: [] }));
+        expect(result.exit).toBe(0);
+        expect(result["validation/result"]).toEqual({ ok: true, errors: [] });
+    });
+    it("invalid report fails", () => {
+        const result = validate([], {}, () => ({
+            ok: false,
+            errors: [{ check: "schema", detail: "bad" }],
+        }));
+        expect(result.exit).toBe(1);
+        expect(result.err).toBe("validation failed");
+    });
+});
+describe("provider-tools picks the right CLIs", () => {
+    const cmds = (params) => new Set(providerTools(params).map((t) => t.cmd));
+    it("hcloud + s3", () => {
+        expect(cmds({ "provider-compute": "hcloud", "provider-backend": "s3" })).toEqual(new Set(["hcloud", "aws"]));
+    });
+    it("oci + s3", () => {
+        expect(cmds({ "provider-compute": "oci", "provider-backend": "s3" })).toEqual(new Set(["oci", "aws"]));
+    });
+    it("digitalocean + s3", () => {
+        expect(cmds({ "provider-compute": "digitalocean", "provider-backend": "s3" })).toEqual(new Set(["doctl", "aws"]));
+    });
+    it("hcloud + r2", () => {
+        expect(cmds({ "provider-compute": "hcloud", "provider-backend": "r2" })).toEqual(new Set(["hcloud", "aws"]));
+    });
+    it("oci + r2", () => {
+        expect(cmds({ "provider-compute": "oci", "provider-backend": "r2" })).toEqual(new Set(["oci", "aws"]));
+    });
+    it("no-infra + local", () => {
+        expect(cmds({ "provider-compute": "no-infra", "provider-backend": "local" })).toEqual(new Set());
+    });
+    it("hcloud + local", () => {
+        expect(cmds({ "provider-compute": "hcloud", "provider-backend": "local" })).toEqual(new Set(["hcloud"]));
+    });
+});
+it("tool-errors honors the injected which-fn", () => {
+    const params = withCreds(profileAlpha).params;
+    const errors = toolErrors(params, (cmd) => cmd !== "tofu");
+    expect(errors.length).toBe(1);
+    expect(errors[0].detail).toContain("OpenTofu");
+});
+describe("ssh-agent checks cloud compute pubkey", () => {
+    const params = {
+        "provider-compute": "hcloud",
+        "compute-pubkey": testComputePubkey,
+    };
+    const keyIdLine = testComputePubkey.split(/\s+/).slice(0, 2).join(" ");
+    it("missing SSH_AUTH_SOCK is reported for cloud compute", () => {
+        const errors = sshAgentErrors(params, {});
+        expect(errors.length).toBe(1);
+        expect(errors[0]).toContain("SSH_AUTH_SOCK");
+    });
+    it("no-infra skips the ssh-agent check", () => {
+        expect(sshAgentErrors({ ...params, "provider-compute": "no-infra" }, {})).toEqual([]);
+    });
+    it("loaded key is matched by type and body, ignoring comments", () => {
+        const runFn = (args, extraEnv) => {
+            expect(args).toEqual(["ssh-add", "-L"]);
+            expect(extraEnv).toEqual({ SSH_AUTH_SOCK: "/tmp/agent.sock" });
+            return {
+                ok: true,
+                exit: 0,
+                out: `${keyIdLine} other-comment\n`,
+                err: "",
+            };
+        };
+        expect(sshAgentErrors(params, { SSH_AUTH_SOCK: "/tmp/agent.sock" }, runFn)).toEqual([]);
+    });
+    it("missing loaded key is reported", () => {
+        const runFn = () => ({
+            ok: true,
+            exit: 0,
+            out: "ssh-ed25519 AAAAother comment\n",
+            err: "",
+        });
+        const errors = sshAgentErrors(params, { SSH_AUTH_SOCK: "/tmp/agent.sock" }, runFn);
+        expect(errors.length).toBe(1);
+        expect(errors[0]).toContain("not loaded");
+    });
+    it("dead SSH_AUTH_SOCK is reported", () => {
+        const runFn = () => ({
+            ok: false,
+            exit: 2,
+            out: "",
+            err: "Error connecting to agent: No such file or directory",
+        });
+        const errors = sshAgentErrors(params, { SSH_AUTH_SOCK: "/tmp/dead.sock" }, runFn);
+        expect(errors.length).toBe(1);
+        expect(errors[0]).toContain("ssh-add -L failed");
+    });
+});
+describe("cloudflare zone checks the configured domain", () => {
+    const cfParams = () => {
+        const p = withCreds(profileAlpha).params;
+        return {
+            "provider-dns": p["provider-dns"],
+            domain: p.domain,
+            "cloudflare-api-token": p["cloudflare-api-token"],
+        };
+    };
+    it("configured zone exists", () => {
+        const runFn = (args) => {
+            expect(args.some((a) => a.includes("name=alpha.example.com"))).toBe(true);
+            return {
+                ok: true,
+                exit: 0,
+                out: '{"success":true,"result":[{"id":"zone-id"}]}',
+                err: "",
+            };
+        };
+        expect(credentialErrors(cfParams(), {}, runFn)).toEqual([]);
+    });
+    it("configured zone is missing", () => {
+        const runFn = () => ({
+            ok: true,
+            exit: 0,
+            out: '{"success":true,"result":[]}',
+            err: "",
+        });
+        const errors = credentialErrors(cfParams(), {}, runFn);
+        expect(errors.length).toBe(1);
+        expect(errors[0].detail).toContain("Cloudflare zone");
+        expect(errors[0].detail).toContain("alpha.example.com");
+    });
+});
+describe("domain regex table", () => {
+    const paramsOf = (domain) => withParams(withCreds(profileAlpha), { domain, once: { applications: [] } });
+    it("valid", () => {
+        for (const d of ["example.com", "foo.bar.example.com", "a.b", "ex-ample.co"]) {
+            expect(schemaErrors(paramsOf(d)), `${d} should be valid`).toBeUndefined();
+        }
+    });
+    it("invalid", () => {
+        for (const d of ["not_a_domain", "", "no-dot", "UPPER.case", ".leading"]) {
+            expect(schemaErrors(paramsOf(d)), `${d} should be invalid`).toBeDefined();
+        }
+    });
+});
+describe("image regex table", () => {
+    const paramsOf = (image) => withParams(withCreds(profileAlpha), {
+        once: { applications: [{ host: "www.alpha.example.com", image }] },
+    });
+    it("valid", () => {
+        for (const i of [
+            "ghcr.io/foo/bar",
+            "ghcr.io/foo/bar:latest",
+            "ghcr.io/org/path/sub:tag-1.2",
+            "registry.example.com/foo/bar:v1",
+        ]) {
+            expect(schemaErrors(paramsOf(i)), `${i} should be valid`).toBeUndefined();
+        }
+    });
+    it("invalid", () => {
+        for (const i of [
+            "nginx",
+            "",
+            "/no-registry",
+            "Foo/Bar",
+            "ghcr.io/foo/bar:bad tag",
+        ]) {
+            expect(schemaErrors(paramsOf(i)), `${i} should be invalid`).toBeDefined();
+        }
+    });
+});
+//# sourceMappingURL=validation.test.js.map
