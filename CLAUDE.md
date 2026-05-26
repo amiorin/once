@@ -113,7 +113,7 @@ Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources
 `validate` and `describe` are opt-in `big-config.workflow/run-steps` steps exposed through `bb once package validate` and `bb once package describe`. Validation is also exposed as a top-level `bb validate` shortcut, which accepts no extra args and exits non-zero when `*command-line-args*` is non-empty. These steps do not run automatically before `create`.
 
 ### Template Rendering
-`big-config` renders templates from `src/resources/` into `.dist/` using parameters. Templates use `{{ ... }}` delimiters for provider switching and `{ ... }` for filter expressions.
+`big-config` renders templates from `src/resources/` into `.dist/` using parameters. The Selmer parser is configured in `tools.clj` with custom delimiters (`:tag-open \<`, `:tag-close \>`, `:filter-open \{`, `:filter-close \}`), so variables in template file content are written as `<{ var }>` — this leaves literal `{{ ... }}` untouched so downstream tools like Ansible can interpret them. Provider switching is directory-level: each render step passes a `:transform [[<provider> delimiters]]` entry (e.g., `[["digitalocean" delimiters]]`) and the renderer copies only the matching subdirectory under `tools/<step>/`.
 
 ### Parameter Flow
 1. Options maps in `options.clj` define base params under `::workflow/params`
@@ -142,20 +142,20 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use
 
 ### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`online`, `space`, `website`, `no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb validate` / `bb once package validate` enforce this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
+Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`profile-alpha`, `profile-beta`, `profile-gamma`, `profile-no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb validate` / `bb once package validate` enforce this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
 ```clojure
-(def space (merge-with merge resend cloudflare r2 oci deploy
-                       {::render/profile "space"
-                        ::workflow/params {:domain "bigconfig.space"
-                                           :package "space"
-                                           :once {:applications [{:host "marketplace-api.bigconfig.space"
-                                                                  :image "ghcr.io/amiorin/once-pocketbase"
-                                                                  :env ["SUPERUSER_PASSWORD=<{ superuser-password }>"]}]}}}))
+(def profile-alpha (merge-with merge resend cloudflare r2 digitalocean deploy
+                               {::render/profile "profile-alpha"
+                                ::workflow/params {:domain "alpha.example.com"
+                                                   :package "profile-alpha"
+                                                   :once {:applications [{:host "www.alpha.example.com"
+                                                                          :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"}]}}}))
 ```
-`online` and `space` ride on `oci`; `website` rides on `digitalocean`; `no-infra` targets an existing server. The `bb` var sets the active profile for Babashka tasks:
+`profile-alpha` rides on `digitalocean`; `profile-beta` and `profile-gamma` ride on `oci`; `profile-no-infra` targets an existing server. The `bb` var sets the active profile for Babashka tasks:
 ```clojure
-(def bb website)  ; change this to switch profiles
+(def bb profile-alpha)  ; change this to switch profiles
 ```
+The profile names match the TypeScript implementation (`profileAlpha`, `profileBeta`, …) and are what `bb once build` uses to name its output directory (`.dist/profile-alpha-<hash>/`).
 
 ### REPL Development Pattern
 All source files contain `comment` blocks with live evaluation examples:
@@ -186,25 +186,25 @@ All cloud profiles combine with `resend` (SMTP) and `cloudflare` (DNS) sub-profi
 
 ## Dependencies
 
-To use `big-config` from local source during development, swap in `deps.edn`:
+`deps.edn` currently uses the local checkout of `big-config`:
 ```clojure
-;; comment out:
-io.github.amiorin/big-config {:git/sha "364fe1f..."}
-;; uncomment:
-io.github.amiorin/big-config {:local/root "../../big-config/main"}
+io.github.amiorin/big-config {:local/root "../../big-config/clojure"}
 ```
+The pinned Git coordinate is kept commented out beside it (`#_#_ ... {:git/sha "12f853026d..."}`). To consume the published version instead, swap which line is commented and re-run `clojure -P`.
 
 ## Git Conventions
 
-Commit messages use [Conventional Commits](https://www.conventionalcommits.org/):
+Stay on `clojure` (each language has its own branch in this repo). Commit only when explicitly asked. Commit messages use [Conventional Commits](https://www.conventionalcommits.org/):
 - `feat:` new feature
+- `fix:` bug fix
 - `refactor:` code restructuring
-- `deps:` dependency updates
 - `docs:` documentation changes
+- `chore:` build / tooling
+- `deps:` dependency updates
 
 ## What to Avoid
 
 - Do not add error handling for cases that cannot happen (big-config handles step failure via `::bc/exit` and `::bc/err`)
-- Do not create new namespaces unless a genuine new concern arises; the six existing namespaces (`options`, `package`, `params`, `tools`, `validation`, `describe`) map cleanly to their responsibilities
+- Do not create new namespaces unless a genuine new concern arises; the existing namespaces (`cli`, `options`, `package`, `params`, `tools`, `validation`, `describe`, `utils`) map cleanly to their responsibilities
 - Do not modify `.dist/` — it is generated output, not source
 - Credentials and tokens never go in source files; use `.envrc.private` (already gitignored via the whitelist `.gitignore`)
