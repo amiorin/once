@@ -11,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 CLOJURE_DIR = ROOT / "once" / "clojure"
 PYTHON_DIR = ROOT / "once" / "python"
-PROFILE_DIR = Path(".dist/profile-alpha-d2264632")
+PROFILE_DIR = Path(".dist/profile-alpha-2564897c")
 HAS_BB = shutil.which("bb") is not None
 
 
@@ -33,19 +33,21 @@ def test_python_build_matches_clojure_byte_for_byte():
     _clean_build_dir(CLOJURE_DIR)
     _clean_build_dir(PYTHON_DIR)
 
-    _run(["bb", "once", "package", "build"], CLOJURE_DIR)
+    _run(["bb", "run", "once", "package", "build"], CLOJURE_DIR)
 
     env = os.environ.copy()
     extra_pythonpath = [
         str(PYTHON_DIR / "src"),
         str(ROOT / "big-config" / "python" / "src"),
-        str(ROOT / "Selmer" / "python" / "src"),
+        str(ROOT / "selmer" / "python" / "src"),
     ]
     env["PYTHONPATH"] = os.pathsep.join([*extra_pythonpath, env.get("PYTHONPATH", "")])
     _run([sys.executable, "-m", "once", "package", "build"], PYTHON_DIR, env)
 
     clj_out = CLOJURE_DIR / PROFILE_DIR
     py_out = PYTHON_DIR / PROFILE_DIR
+    assert clj_out.is_dir()
+    assert py_out.is_dir()
     assert _files(py_out) == _files(clj_out)
     for rel in _files(clj_out):
         assert (py_out / rel).read_bytes() == (clj_out / rel).read_bytes(), str(rel)
