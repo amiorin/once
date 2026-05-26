@@ -1,0 +1,50 @@
+#!/usr/bin/env node
+/** Run the ONCE CLI.
+ *
+ * This is the TypeScript counterpart to the Clojure `bb run` script and the
+ * Python `python run` script.
+ */
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = dirname(fileURLToPath(import.meta.url));
+const IS_WINDOWS = process.platform === "win32";
+const ARGS = process.argv.slice(2);
+
+function localBin(name) {
+  return join(ROOT, "node_modules", ".bin", IS_WINDOWS ? `${name}.cmd` : name);
+}
+
+function run(command, args) {
+  const result = spawnSync(command, args, {
+    cwd: ROOT,
+    env: process.env,
+    shell: IS_WINDOWS,
+    stdio: "inherit",
+  });
+  if (result.error) {
+    console.error(`failed to start ${command}: ${result.error.message}`);
+    return 127;
+  }
+  return result.signal ? 1 : result.status ?? 1;
+}
+
+const sourceCli = join(ROOT, "src", "cli.ts");
+const tsx = localBin("tsx");
+const once = localBin("once");
+
+if (existsSync(sourceCli)) {
+  if (!existsSync(tsx)) {
+    console.error("tsx is required to run this project from source. Run npm install and try again.");
+    process.exit(127);
+  }
+  process.exit(run(tsx, [sourceCli, ...ARGS]));
+}
+
+if (!existsSync(once)) {
+  console.error("once is required to run this project. Run npm install and try again.");
+  process.exit(127);
+}
+process.exit(run(once, ARGS));
