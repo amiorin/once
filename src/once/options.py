@@ -127,13 +127,19 @@ profile_alpha: Opts = compose(
     digitalocean,
     deploy,
     {
-        "profile": "website",
+        "profile": "profile-alpha",
         "params": {
-            "domain": "bigconfig.website",
-            "package": "website",
+            "domain": "alpha.example.com",
+            "package": "profile-alpha",
             "once": {
                 "applications": [
-                    {"host": "www.bigconfig.website", "image": "ghcr.io/bigconfig-ai/once-bigconfig:latest"},
+                    {"host": "www.alpha.example.com", "image": "ghcr.io/bigconfig-ai/once-bigconfig:latest"},
+                    {"host": "alpha.example.com", "image": "ghcr.io/bigconfig-ai/once-caddy-redirect:latest"},
+                    {
+                        "host": "forms.alpha.example.com",
+                        "image": "ghcr.io/bigconfig-ai/once-forms:latest",
+                        "env": ["TARGET_EMAIL=forms@alpha.example.com"],
+                    },
                 ]
             },
         },
