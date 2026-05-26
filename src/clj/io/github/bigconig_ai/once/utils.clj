@@ -1,4 +1,4 @@
-(ns io.github.amiorin.once.utils
+(ns io.github.bigconig-ai.once.utils
   (:require
    [clojure.string :as str]))
 

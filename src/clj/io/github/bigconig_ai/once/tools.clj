@@ -1,4 +1,4 @@
-(ns io.github.amiorin.once.tools
+(ns io.github.bigconig-ai.once.tools
   (:require
    [big-config :as bc]
    [big-config.pluggable :as pluggable]
@@ -11,8 +11,8 @@
    [clj-yaml.core :as yaml]
    [clojure.string :as str]
    [com.rpl.specter :as s]
-   [io.github.amiorin.once.options :as options]
-   [io.github.amiorin.once.params :as params]))
+   [io.github.bigconig-ai.once.options :as options]
+   [io.github.bigconig-ai.once.params :as params]))
 
 (def step-fns [workflow/print-step-fn
                (step-fns/->exit-step-fn ::workflow/end)

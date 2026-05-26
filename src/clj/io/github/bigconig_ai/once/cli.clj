@@ -1,9 +1,9 @@
-(ns io.github.amiorin.once.cli
+(ns io.github.bigconig-ai.once.cli
   (:require
-   [io.github.amiorin.once.options :as options]
-   [io.github.amiorin.once.package :as package]
-   [io.github.amiorin.once.params :as params]
-   [io.github.amiorin.once.tools :as tools]))
+   [io.github.bigconig-ai.once.options :as options]
+   [io.github.bigconig-ai.once.package :as package]
+   [io.github.bigconig-ai.once.params :as params]
+   [io.github.bigconig-ai.once.tools :as tools]))
 
 (def help-text
   "Usage: once <command> [args...]
@@ -26,7 +26,7 @@ Commands:
   ansible-local <args>
 
 Notes:
-  * The active profile is selected by `bb` in io.github.amiorin.once.options.
+  * The active profile is selected by `bb` in io.github.bigconig-ai.once.options.
   * Any param can be overridden with BC_PAR_* environment variables.
 
 See: https://www.bigconfig.ai/manual")

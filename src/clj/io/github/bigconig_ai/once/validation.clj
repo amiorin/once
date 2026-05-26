@@ -1,4 +1,4 @@
-(ns io.github.amiorin.once.validation
+(ns io.github.bigconig-ai.once.validation
   "Validate the active profile before running `bb once create`.
 
   Four phases run in a single pass and their errors are collected into a flat

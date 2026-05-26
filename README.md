@@ -78,13 +78,13 @@ The easiest way to interact with `once` is through the provided Babashka tasks.
 Clone the repository and configure your options:
 
 ```bash
-git clone https://github.com/amiorin/once
+git clone https://github.com/bigconig-ai/once
 cd once
 # Edit your chosen provider options
-edit src/clj/io/github/amiorin/once/options.clj
+edit src/clj/io/github/bigconig_ai/once/options.clj
 ```
 
-In `src/clj/io/github/amiorin/once/options.clj`, you can switch the active profile used by Babashka by changing the `bb` definition:
+In `src/clj/io/github/bigconig_ai/once/options.clj`, you can switch the active profile used by Babashka by changing the `bb` definition:
 
 ```clojure
 ;; options.clj
@@ -171,8 +171,8 @@ You can also run the underlying tools individually. Most tasks require a `render
 You can trigger workflows directly from a Clojure REPL:
 
 ```clojure
-(require '[io.github.amiorin.once.package :as once])
-(require '[io.github.amiorin.once.options :as options])
+(require '[io.github.bigconig-ai.once.package :as once])
+(require '[io.github.bigconig-ai.once.options :as options])
 
 ;; Run workflow steps using the active profile
 (once/once* "validate" options/bb)
@@ -183,8 +183,8 @@ You can trigger workflows directly from a Clojure REPL:
 The pure report builders remain available for tests and tooling:
 
 ```clojure
-(require '[io.github.amiorin.once.validation :as validation])
-(require '[io.github.amiorin.once.describe :as describe])
+(require '[io.github.bigconig-ai.once.validation :as validation])
+(require '[io.github.bigconig-ai.once.describe :as describe])
 
 (validation/validate-report options/bb)
 (describe/describe-report options/bb)

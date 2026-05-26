@@ -1,10 +1,10 @@
-{:deps {io.github.amiorin/once {:local/root "."}}
+{:deps {io.github.bigconig-ai/once {:local/root "."}}
  :tasks
- {:requires ([io.github.amiorin.once.cli :as cli]
-             [io.github.amiorin.once.params :as params]
-             [io.github.amiorin.once.options :as options]
-             [io.github.amiorin.once.package :as package]
-             [io.github.amiorin.once.tools :as tools])
+ {:requires ([io.github.bigconig-ai.once.cli :as cli]
+             [io.github.bigconig-ai.once.params :as params]
+             [io.github.bigconig-ai.once.options :as options]
+             [io.github.bigconig-ai.once.package :as package]
+             [io.github.bigconig-ai.once.tools :as tools])
   help {:doc "the workflow help"
         :override-builtin true
         :task (println "Usage: bb <task> [args...]

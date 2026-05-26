@@ -1,8 +1,8 @@
-(ns io.github.amiorin.once.params-test
+(ns io.github.bigconig-ai.once.params-test
   (:require
    [big-config.workflow :as workflow]
    [clojure.test :refer [deftest is]]
-   [io.github.amiorin.once.params :as params]))
+   [io.github.bigconig-ai.once.params :as params]))
 
 (defn- missing-prefix []
   (str "/tmp/once-params-test-" (random-uuid)))

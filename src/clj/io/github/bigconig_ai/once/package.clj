@@ -1,4 +1,4 @@
-(ns io.github.amiorin.once.package
+(ns io.github.bigconig-ai.once.package
   (:require
    [big-config :as bc]
    [big-config.core :as core]
@@ -6,11 +6,11 @@
    [big-config.step-fns :as step-fns]
    [big-config.utils :refer [debug]]
    [big-config.workflow :as workflow]
-   [io.github.amiorin.once.describe :as describe]
-   [io.github.amiorin.once.options :as options]
-   [io.github.amiorin.once.params :as params]
-   [io.github.amiorin.once.tools :as tools]
-   [io.github.amiorin.once.validation :as validation]))
+   [io.github.bigconig-ai.once.describe :as describe]
+   [io.github.bigconig-ai.once.options :as options]
+   [io.github.bigconig-ai.once.params :as params]
+   [io.github.bigconig-ai.once.tools :as tools]
+   [io.github.bigconig-ai.once.validation :as validation]))
 
 (def step-fns [workflow/print-step-fn
                (step-fns/->exit-step-fn ::end)

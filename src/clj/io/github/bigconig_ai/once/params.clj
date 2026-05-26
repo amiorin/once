@@ -1,4 +1,4 @@
-(ns io.github.amiorin.once.params
+(ns io.github.bigconig-ai.once.params
   (:require
    [babashka.process :as p]
    [big-config.render :as render]
@@ -6,7 +6,7 @@
    [big-config.workflow :as workflow]
    [cheshire.core :as json]
    [com.rpl.specter :as s]
-   [io.github.amiorin.once.options :as options]))
+   [io.github.bigconig-ai.once.options :as options]))
 
 (defn- tofu-output
   [dir]
@@ -58,21 +58,21 @@
 (defn tofu-params
   [opts]
   (let [params (::workflow/params opts)
-        dir (workflow/path opts :io.github.amiorin.once.tools/tofu)]
+        dir (workflow/path opts :io.github.bigconig-ai.once.tools/tofu)]
     (merge-with merge opts {::workflow/params (merge (fallback-compute-params params)
                                                      (or (tofu-output dir) {}))})))
 
 (defn tofu-smtp-params
   [opts]
   (let [params (::workflow/params opts)
-        dir (workflow/path opts :io.github.amiorin.once.tools/tofu-smtp)]
+        dir (workflow/path opts :io.github.bigconig-ai.once.tools/tofu-smtp)]
     (merge-with merge opts {::workflow/params (merge (fallback-smtp-params params)
                                                      (or (tofu-output dir) {}))})))
 
 (comment
   (debug tap-values
     (-> {::render/profile "profile-gamma"}
-        (workflow/new-prefix :io.github.amiorin.once.package/start-create-or-delete)
+        (workflow/new-prefix :io.github.bigconig-ai.once.package/start-create-or-delete)
         tofu-smtp-params))
   (-> tap-values))
 
@@ -81,12 +81,12 @@
 (comment
   (debug tap-values
     (-> options/bb
-        (workflow/new-prefix :io.github.amiorin.once.package/start-create-or-delete)
+        (workflow/new-prefix :io.github.bigconig-ai.once.package/start-create-or-delete)
         opts-fn))
   (-> tap-values))
 
-(def once-opts (comp opts-fn #(workflow/new-prefix % :io.github.amiorin.once.package/start-create-or-delete)))
+(def once-opts (comp opts-fn #(workflow/new-prefix % :io.github.bigconig-ai.once.package/start-create-or-delete)))
 
 (comment
-  (workflow/new-prefix {} :io.github.amiorin.once.package/start-create-or-delete)
+  (workflow/new-prefix {} :io.github.bigconig-ai.once.package/start-create-or-delete)
   (once-opts options/bb))
