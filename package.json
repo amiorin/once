@@ -18,7 +18,7 @@
     "validate": "tsx src/cli.ts validate"
   },
   "dependencies": {
-    "big-config": "github:bigconfig-ai/big-config#29b83569807704650be488c7d62dbdc0c8c37d55"
+    "big-config": "github:bigconfig-ai/big-config#50f7814e58182b2fbb5ac94ebd6802502c1225d1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
