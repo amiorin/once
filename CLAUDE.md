@@ -6,7 +6,7 @@ This file describes the `once` codebase for AI assistants. Read it before making
 
 `once` is a TypeScript library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment via [Basecamp's ONCE](https://github.com/basecamp/once).
 
-It uses the shared local `big-config` TypeScript package (`../../big-config/typescript`) for the workflow engine, template renderer, step runner, and plugin system.
+It depends on the `big-config` TypeScript package (`bigconfig-ai/big-config`, pinned to a GitHub commit in `package.json`) for the workflow engine, template renderer, step runner, and plugin system. To develop against a local checkout instead, override the `big-config` dependency in `package.json` with `"big-config": "file:../../big-config/typescript"` and re-run `npm install`.
 
 ## Tech Stack
 
@@ -24,15 +24,6 @@ The CLI shells out to external tools at runtime: `tofu`, `ansible-playbook`, `ss
 ```
 once/
 ├── src/
-│   ├── bc/                  # Ported "big-config" engine (no external deps)
-│   │   ├── core.ts          # Workflow engine: toWorkflow, ok, choice, toStepFn
-│   │   ├── pluggable.ts     # handleStep registry + toWorkflowStar
-│   │   ├── workflow.ts      # runSteps, toCompWorkflow, parseArgs, prepare, params helpers
-│   │   ├── render.ts        # Template engine (selmer-subset renderer)
-│   │   ├── run.ts           # Command execution + the `exec` workflow
-│   │   ├── step-fns.ts      # exitStepFn / printErrorStepFn middleware
-│   │   ├── big-tofu.ts      # Terraform construct helpers
-│   │   └── utils.ts         # deepMerge, sortNestedMap, keyword/path helpers
 │   ├── once/
 │   │   ├── options.ts       # Cloud profiles & active profile (`bb`)
 │   │   ├── package.ts       # High-level create/delete workflows + validate/describe wiring
@@ -40,6 +31,7 @@ once/
 │   │   ├── tools.ts         # Tofu/Ansible tool workflows
 │   │   ├── validation.ts    # Profile schema, tool/credential/image/ssh-agent checks
 │   │   ├── describe.ts      # Post-provisioning report
+│   │   ├── interop.ts       # big-config interop helpers
 │   │   └── utils.ts         # stripAnsi
 │   ├── resources/io/github/bigconig-ai/once/tools/
 │   │   ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
@@ -136,7 +128,7 @@ Sensitive credentials go in `.envrc.private` (gitignored).
 
 ## Code Conventions
 
-- **Modules**: `../../big-config/typescript` is the engine; `src/once/*` is the application. Keep that separation.
+- **Modules**: the `big-config` npm package is the engine; `src/once/*` is the application. Keep that separation.
 - **`opts` keys**: BigConfig engine keys are namespaced strings (`big-config/exit`, `big-config.workflow/params`, etc.). ONCE also mirrors friendly aliases (`exit`, `err`, `params`, `profile`) at the CLI/test boundary. Profile/template parameter keys are kebab-case strings matching the template variable names (`provider-compute`, `do-token`, `oci-shape`).
 - **Entry points**: `*Star` functions (`onceStar`, `tofuStar`, …) are the CLI-ready wrappers; `validate` / `describe` are workflow steps, while `validateReport` / `describeReport` are the pure report builders (and accept injected dependencies for testing).
 - **Configuration Profiles (`options.ts`)**: private sub-profile maps (`oci`, `hcloud`, `digitalocean`, `noInfraCompute`, `resend`, `cloudflare`, `r2`, `deploy`, …) compose into public application profiles (`profileAlpha`, `profileBeta`, `profileGamma`, `profileNoInfra`) via `compose`. Each application profile pins a `domain`, `package`, and the `once.applications` list. `profileAlpha` rides on DigitalOcean; `profileBeta` / `profileGamma` ride on OCI; `profileNoInfra` targets an existing server. The active profile is `export const bb = profileAlpha;` — change it to switch profiles.
@@ -154,3 +146,7 @@ Functions designed for testing take their side-effecting collaborators as inject
 - Do not edit `.dist/` — it is generated output.
 - Credentials and tokens never go in source files; use `.envrc.private` (gitignored).
 - Keep imports using explicit `.js` extensions (required by `NodeNext` module resolution).
+
+## Git
+
+Stay on `typescript` (each language has its own branch in this repo). Commit only when explicitly asked. Commit messages follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `deps:`).
