@@ -5,7 +5,7 @@ description = "Automated provisioning and configuration of cloud infrastructure 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "big-config @ git+https://github.com/bigconfig-ai/big-config.git@4ff8b09f89992ca194e7a31544faff1ce94a62a7",
+  "big-config @ git+https://github.com/bigconfig-ai/big-config.git@5e65118000ef4b449ec7db38a03c0fb46524a432",
 ]
 
 [project.scripts]
