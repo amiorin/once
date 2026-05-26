@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/** Command-line entry point. */
 import { bb } from "./once/options.js";
 import { onceOpts } from "./once/params.js";
 import { onceStar } from "./once/package.js";
@@ -24,15 +23,34 @@ Commands:
   ansible-local <args>
 
 Notes:
-  * The active profile is selected by \`bb\` in src/once/options.ts.
+  * When launched through \`run\`, the active profile comes from that script;
+    otherwise it defaults to \`bb\` in src/once/options.ts.
   * Any param can be overridden with BC_PAR_* environment variables.
 
 See: https://www.bigconfig.ai/manual`;
 const PACKAGE_COMMANDS = new Set(["describe", "build", "create", "delete"]);
-function main(argv) {
+const PROFILE_ENV = "ONCE_PROFILE_JSON";
+function profileFromEnv() {
+    const raw = process.env[PROFILE_ENV];
+    if (!raw)
+        return undefined;
+    try {
+        const profile = JSON.parse(raw);
+        if (profile && typeof profile === "object" && !Array.isArray(profile)) {
+            return profile;
+        }
+    }
+    catch (err) {
+        console.error(`Invalid ${PROFILE_ENV}: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+    }
+    console.error(`Invalid ${PROFILE_ENV}: expected a JSON object`);
+    process.exit(1);
+}
+function main(argv, opts = profileFromEnv() ?? bb) {
     const [command, ...rest] = argv;
     if (command && PACKAGE_COMMANDS.has(command)) {
-        onceStar(argv, bb);
+        onceStar(argv, opts);
         return;
     }
     switch (command) {
@@ -44,28 +62,28 @@ function main(argv) {
             return;
         case "package":
         case "once": // Backwards-compatible alias for the old nested form.
-            onceStar(rest, bb);
+            onceStar(rest, opts);
             return;
         case "validate":
-            onceStar(rest.length > 0 ? argv : ["validate"], bb);
+            onceStar(rest.length > 0 ? argv : ["validate"], opts);
             return;
         case "tofu":
-            tofuStar(rest, onceOpts(bb));
+            tofuStar(rest, onceOpts(opts));
             return;
         case "tofu-smtp":
-            tofuSmtpStar(rest, onceOpts(bb));
+            tofuSmtpStar(rest, onceOpts(opts));
             return;
         case "tofu-dns":
-            tofuDnsStar(rest, onceOpts(bb));
+            tofuDnsStar(rest, onceOpts(opts));
             return;
         case "tofu-smtp-post":
-            tofuSmtpPostStar(rest, onceOpts(bb));
+            tofuSmtpPostStar(rest, onceOpts(opts));
             return;
         case "ansible":
-            ansibleStar(rest, onceOpts(bb));
+            ansibleStar(rest, onceOpts(opts));
             return;
         case "ansible-local":
-            ansibleLocalStar(rest, onceOpts(bb));
+            ansibleLocalStar(rest, onceOpts(opts));
             return;
         default:
             console.error(`Unknown command: ${command}\n`);
