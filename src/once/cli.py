@@ -1,7 +1,11 @@
 """Command-line entry point."""
 from __future__ import annotations
 
+import json
+import os
 import sys
+
+from big_config.core import Opts
 
 from .options import bb
 from .package import once_star
@@ -28,16 +32,34 @@ Commands:
   ansible-local <args>
 
 Notes:
-  * The active profile is selected by `bb` in once/options.py.
+  * When launched through `run`, the active profile comes from that script;
+    otherwise it defaults to `bb` in once/options.py.
   * Any param can be overridden with BC_PAR_* environment variables.
 
 See: https://www.bigconfig.ai/manual"""
 
 PACKAGE_COMMANDS = {"validate", "describe", "build", "create", "delete"}
+PROFILE_ENV = "ONCE_PROFILE_JSON"
 
 
-def main(argv: list[str] | None = None) -> None:
+def profile_from_env() -> Opts | None:
+    raw = os.environ.get(PROFILE_ENV)
+    if not raw:
+        return None
+    try:
+        profile = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        print(f"Invalid {PROFILE_ENV}: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    if not isinstance(profile, dict):
+        print(f"Invalid {PROFILE_ENV}: expected a JSON object", file=sys.stderr)
+        raise SystemExit(1)
+    return profile
+
+
+def main(argv: list[str] | None = None, opts: Opts | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
+    active_profile = opts if opts is not None else (profile_from_env() or bb)
     command = argv[0] if argv else None
     rest = argv[1:] if argv else []
 
@@ -45,31 +67,31 @@ def main(argv: list[str] | None = None) -> None:
         print(HELP)
         return
     if command in {"package", "once"}:  # "once" kept as a backwards-compatible alias.
-        once_star(rest, bb)
+        once_star(rest, active_profile)
         return
     if command == "validate":
-        once_star(argv if rest else ["validate"], bb)
+        once_star(argv if rest else ["validate"], active_profile)
         return
     if command in PACKAGE_COMMANDS:
-        once_star(argv, bb)
+        once_star(argv, active_profile)
         return
     if command == "tofu":
-        tofu_star(rest, once_opts(bb))
+        tofu_star(rest, once_opts(active_profile))
         return
     if command == "tofu-smtp":
-        tofu_smtp_star(rest, once_opts(bb))
+        tofu_smtp_star(rest, once_opts(active_profile))
         return
     if command == "tofu-dns":
-        tofu_dns_star(rest, once_opts(bb))
+        tofu_dns_star(rest, once_opts(active_profile))
         return
     if command == "tofu-smtp-post":
-        tofu_smtp_post_star(rest, once_opts(bb))
+        tofu_smtp_post_star(rest, once_opts(active_profile))
         return
     if command == "ansible":
-        ansible_star(rest, once_opts(bb))
+        ansible_star(rest, once_opts(active_profile))
         return
     if command == "ansible-local":
-        ansible_local_star(rest, once_opts(bb))
+        ansible_local_star(rest, once_opts(active_profile))
         return
 
     print(f"Unknown command: {command}\n", file=sys.stderr)
