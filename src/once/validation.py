@@ -10,10 +10,9 @@ from pathlib import Path
 from typing import Any, Callable, Literal, TypedDict
 from urllib.parse import quote
 
-from big_config import workflow as bc_workflow
 from big_config.core import Opts
 
-from .interop import ok_alias, params_of, profile_of, status, to_bc_opts
+from .interop import ok_alias, params_of, profile_of, read_bc_pars, status
 
 CheckKind = Literal["schema", "tool", "credential", "image"]
 
@@ -545,7 +544,7 @@ def image_errors(params: dict[str, Any], run_fn: Runner = run) -> list[CheckErro
 def validate_report(opts: Opts, env: dict[str, str | None] | None = None) -> ValidateResult:
     """Validate the merged active profile."""
     env = os.environ if env is None else env
-    merged = bc_workflow.read_bc_pars(to_bc_opts(opts), env)
+    merged = read_bc_pars(opts, env)
     params = params_of(merged)
     errors = [
         *(schema_errors(merged) or []),

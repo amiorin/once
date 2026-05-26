@@ -40,6 +40,11 @@ def sync_aliases(opts: Mapping[str, Any] | None) -> Opts:
     return out
 
 
+def read_bc_pars(opts: Mapping[str, Any] | None, env: Mapping[str, str] | None = None) -> Opts:
+    """Read BC_PAR_* overrides and keep ONCE aliases in sync."""
+    return sync_aliases(bc_workflow.read_bc_pars(to_bc_opts(opts), env))
+
+
 def params_of(opts: Mapping[str, Any] | None) -> dict[str, Any]:
     return dict(to_bc_opts(opts).get(PARAMS) or {})
 

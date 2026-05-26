@@ -8,6 +8,7 @@ from once.validation import (
     ssh_agent_errors,
     tool_errors,
     validate,
+    validate_report,
 )
 
 TEST_COMPUTE_PUBKEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 test@example.com"
@@ -61,6 +62,15 @@ def test_placeholder_credential_is_reported():
     errors = schema_errors(profile_alpha)
     assert errors is not None
     assert any("resend-api-key" in e["detail"] and "REPLACE_ME" in e["detail"] for e in errors)
+
+
+def test_validate_report_honors_bc_par_overrides_when_profile_has_aliases(monkeypatch):
+    monkeypatch.setattr("once.validation.tool_errors", lambda _params: [])
+    monkeypatch.setattr("once.validation.credential_errors", lambda _params, _env=None: [])
+    monkeypatch.setattr("once.validation.image_errors", lambda _params: [])
+    env = {f"BC_PAR_{k.upper().replace('-', '_')}": str(v) for k, v in CREDS.items()}
+
+    assert validate_report(profile_alpha, env) == {"ok": True, "errors": []}
 
 
 def test_missing_compute_pubkey_is_reported():

@@ -8,7 +8,7 @@ from typing import Any
 from big_config import workflow as bc_workflow
 from big_config.core import Opts
 
-from .interop import PARAMS, sync_aliases, to_bc_opts
+from .interop import PARAMS, read_bc_pars, sync_aliases, to_bc_opts
 
 START_STEP = "io.github.bigconig-ai.once.package/start-create-or-delete"
 TOFU = "io.github.bigconig-ai.once.tools/tofu"
@@ -99,7 +99,7 @@ def tofu_smtp_params(opts: Opts) -> Opts:
 
 def opts_fn(opts: Opts) -> Opts:
     """Compose env overrides with SMTP and compute Tofu outputs."""
-    return sync_aliases(tofu_params(tofu_smtp_params(bc_workflow.read_bc_pars(to_bc_opts(opts)))))
+    return sync_aliases(tofu_params(tofu_smtp_params(read_bc_pars(opts))))
 
 
 def once_opts(opts: Opts) -> Opts:
