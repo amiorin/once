@@ -27,7 +27,8 @@ Commands:
   ansible-local <args>
 
 Notes:
-  * The active profile is selected by `bb` in io.github.bigconig-ai.once.options.
+  * When launched through `run`, the active profile comes from that script;
+    otherwise it defaults to `bb` in io.github.bigconig-ai.once.options.
   * Any param can be overridden with BC_PAR_* environment variables.
 
 See: https://www.bigconfig.ai/manual")
@@ -42,10 +43,12 @@ See: https://www.bigconfig.ai/manual")
   (System/exit 1))
 
 (defn main*
-  [args]
-  (let [args (mapv str args)
-        command (first args)
-        rest-args (if (seq args) (subvec args 1) [])]
+  ([args]
+   (main* args options/bb))
+  ([args opts]
+   (let [args (mapv str args)
+         command (first args)
+         rest-args (if (seq args) (subvec args 1) [])]
     (cond
       (or (nil? command) (#{"help" "--help" "-h"} command))
       (println help-text)
@@ -59,7 +62,7 @@ See: https://www.bigconfig.ai/manual")
 
           (= subcommand "package")
           (if (seq package-args)
-            (package/once* package-args options/bb)
+            (package/once* package-args opts)
             (die! "Missing package step."
                   "Usage: bb run once package <validate|describe|build|create|delete>..."))
 
@@ -73,11 +76,11 @@ See: https://www.bigconfig.ai/manual")
       (if (seq rest-args)
         (die! "Error: bb run validate does not accept arguments."
               "Usage: bb run validate")
-        (package/once* ["validate"] options/bb))
+        (package/once* ["validate"] opts))
 
       (= command "package")
       (if (seq rest-args)
-        (package/once* rest-args options/bb)
+        (package/once* rest-args opts)
         (die! "Missing package step."
               "Usage: bb run package <validate|describe|build|create|delete>..."))
 
@@ -85,25 +88,25 @@ See: https://www.bigconfig.ai/manual")
       (die! (str "Use `bb run package " command "`.") "" help-text)
 
       (= command "tofu")
-      (tools/tofu* rest-args (params/once-opts options/bb))
+      (tools/tofu* rest-args (params/once-opts opts))
 
       (= command "tofu-smtp")
-      (tools/tofu-smtp* rest-args (params/once-opts options/bb))
+      (tools/tofu-smtp* rest-args (params/once-opts opts))
 
       (= command "tofu-dns")
-      (tools/tofu-dns* rest-args (params/once-opts options/bb))
+      (tools/tofu-dns* rest-args (params/once-opts opts))
 
       (= command "tofu-smtp-post")
-      (tools/tofu-smtp-post* rest-args (params/once-opts options/bb))
+      (tools/tofu-smtp-post* rest-args (params/once-opts opts))
 
       (= command "ansible")
-      (tools/ansible* rest-args (params/once-opts options/bb))
+      (tools/ansible* rest-args (params/once-opts opts))
 
       (= command "ansible-local")
-      (tools/ansible-local* rest-args (params/once-opts options/bb))
+      (tools/ansible-local* rest-args (params/once-opts opts))
 
       :else
-      (die! (str "Unknown command: " command) "" help-text))))
+      (die! (str "Unknown command: " command) "" help-text)))))
 
 (defn -main
   [& args]
