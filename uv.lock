@@ -5,16 +5,10 @@ requires-python = ">=3.12"
 [[package]]
 name = "big-config"
 version = "0.3.0"
-source = { directory = "/home/ubuntu/code/bigconfig/big-config/python" }
+source = { git = "https://github.com/bigconfig-ai/big-config.git?rev=4ff8b09f89992ca194e7a31544faff1ce94a62a7#4ff8b09f89992ca194e7a31544faff1ce94a62a7" }
 dependencies = [
     { name = "selmer" },
 ]
-
-[package.metadata]
-requires-dist = [{ name = "selmer", directory = "/home/ubuntu/code/bigconfig/Selmer/python" }]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]
 name = "colorama"
@@ -48,7 +42,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "big-config", directory = "/home/ubuntu/code/bigconfig/big-config/python" }]
+requires-dist = [{ name = "big-config", git = "https://github.com/bigconfig-ai/big-config.git?rev=4ff8b09f89992ca194e7a31544faff1ce94a62a7" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.0" }]
@@ -99,9 +93,4 @@ wheels = [
 [[package]]
 name = "selmer"
 version = "1.13.1.post0"
-source = { directory = "/home/ubuntu/code/bigconfig/Selmer/python" }
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
+source = { git = "https://github.com/bigconfig-ai/Selmer.git?rev=d6db31695ba1c06abefe30d6ed8a1dedc0de110a#d6db31695ba1c06abefe30d6ed8a1dedc0de110a" }
