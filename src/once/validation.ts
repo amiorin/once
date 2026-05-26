@@ -11,7 +11,7 @@ import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import type { Opts } from "big-config";
 import { readBcPars } from "big-config/workflow";
-import { okAlias, paramsOf, profileOf, status, toBcOpts } from "./interop.js";
+import { okAlias, paramsOf, profileOf, status, syncAliases, toBcOpts } from "./interop.js";
 
 export interface CheckError {
   check: "schema" | "tool" | "credential" | "image";
@@ -758,7 +758,7 @@ export function validateReport(
   opts: Opts,
   env: Record<string, string | undefined> = process.env,
 ): ValidateResult {
-  const merged = readBcPars(toBcOpts(opts), env);
+  const merged = syncAliases(readBcPars(toBcOpts(opts), env));
   const params = paramsOf(merged);
   const errors: CheckError[] = [
     ...(schemaErrors(merged) ?? []),

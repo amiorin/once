@@ -1,3 +1,6 @@
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Opts } from "big-config";
 import {
@@ -15,12 +18,15 @@ import {
   sshAgentErrors,
   toolErrors,
   validate,
+  validateReport,
 } from "../src/once/validation.js";
 
 const testComputePubkey =
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 test@example.com";
 const testDeployPubkey =
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII1Lbgxiv2OnDKwc8Wx25SQlGyI+iY1drUii/IMZ3YSh deploy@example.com";
+
+const profileAlphaDomain = String(profileAlpha.params.domain);
 
 const creds: Record<string, any> = {
   "compute-pubkey": testComputePubkey,
@@ -72,6 +78,34 @@ describe("public profiles pass schema with stub creds", () => {
     it(name, () => {
       expect(schemaErrors(profile)).toBeUndefined();
     });
+  }
+});
+
+it("validateReport honors BC_PAR env overrides", () => {
+  const binDir = mkdtempSync(join(tmpdir(), "once-validation-bin-"));
+  const oldPath = process.env.PATH;
+  try {
+    for (const cmd of ["tofu", "ansible-playbook", "ssh", "curl", "skopeo"]) {
+      const file = join(binDir, cmd);
+      writeFileSync(file, "#!/bin/sh\nexit 0\n");
+      chmodSync(file, 0o755);
+    }
+    process.env.PATH = `${binDir}:${oldPath ?? ""}`;
+    const result = validateReport(profileNoInfra, {
+      BC_PAR_COMPUTE_PUBKEY: testComputePubkey,
+      BC_PAR_DEPLOY_PUBKEY: testDeployPubkey,
+      BC_PAR_NO_INFRA_COMPUTE_IP: "192.0.2.10",
+      BC_PAR_NO_INFRA_COMPUTE_USER: "ubuntu",
+      BC_PAR_NO_INFRA_COMPUTE_SUDOER: "ubuntu",
+      BC_PAR_NO_INFRA_COMPUTE_UID: "1000",
+      BC_PAR_NO_INFRA_COMPUTE_NAME: "once",
+      BC_PAR_NO_INFRA_SMTP_PASSWORD: "stub",
+    });
+    expect(result).toEqual({ ok: true, errors: [] });
+  } finally {
+    if (oldPath === undefined) delete process.env.PATH;
+    else process.env.PATH = oldPath;
+    rmSync(binDir, { recursive: true, force: true });
   }
 });
 
@@ -129,8 +163,8 @@ describe("schema validation", () => {
     const okProfile = withParams(withCreds(profileAlpha), {
       once: {
         applications: [
-          { host: "alpha.example.com", image: "ghcr.io/foo/bar:latest" },
-          { host: "www.alpha.example.com", image: "ghcr.io/foo/bar:latest" },
+          { host: profileAlphaDomain, image: "ghcr.io/foo/bar:latest" },
+          { host: `www.${profileAlphaDomain}`, image: "ghcr.io/foo/bar:latest" },
         ],
       },
     });
@@ -283,7 +317,7 @@ describe("cloudflare zone checks the configured domain", () => {
 
   it("configured zone exists", () => {
     const runFn: Runner = (args) => {
-      expect(args.some((a) => a.includes("name=alpha.example.com"))).toBe(true);
+      expect(args.some((a) => a.includes(`name=${profileAlphaDomain}`))).toBe(true);
       return {
         ok: true,
         exit: 0,
@@ -304,7 +338,7 @@ describe("cloudflare zone checks the configured domain", () => {
     const errors = credentialErrors(cfParams(), {}, runFn);
     expect(errors.length).toBe(1);
     expect(errors[0].detail).toContain("Cloudflare zone");
-    expect(errors[0].detail).toContain("alpha.example.com");
+    expect(errors[0].detail).toContain(profileAlphaDomain);
   });
 });
 
@@ -328,7 +362,7 @@ describe("domain regex table", () => {
 describe("image regex table", () => {
   const paramsOf = (image: string) =>
     withParams(withCreds(profileAlpha), {
-      once: { applications: [{ host: "www.alpha.example.com", image }] },
+      once: { applications: [{ host: `www.${profileAlphaDomain}`, image }] },
     });
 
   it("valid", () => {

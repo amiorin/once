@@ -90,7 +90,8 @@ export function tofuSmtpParams(opts0: Opts): Opts {
 
 /** Compose env overrides with the SMTP and compute Tofu outputs. */
 export function optsFn(opts: Opts): Opts {
-  return syncAliases(tofuParams(tofuSmtpParams(bcWorkflow.readBcPars(toBcOpts(opts)))));
+  const withEnv = syncAliases(bcWorkflow.readBcPars(toBcOpts(opts)));
+  return syncAliases(tofuParams(tofuSmtpParams(withEnv)));
 }
 
 /** `optsFn` after stamping the deterministic prefix for the create/delete workflow. */
