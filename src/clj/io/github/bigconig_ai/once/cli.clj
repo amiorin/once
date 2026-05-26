@@ -9,13 +9,14 @@
   "Usage: bb run <command> [args...]
 
 Commands:
-  once package <step>...  Build, provision, or tear down infrastructure for the active profile.
-                            bb run once package validate
-                            bb run once package describe
-                            bb run once package build
-                            bb run once package create
-                            bb run once package delete
-  validate                Strict shortcut for `bb run once package validate`.
+  package <step>...       Build, provision, or tear down infrastructure for the active profile.
+                            bb run package validate
+                            bb run package describe
+                            bb run package build
+                            bb run package create
+                            bb run package delete
+  once package <step>...  Backwards-compatible nested form.
+  validate                Strict shortcut for `bb run package validate`.
 
   Individual tools (each requires `render` first):
   tofu <args>             e.g. bb run tofu render tofu:init tofu:apply:-auto-approve
@@ -74,8 +75,14 @@ See: https://www.bigconfig.ai/manual")
               "Usage: bb run validate")
         (package/once* ["validate"] options/bb))
 
-      (or (= command "package") (contains? package-commands command))
-      (die! (str "Use `bb run once package " (if (= command "package") "<step>" command) "`.") "" help-text)
+      (= command "package")
+      (if (seq rest-args)
+        (package/once* rest-args options/bb)
+        (die! "Missing package step."
+              "Usage: bb run package <validate|describe|build|create|delete>..."))
+
+      (contains? package-commands command)
+      (die! (str "Use `bb run package " command "`.") "" help-text)
 
       (= command "tofu")
       (tools/tofu* rest-args (params/once-opts options/bb))
