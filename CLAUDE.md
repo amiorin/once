@@ -188,11 +188,11 @@ All cloud profiles combine with `resend` (SMTP) and `cloudflare` (DNS) sub-profi
 
 ## Dependencies
 
-`deps.edn` currently uses the local checkout of `big-config`:
+`deps.edn` currently pins `big-config` to a Git SHA from GitHub:
 ```clojure
-io.github.amiorin/big-config {:local/root "../../big-config/clojure"}
+io.github.amiorin/big-config {:git/sha "c20a1ab26c541f9080d6ef220fdc969058d622af"}
 ```
-The pinned Git coordinate is kept commented out beside it (`#_#_ ... {:git/sha "12f853026d..."}`). To consume the published version instead, swap which line is commented and re-run `clojure -P`.
+A `:local/root "../../big-config/clojure"` coordinate is kept commented beside it with `#_#_` so it can be swapped in for local-source development. To switch, comment out the `:git/sha` line and uncomment the `:local/root` one, then re-run `clojure -P`.
 
 ## Git Conventions
 
