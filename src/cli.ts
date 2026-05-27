@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 /** Command-line entry point. */
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Opts } from "big-config";
 import { bb } from "./once/options.js";
 import { onceOpts } from "./once/params.js";
@@ -40,25 +43,8 @@ Notes:
 See: https://www.bigconfig.ai/manual`;
 
 const PACKAGE_COMMANDS = new Set(["describe", "build", "create", "delete"]);
-const PROFILE_ENV = "ONCE_PROFILE_JSON";
 
-function profileFromEnv(): Opts | undefined {
-  const raw = process.env[PROFILE_ENV];
-  if (!raw) return undefined;
-  try {
-    const profile = JSON.parse(raw) as unknown;
-    if (profile && typeof profile === "object" && !Array.isArray(profile)) {
-      return profile as Opts;
-    }
-  } catch (err) {
-    console.error(`Invalid ${PROFILE_ENV}: ${err instanceof Error ? err.message : String(err)}`);
-    process.exit(1);
-  }
-  console.error(`Invalid ${PROFILE_ENV}: expected a JSON object`);
-  process.exit(1);
-}
-
-function main(argv: string[], opts: Opts = profileFromEnv() ?? bb): void {
+export function main(argv: string[], opts: Opts = bb): void {
   const [command, ...rest] = argv;
   if (command && PACKAGE_COMMANDS.has(command)) {
     onceStar(argv, opts);
@@ -103,4 +89,17 @@ function main(argv: string[], opts: Opts = profileFromEnv() ?? bb): void {
   }
 }
 
-main(process.argv.slice(2));
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  const modulePath = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(entry) === realpathSync(modulePath);
+  } catch {
+    return resolve(entry) === modulePath;
+  }
+}
+
+if (isMainModule()) {
+  main(process.argv.slice(2));
+}

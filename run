@@ -4,15 +4,11 @@
  * This file is copied by bc-pkg into the user's project directory, so keep the
  * profile below user-editable and free of real credentials.
  */
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const IS_WINDOWS = process.platform === "win32";
-const ARGS = process.argv.slice(2);
-const PROFILE_ENV = "ONCE_PROFILE_JSON";
 
 const DEFAULT_PROFILE = {
   profile: "default",
@@ -91,38 +87,8 @@ const DEFAULT_PROFILE = {
   },
 };
 
-function localBin(name) {
-  return join(ROOT, "node_modules", ".bin", IS_WINDOWS ? `${name}.cmd` : name);
-}
+const localCli = join(ROOT, "dist", "src", "cli.js");
+const cliModule = existsSync(localCli) ? pathToFileURL(localCli).href : "once/dist/src/cli.js";
+const { main } = await import(cliModule);
 
-function run(command, args) {
-  const result = spawnSync(command, args, {
-    cwd: ROOT,
-    env: { ...process.env, [PROFILE_ENV]: JSON.stringify(DEFAULT_PROFILE) },
-    shell: IS_WINDOWS,
-    stdio: "inherit",
-  });
-  if (result.error) {
-    console.error(`failed to start ${command}: ${result.error.message}`);
-    return 127;
-  }
-  return result.signal ? 1 : result.status ?? 1;
-}
-
-const sourceCli = join(ROOT, "src", "cli.ts");
-const tsx = localBin("tsx");
-const once = localBin("once");
-
-if (existsSync(sourceCli)) {
-  if (!existsSync(tsx)) {
-    console.error("tsx is required to run this project from source. Run npm install and try again.");
-    process.exit(127);
-  }
-  process.exit(run(tsx, [sourceCli, ...ARGS]));
-}
-
-if (!existsSync(once)) {
-  console.error("once is required to run this project. Run npm install and try again.");
-  process.exit(127);
-}
-process.exit(run(once, ARGS));
+main(process.argv.slice(2), DEFAULT_PROFILE);
