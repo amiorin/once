@@ -1,8 +1,6 @@
 """Command-line entry point."""
 from __future__ import annotations
 
-import json
-import os
 import sys
 
 from big_config.core import Opts
@@ -39,27 +37,11 @@ Notes:
 See: https://www.bigconfig.ai/manual"""
 
 PACKAGE_COMMANDS = {"validate", "describe", "build", "create", "delete"}
-PROFILE_ENV = "ONCE_PROFILE_JSON"
-
-
-def profile_from_env() -> Opts | None:
-    raw = os.environ.get(PROFILE_ENV)
-    if not raw:
-        return None
-    try:
-        profile = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        print(f"Invalid {PROFILE_ENV}: {exc}", file=sys.stderr)
-        raise SystemExit(1) from exc
-    if not isinstance(profile, dict):
-        print(f"Invalid {PROFILE_ENV}: expected a JSON object", file=sys.stderr)
-        raise SystemExit(1)
-    return profile
 
 
 def main(argv: list[str] | None = None, opts: Opts | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
-    active_profile = opts if opts is not None else (profile_from_env() or bb)
+    active_profile = opts if opts is not None else bb
     command = argv[0] if argv else None
     rest = argv[1:] if argv else []
 

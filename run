@@ -1,21 +1,42 @@
 #!/usr/bin/env python3
-"""Run the ONCE CLI through uv with a local default profile template.
+"""Run the ONCE CLI with a local default profile template.
 
 This file is copied by bc-pkg into the user's project directory, so keep the
 profile below user-editable and free of real credentials.
 """
 from __future__ import annotations
 
-import json
-import os
-import shutil
-import subprocess
+import site
 import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent
-PROFILE_ENV = "ONCE_PROFILE_JSON"
+
+
+def add_site_dir_first(path: Path) -> None:
+    before = list(sys.path)
+    site.addsitedir(str(path))
+    added = [p for p in sys.path if p not in before]
+    if str(path) in sys.path and str(path) not in added:
+        added.insert(0, str(path))
+    for p in reversed(added):
+        sys.path.remove(p)
+        sys.path.insert(0, p)
+
+
+for site_packages in [
+    *sorted((ROOT / ".venv" / "lib").glob("python*/site-packages"), reverse=True),
+    ROOT / ".venv" / "Lib" / "site-packages",
+]:
+    if site_packages.is_dir():
+        add_site_dir_first(site_packages)
+
+SRC = ROOT / "src"
+if SRC.is_dir():
+    sys.path.insert(0, str(SRC))
+
+from once.cli import main  # noqa: E402
 
 DEFAULT_PROFILE: dict[str, Any] = {
     "profile": "default",
@@ -87,15 +108,5 @@ DEFAULT_PROFILE: dict[str, Any] = {
 }
 
 
-def main() -> int:
-    uv = shutil.which("uv")
-    if uv is None:
-        print("uv is required to run this project. Install uv and try again.", file=sys.stderr)
-        return 127
-    env = {**os.environ, PROFILE_ENV: json.dumps(DEFAULT_PROFILE, separators=(",", ":"))}
-    completed = subprocess.run([uv, "run", "once", *sys.argv[1:]], cwd=ROOT, env=env)
-    return completed.returncode
-
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main(sys.argv[1:], DEFAULT_PROFILE)
