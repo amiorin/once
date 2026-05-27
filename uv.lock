@@ -5,7 +5,7 @@ requires-python = ">=3.12"
 [[package]]
 name = "big-config"
 version = "0.3.0"
-source = { git = "https://github.com/bigconfig-ai/big-config.git?rev=5e65118000ef4b449ec7db38a03c0fb46524a432#5e65118000ef4b449ec7db38a03c0fb46524a432" }
+source = { git = "https://github.com/bigconfig-ai/big-config.git?rev=13abf2fc3d4b9749ae2f38d0d680e8dc902c5473#13abf2fc3d4b9749ae2f38d0d680e8dc902c5473" }
 dependencies = [
     { name = "selmer" },
 ]
@@ -42,7 +42,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "big-config", git = "https://github.com/bigconfig-ai/big-config.git?rev=5e65118000ef4b449ec7db38a03c0fb46524a432" }]
+requires-dist = [{ name = "big-config", git = "https://github.com/bigconfig-ai/big-config.git?rev=13abf2fc3d4b9749ae2f38d0d680e8dc902c5473" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.0" }]
@@ -93,4 +93,4 @@ wheels = [
 [[package]]
 name = "selmer"
 version = "1.13.1.post0"
-source = { git = "https://github.com/bigconfig-ai/Selmer.git?rev=d6db31695ba1c06abefe30d6ed8a1dedc0de110a#d6db31695ba1c06abefe30d6ed8a1dedc0de110a" }
+source = { git = "https://github.com/bigconfig-ai/Selmer.git?rev=94a9475b22104f5a3c015b6b84513a5b8c22e316#94a9475b22104f5a3c015b6b84513a5b8c22e316" }

@@ -11,7 +11,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 CLOJURE_DIR = ROOT / "once" / "clojure"
 PYTHON_DIR = ROOT / "once" / "python"
-PROFILE_DIR = Path(".dist/profile-alpha-2564897c")
 HAS_BB = shutil.which("bb") is not None
 
 
@@ -28,6 +27,12 @@ def _files(base: Path) -> list[Path]:
     return sorted(p.relative_to(base) for p in base.rglob("*") if p.is_file())
 
 
+def _single_output_dir(project: Path) -> Path:
+    outputs = sorted(p for p in (project / ".dist").iterdir() if p.is_dir())
+    assert len(outputs) == 1
+    return outputs[0]
+
+
 @pytest.mark.skipif(not HAS_BB, reason="babashka (bb) not on PATH")
 def test_python_build_matches_clojure_byte_for_byte():
     _clean_build_dir(CLOJURE_DIR)
@@ -42,12 +47,11 @@ def test_python_build_matches_clojure_byte_for_byte():
         str(ROOT / "selmer" / "python" / "src"),
     ]
     env["PYTHONPATH"] = os.pathsep.join([*extra_pythonpath, env.get("PYTHONPATH", "")])
-    _run([sys.executable, "-m", "once", "package", "build"], PYTHON_DIR, env)
+    _run([sys.executable, "run", "package", "build"], PYTHON_DIR, env)
 
-    clj_out = CLOJURE_DIR / PROFILE_DIR
-    py_out = PYTHON_DIR / PROFILE_DIR
-    assert clj_out.is_dir()
-    assert py_out.is_dir()
+    clj_out = _single_output_dir(CLOJURE_DIR)
+    py_out = _single_output_dir(PYTHON_DIR)
+    assert py_out.name == clj_out.name
     assert _files(py_out) == _files(clj_out)
     for rel in _files(clj_out):
         assert (py_out / rel).read_bytes() == (clj_out / rel).read_bytes(), str(rel)
