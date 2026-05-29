@@ -12,7 +12,7 @@ import pytest
 RESOURCES_DIR = Path(__file__).resolve().parents[1] / "src" / "resources"
 
 
-DEPLOY_SCRIPT = RESOURCES_DIR / "io" / "github" / "bigconig-ai" / "once" / "tools" / "ansible" / "files" / "deploy"
+DEPLOY_SCRIPT = RESOURCES_DIR / "io" / "github" / "bigconfig-ai" / "once" / "tools" / "ansible" / "files" / "deploy"
 HAS_BB = shutil.which("bb") is not None and subprocess.run(["bb", "--version"], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0
 
 

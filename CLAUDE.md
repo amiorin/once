@@ -34,7 +34,7 @@ once/
 │   │   ├── describe.py     # Post-provisioning report
 │   │   ├── interop.py      # big-config alias <-> namespaced-key bridge
 │   │   └── utils.py        # strip_ansi
-│   └── resources/io/github/bigconig-ai/once/tools/
+│   └── resources/io/github/bigconfig-ai/once/tools/
 │       ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
 │       ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
 │       ├── tofu-smtp/       # SMTP (Resend) setup templates

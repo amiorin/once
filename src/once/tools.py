@@ -20,14 +20,14 @@ step_fns: list[StepFn] = [bc_workflow.print_step_fn, exit_step_fn(END), print_er
 
 delimiters = {"tag-open": "<", "tag-close": ">", "filter-open": "{", "filter-close": "}"}
 
-TOFU = "io.github.bigconig-ai.once.tools/tofu"
-TOFU_SMTP = "io.github.bigconig-ai.once.tools/tofu-smtp"
-TOFU_DNS = "io.github.bigconig-ai.once.tools/tofu-dns"
-TOFU_SMTP_POST = "io.github.bigconig-ai.once.tools/tofu-smtp-post"
-ANSIBLE_LOCAL = "io.github.bigconig-ai.once.tools/ansible-local"
-ANSIBLE = "io.github.bigconig-ai.once.tools/ansible"
+TOFU = "io.github.bigconfig-ai.once.tools/tofu"
+TOFU_SMTP = "io.github.bigconfig-ai.once.tools/tofu-smtp"
+TOFU_DNS = "io.github.bigconfig-ai.once.tools/tofu-dns"
+TOFU_SMTP_POST = "io.github.bigconfig-ai.once.tools/tofu-smtp-post"
+ANSIBLE_LOCAL = "io.github.bigconfig-ai.once.tools/ansible-local"
+ANSIBLE = "io.github.bigconfig-ai.once.tools/ansible"
 
-plugin_step = "io.github.bigconig-ai.once.tools/render-tofu-backend"
+plugin_step = "io.github.bigconfig-ai.once.tools/render-tofu-backend"
 
 
 def run_steps_with_plugin(plugin: str, sfns: list[StepFn], opts: Opts) -> Opts:
@@ -60,7 +60,7 @@ def _render_tofu_backend(_f, _step: str, sfns: list[StepFn], opts: Opts) -> Opts
             bc_workflow.NAME: opts.get(bc_workflow.NAME),
             bc_render.TEMPLATES: [
                 {
-                    "template": keyword_to_path("io.github.bigconig-ai.once.tools/tofu-backend"),
+                    "template": keyword_to_path("io.github.bigconfig-ai.once.tools/tofu-backend"),
                     "overwrite": True,
                     "provider-backend": provider_backend,
                     "transform": [[provider_backend, delimiters]],
@@ -152,7 +152,7 @@ def render_fn(src: str, data: dict[str, Any]) -> str:
                 Construct(
                     "resource",
                     "cloudflare_dns_record",
-                    add_suffix("io.github.bigconig-ai.once.tools/smtp-dns", f"-{record}-{type_}"),
+                    add_suffix("io.github.bigconfig-ai.once.tools/smtp-dns", f"-{record}-{type_}"),
                     block,
                 )
             )
