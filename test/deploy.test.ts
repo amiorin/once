@@ -10,7 +10,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const deployScript = resolve(
-  "src/resources/io/github/bigconig-ai/once/tools/ansible/files/deploy",
+  "src/resources/io/github/bigconfig-ai/once/tools/ansible/files/deploy",
 );
 
 const hasBb =

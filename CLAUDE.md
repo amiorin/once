@@ -33,7 +33,7 @@ once/
 │   │   ├── describe.ts      # Post-provisioning report
 │   │   ├── interop.ts       # big-config interop helpers
 │   │   └── utils.ts         # stripAnsi
-│   ├── resources/io/github/bigconig-ai/once/tools/
+│   ├── resources/io/github/bigconfig-ai/once/tools/
 │   │   ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
 │   │   ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
 │   │   ├── tofu-smtp/       # SMTP (Resend) setup templates

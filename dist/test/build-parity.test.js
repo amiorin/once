@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const root = resolve("../..");
 const clojureDir = join(root, "once/clojure");
 const typeScriptDir = join(root, "once/typescript");
-const profileDir = ".dist/profile-alpha-d2264632";
+const profileDir = ".dist/default-378cc184";
 const hasBb = spawnSync("bb", ["--version"], { encoding: "utf8" }).status === 0;
 function run(cmd, args, cwd) {
     const res = spawnSync(cmd, args, { cwd, encoding: "utf8", env: process.env });
@@ -48,7 +48,7 @@ describe.skipIf(!hasBb)("build parity", () => {
         clean(clojureDir);
         clean(typeScriptDir);
         run("bb", ["run", "once", "package", "build"], clojureDir);
-        run("npm", ["run", "once", "--", "package", "build"], typeScriptDir);
+        run("node", ["run", "package", "build"], typeScriptDir);
         const cljOut = join(clojureDir, profileDir);
         const tsOut = join(typeScriptDir, profileDir);
         expect(files(tsOut)).toEqual(files(cljOut));

@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync, } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-const deployScript = resolve("src/resources/io/github/bigconig-ai/once/tools/ansible/files/deploy");
+const deployScript = resolve("src/resources/io/github/bigconfig-ai/once/tools/ansible/files/deploy");
 const hasBb = spawnSync("bb", ["--version"], { encoding: "utf8" }).status === 0;
 /**
  * Create a temp dir with `sudo` and `once` shims. The `once` shim logs every

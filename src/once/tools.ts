@@ -39,12 +39,12 @@ export const delimiters = {
   "filter-close": "}",
 };
 
-export const TOFU = "io.github.bigconig-ai.once.tools/tofu";
-export const TOFU_SMTP = "io.github.bigconig-ai.once.tools/tofu-smtp";
-export const TOFU_DNS = "io.github.bigconig-ai.once.tools/tofu-dns";
-export const TOFU_SMTP_POST = "io.github.bigconig-ai.once.tools/tofu-smtp-post";
-export const ANSIBLE_LOCAL = "io.github.bigconig-ai.once.tools/ansible-local";
-export const ANSIBLE = "io.github.bigconig-ai.once.tools/ansible";
+export const TOFU = "io.github.bigconfig-ai.once.tools/tofu";
+export const TOFU_SMTP = "io.github.bigconfig-ai.once.tools/tofu-smtp";
+export const TOFU_DNS = "io.github.bigconfig-ai.once.tools/tofu-dns";
+export const TOFU_SMTP_POST = "io.github.bigconfig-ai.once.tools/tofu-smtp-post";
+export const ANSIBLE_LOCAL = "io.github.bigconfig-ai.once.tools/ansible-local";
+export const ANSIBLE = "io.github.bigconfig-ai.once.tools/ansible";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -58,7 +58,7 @@ function templatePath(template: string): string {
   return candidates.find((candidate) => existsSync(candidate)) ?? rel;
 }
 
-export const pluginStep = "io.github.bigconig-ai.once.tools/render-tofu-backend";
+export const pluginStep = "io.github.bigconfig-ai.once.tools/render-tofu-backend";
 
 function runStepsWithPlugin(plugin: string, sfns: StepFn[], opts: Opts): Opts {
   const steps: string[] = [];
@@ -83,7 +83,7 @@ registerHandleStep(pluginStep, (_f, _step, sfns, opts) => {
       [WF_NAME]: opts[WF_NAME],
       [RENDER_TEMPLATES]: [
         {
-          template: templatePath("io.github.bigconig-ai.once.tools/tofu-backend"),
+          template: templatePath("io.github.bigconfig-ai.once.tools/tofu-backend"),
           overwrite: true,
           "provider-backend": providerBackend,
           transform: [[providerBackend, delimiters]],
@@ -149,7 +149,7 @@ export function renderFn(src: string, data: Record<string, any>): string {
     return construct(new Construct(
       "resource",
       "cloudflare_dns_record",
-      addSuffix("io.github.bigconig-ai.once.tools/smtp-dns", `-${record}-${type}`),
+      addSuffix("io.github.bigconfig-ai.once.tools/smtp-dns", `-${record}-${type}`),
       block,
     ));
   });
