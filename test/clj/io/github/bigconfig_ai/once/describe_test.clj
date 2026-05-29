@@ -1,4 +1,4 @@
-(ns io.github.bigconig-ai.once.describe-test
+(ns io.github.bigconfig-ai.once.describe-test
   (:require
    [big-config :as bc]
    [big-config.render :as render]
@@ -6,7 +6,7 @@
    [cheshire.core :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [io.github.bigconig-ai.once.describe :as d]))
+   [io.github.bigconfig-ai.once.describe :as d]))
 
 (def ^:private base-opts
   {::render/profile "test"

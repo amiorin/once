@@ -1,8 +1,8 @@
-(ns io.github.bigconig-ai.once.utils-test
+(ns io.github.bigconfig-ai.once.utils-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [io.github.bigconig-ai.once.utils :as sut]))
+   [io.github.bigconfig-ai.once.utils :as sut]))
 
 (deftest strip-ansi-test
   (testing "strips ANSI escape sequences and OSC 8 hyperlinks"

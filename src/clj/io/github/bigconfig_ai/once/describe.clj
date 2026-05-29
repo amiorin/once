@@ -1,4 +1,4 @@
-(ns io.github.bigconig-ai.once.describe
+(ns io.github.bigconfig-ai.once.describe
   "Describe the active profile after provisioning.
 
   `describe` is the big-config workflow step behind `bb run once package describe`. It
@@ -15,7 +15,7 @@
    [big-config.workflow :as workflow]
    [cheshire.core :as json]
    [clojure.string :as str]
-   [io.github.bigconig-ai.once.params :as params]))
+   [io.github.bigconfig-ai.once.params :as params]))
 
 ;;; -------------------------------------------------------------- command helpers
 

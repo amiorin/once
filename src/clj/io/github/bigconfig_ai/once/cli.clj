@@ -1,9 +1,9 @@
-(ns io.github.bigconig-ai.once.cli
+(ns io.github.bigconfig-ai.once.cli
   (:require
-   [io.github.bigconig-ai.once.options :as options]
-   [io.github.bigconig-ai.once.package :as package]
-   [io.github.bigconig-ai.once.params :as params]
-   [io.github.bigconig-ai.once.tools :as tools]))
+   [io.github.bigconfig-ai.once.options :as options]
+   [io.github.bigconfig-ai.once.package :as package]
+   [io.github.bigconfig-ai.once.params :as params]
+   [io.github.bigconfig-ai.once.tools :as tools]))
 
 (def help-text
   "Usage: bb run <command> [args...]
@@ -28,7 +28,7 @@ Commands:
 
 Notes:
   * When launched through `run`, the active profile comes from that script;
-    otherwise it defaults to `bb` in io.github.bigconig-ai.once.options.
+    otherwise it defaults to `bb` in io.github.bigconfig-ai.once.options.
   * Any param can be overridden with BC_PAR_* environment variables.
 
 See: https://www.bigconfig.ai/manual")

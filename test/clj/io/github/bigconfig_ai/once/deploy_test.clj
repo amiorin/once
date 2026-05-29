@@ -1,4 +1,4 @@
-(ns io.github.bigconig-ai.once.deploy-test
+(ns io.github.bigconfig-ai.once.deploy-test
   (:require
    [babashka.process :as p]
    [clojure.java.io :as io]
@@ -7,7 +7,7 @@
 
 (def deploy-script
   (.getAbsolutePath
-   (io/file "src/resources/io/github/bigconig-ai/once/tools/ansible/files/deploy")))
+   (io/file "src/resources/io/github/bigconfig-ai/once/tools/ansible/files/deploy")))
 
 (defn- make-temp-dir! []
   (.toFile (java.nio.file.Files/createTempDirectory

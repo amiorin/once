@@ -1,11 +1,11 @@
-(ns io.github.bigconig-ai.once.validation-test
+(ns io.github.bigconfig-ai.once.validation-test
   (:require
    [big-config :as bc]
    [big-config.workflow :as workflow]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [io.github.bigconig-ai.once.options :as options]
-   [io.github.bigconig-ai.once.validation :as v]))
+   [io.github.bigconfig-ai.once.options :as options]
+   [io.github.bigconfig-ai.once.validation :as v]))
 
 (def ^:private test-compute-pubkey
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 test@example.com")

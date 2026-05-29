@@ -1,4 +1,4 @@
-(ns io.github.bigconig-ai.once.options
+(ns io.github.bigconfig-ai.once.options
   (:require
    [big-config.render :as render]
    [big-config.utils :refer [debug]]

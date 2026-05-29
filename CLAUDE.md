@@ -22,14 +22,14 @@ Built on top of [big-config](https://github.com/amiorin/big-config), which provi
 ```
 once/
 ├── src/
-│   ├── clj/io/github/bigconig_ai/once/
+│   ├── clj/io/github/bigconfig_ai/once/
 │   │   ├── options.clj      # Cloud profiles & active profile (def bb ...)
 │   │   ├── package.clj      # High-level create/delete workflows + validate/describe step wiring
 │   │   ├── params.clj       # Parameter extraction from OpenTofu outputs
 │   │   ├── tools.clj        # Tofu/Ansible tool implementations
 │   │   ├── validation.clj   # Profile schema (malli), tool/credential/image/ssh-agent checks
 │   │   └── describe.clj     # Post-provisioning report (providers, SSH, deployed apps)
-│   └── resources/io/github/bigconig-ai/once/tools/
+│   └── resources/io/github/bigconfig-ai/once/tools/
 │       ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
 │       ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
 │       ├── tofu-smtp/       # SMTP (Resend) setup templates
@@ -37,7 +37,7 @@ once/
 │       ├── tofu-smtp-post/  # SMTP post-verification templates
 │       ├── ansible/         # Remote host playbooks (incl. files/deploy bb script)
 │       └── ansible-local/   # Local machine playbooks
-├── test/clj/io/github/bigconig_ai/once/
+├── test/clj/io/github/bigconfig_ai/once/
 │   ├── deploy_test.clj      # Tests for the deploy ForceCommand script
 │   ├── describe_test.clj    # Tests for the describe report (parsing + assembly)
 │   ├── utils_test.clj       # Utility tests
@@ -138,7 +138,7 @@ Variable names are uppercased; hyphens become underscores. Sensitive credentials
 ## Code Conventions
 
 ### Naming
-- **Namespaces**: `io.github.bigconig-ai.once.*`
+- **Namespaces**: `io.github.bigconfig-ai.once.*`
 - **Keywords**: Fully namespaced (`::workflow/params`, `::bc/env`, `::render/profile`)
 - **Entry points**: Functions ending with `*` are CLI/REPL entry points (`tofu*`, `ansible*`, `once*`); `validation/validate` and `describe/describe` are workflow step functions, while `validate-report` / `describe-report` are pure report builders
 - **Private defs**: Use `^:private` metadata for implementation details not intended for external use

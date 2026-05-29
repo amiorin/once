@@ -479,10 +479,10 @@
     <h2>Quick Start</h2>
 
     <h3>1. Clone and configure</h3>
-<pre><code><span class="kw">git</span> clone https://github.com/bigconig-ai/once
+<pre><code><span class="kw">git</span> clone https://github.com/bigconfig-ai/once
 <span class="kw">cd</span> once
 <span class="com"># pick / customize an active profile</span>
-$EDITOR src/clj/io/github/bigconig_ai/once/options.clj</code></pre>
+$EDITOR src/clj/io/github/bigconfig_ai/once/options.clj</code></pre>
     <p>Switch the active profile by changing the last <code>(def bb …)</code> line:</p>
 <pre><code><span class="com">;; options.clj</span>
 (<span class="kw">def</span> <span class="fn">bb</span> website)  <span class="com">;; or: online, space, no-infra</span></code></pre>
@@ -572,7 +572,7 @@ source_env_if_exists .envrc.private</code></pre>
         <tr><td><code>describe</code></td><td>Post-provisioning report: providers, SSH reachability, and remote ONCE applications (with running vs. registry digest comparison).</td></tr>
       </tbody>
     </table>
-    <p>Templates live alongside the code in <code>src/resources/io/github/bigconig-ai/once/tools/</code> and are rendered into <code>.dist/</code> at runtime.</p>
+    <p>Templates live alongside the code in <code>src/resources/io/github/bigconfig-ai/once/tools/</code> and are rendered into <code>.dist/</code> at runtime.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -625,7 +625,7 @@ source_env_if_exists .envrc.private</code></pre>
   <!-- ============================================================ -->
   <section id="templates">
     <h2>Template rendering</h2>
-    <p>Every stage points <code>big-config.render</code> at a directory under <code>src/resources/io/github/bigconig-ai/once/tools/&lt;stage&gt;/</code> and a list of <em>transforms</em>. The renderer walks the directory, applies the transforms, and writes the result to <code>.dist/&lt;package&gt;/&lt;stage&gt;/</code>.</p>
+    <p>Every stage points <code>big-config.render</code> at a directory under <code>src/resources/io/github/bigconfig-ai/once/tools/&lt;stage&gt;/</code> and a list of <em>transforms</em>. The renderer walks the directory, applies the transforms, and writes the result to <code>.dist/&lt;package&gt;/&lt;stage&gt;/</code>.</p>
 
     <h3>Custom delimiters</h3>
     <p><code>once</code> overrides the default <code>{{ … }}</code> / <code>{ … }</code> Mustache pair to avoid clashing with HCL syntax:</p>
@@ -640,7 +640,7 @@ source_env_if_exists .envrc.private</code></pre>
 
     <h3>Two-level switching</h3>
     <p>Each stage's resources directory contains one subdir per provider. The <code>{{ provider-* }}</code> transform tells the renderer which subdir to render. Example layout:</p>
-<pre><code>src/resources/io/github/bigconig-ai/once/tools/
+<pre><code>src/resources/io/github/bigconfig-ai/once/tools/
 ├── tofu/
 │   ├── digitalocean/main.tf
 │   ├── hcloud/main.tf
@@ -934,7 +934,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
 <span class="kw">bb</span> run once package delete              <span class="com"># reverse 4 Tofu stages</span>
 <span class="kw">bb</span> run once package validate create     <span class="com"># validate, then create if validation passes</span>
 <span class="kw">bb</span> run once package delete create       <span class="com"># clean-slate redeploy</span></code></pre>
-    <p><code>bb run</code> executes the root <code>run</code> Babashka script, which delegates to <code>io.github.bigconig-ai.once.cli/main*</code>. The CLI strips the <code>once package</code> prefix and calls <code>package/once*</code> with the remaining workflow steps. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested. The top-level <code>bb run validate</code> command calls the same validation step with no args, and exits with an error if extra args are supplied.</p>
+    <p><code>bb run</code> executes the root <code>run</code> Babashka script, which delegates to <code>io.github.bigconfig-ai.once.cli/main*</code>. The CLI strips the <code>once package</code> prefix and calls <code>package/once*</code> with the remaining workflow steps. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested. The top-level <code>bb run validate</code> command calls the same validation step with no args, and exits with an error if extra args are supplied.</p>
     <h3>Step skipping &amp; partial runs</h3>
     <p>You can pass tool-level args to override what each stage does. For example, replace the default <code>render tofu:init tofu:apply:-auto-approve</code> sequence by editing <code>package.clj</code>'s pipeline — or by invoking individual stage commands (see <a href="#tools-cmd">bb run tofu / ansible</a>).</p>
   </section>
@@ -1060,7 +1060,7 @@ clojure-lsp format</code></pre>
 <pre><code>ssh deploy@your-host sudo once update marketplace-api.bigconfig.space</code></pre>
 
     <h3>Tests</h3>
-    <p>The script is unit-tested in <code>test/clj/io/github/bigconig_ai/once/deploy_test.clj</code> with a mocked <code>once list</code>. Schema and tool/credential validation behaviours are covered in <code>validation_test.clj</code>.</p>
+    <p>The script is unit-tested in <code>test/clj/io/github/bigconfig_ai/once/deploy_test.clj</code> with a mocked <code>once list</code>. Schema and tool/credential validation behaviours are covered in <code>validation_test.clj</code>.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1096,14 +1096,14 @@ clojure-lsp format</code></pre>
     <h2>Repo layout</h2>
 <pre><code>once/
 ├── src/
-│   ├── clj/io/github/bigconig_ai/once/
+│   ├── clj/io/github/bigconfig_ai/once/
 │   │   ├── options.clj      <span class="com">; profiles + (def bb …)</span>
 │   │   ├── package.clj      <span class="com">; create / delete workflows</span>
 │   │   ├── params.clj       <span class="com">; tofu output → params</span>
 │   │   ├── tools.clj        <span class="com">; stage wrappers + plugin step</span>
 │   │   ├── validation.clj   <span class="com">; malli + tools/creds/images/ssh-agent</span>
 │   │   └── describe.clj     <span class="com">; post-provisioning report</span>
-│   └── resources/io/github/bigconig-ai/once/tools/
+│   └── resources/io/github/bigconfig-ai/once/tools/
 │       ├── tofu/{do,hcloud,oci,no-infra}/
 │       ├── tofu-backend/{s3,r2,local}/
 │       ├── tofu-smtp/{resend,no-infra}/
@@ -1111,7 +1111,7 @@ clojure-lsp format</code></pre>
 │       ├── tofu-smtp-post/{resend,no-infra}/
 │       ├── ansible/         <span class="com">; remote playbook + deploy/library</span>
 │       └── ansible-local/   <span class="com">; local playbook</span>
-├── test/clj/io/github/bigconig_ai/once/
+├── test/clj/io/github/bigconfig_ai/once/
 │   ├── deploy_test.clj
 │   ├── describe_test.clj
 │   ├── utils_test.clj
@@ -1166,8 +1166,8 @@ clojure-lsp format</code></pre>
     <p>Every source file ends with a <code>(comment …)</code> block of live evaluation examples — read them as documentation-as-tests. Start a REPL with the <code>:dev</code> alias:</p>
 <pre><code><span class="kw">clj</span> -M:dev</code></pre>
     <p>Then, for example:</p>
-<pre><code>(<span class="fn">require</span> '[io.github.bigconig-ai.once.package <span class="kw">:as</span> once])
-(<span class="fn">require</span> '[io.github.bigconig-ai.once.options <span class="kw">:as</span> options])
+<pre><code>(<span class="fn">require</span> '[io.github.bigconfig-ai.once.package <span class="kw">:as</span> once])
+(<span class="fn">require</span> '[io.github.bigconfig-ai.once.options <span class="kw">:as</span> options])
 
 (once/once* <span class="str">"create"</span> options/oci)</code></pre>
     <p>The <code>debug</code> macro from <code>big-config.utils</code> wraps a form so its <code>tap&gt;</code>'d values are accessible as <code>tap-values</code> afterwards:</p>
@@ -1181,7 +1181,7 @@ clojure-lsp format</code></pre>
     <h2>Code conventions</h2>
     <h3>Naming</h3>
     <ul>
-      <li><strong>Namespaces</strong>: <code>io.github.bigconig-ai.once.*</code></li>
+      <li><strong>Namespaces</strong>: <code>io.github.bigconfig-ai.once.*</code></li>
       <li><strong>Keywords</strong>: fully namespaced (<code>::workflow/params</code>, <code>::bc/env</code>, <code>::render/profile</code>)</li>
       <li><strong>Entry points</strong>: functions ending in <code>*</code> (e.g. <code>tofu*</code>, <code>once*</code>)</li>
       <li><strong>Private defs</strong>: marked with <code>^:private</code></li>

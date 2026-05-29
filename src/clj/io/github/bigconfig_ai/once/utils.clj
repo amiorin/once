@@ -1,4 +1,4 @@
-(ns io.github.bigconig-ai.once.utils
+(ns io.github.bigconfig-ai.once.utils
   (:require
    [clojure.string :as str]))
 
