@@ -6,6 +6,12 @@
   "bin": {
     "once": "./dist/src/cli.js"
   },
+  "files": [
+    "dist/src",
+    "src/resources",
+    "run",
+    "README.md"
+  ],
   "engines": {
     "node": ">=20"
   },
