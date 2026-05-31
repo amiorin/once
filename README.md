@@ -2,7 +2,7 @@
 
 `once` is a BigConfig package for [ONCE](https://github.com/basecamp/once). This BigConfig package is an infrastructure automation tool that simplifies the provisioning and configuration of cloud resources using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). The audience is the vibe coder who wants to deploy his vibe coded application with a "one-click" experience.
 
-It is built on top of [big-config](https://github.com/amiorin/big-config), leveraging its workflow and configuration management capabilities.
+It is built on top of [big-config](https://github.com/bigconfig-ai/big-config), leveraging its workflow and configuration management capabilities.
 
 ![Demo](.github/media/demo.gif)
 

@@ -6,7 +6,7 @@ This file describes the `once` codebase for AI assistants. Read it before making
 
 `once` is a Clojure library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment via [Basecamp's ONCE](https://github.com/basecamp/once).
 
-Built on top of [big-config](https://github.com/amiorin/big-config), which provides workflow orchestration, template rendering, and step execution primitives.
+Built on top of [big-config](https://github.com/bigconfig-ai/big-config), which provides workflow orchestration, template rendering, and step execution primitives.
 
 ## Tech Stack
 
