@@ -11,7 +11,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent
+# Preserve symlinked launcher roots.  Local `bc-pkg` targets symlink this file
+# into the caller's project, and following the symlink would make us load the
+# source checkout's virtualenv instead of the project virtualenv created by uv.
+ROOT = Path(__file__).absolute().parent
 
 
 def add_site_dir_first(path: Path) -> None:
