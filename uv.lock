@@ -5,7 +5,7 @@ requires-python = ">=3.12"
 [[package]]
 name = "big-config"
 version = "0.3.0"
-source = { git = "https://github.com/bigconfig-ai/big-config.git?rev=13abf2fc3d4b9749ae2f38d0d680e8dc902c5473#13abf2fc3d4b9749ae2f38d0d680e8dc902c5473" }
+source = { git = "https://github.com/bigconfig-ai/big-config.git?rev=1a8619d35b4b5957e9c017d8de9707907d524026#1a8619d35b4b5957e9c017d8de9707907d524026" }
 dependencies = [
     { name = "selmer" },
 ]
@@ -42,7 +42,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "big-config", git = "https://github.com/bigconfig-ai/big-config.git?rev=13abf2fc3d4b9749ae2f38d0d680e8dc902c5473" }]
+requires-dist = [{ name = "big-config", git = "https://github.com/bigconfig-ai/big-config.git?rev=1a8619d35b4b5957e9c017d8de9707907d524026" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.0" }]
