@@ -6,7 +6,7 @@ This file describes the `once` Python codebase for AI assistants. Read it before
 
 `once` is a Python library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). The audience is the vibe coder who wants a "one-click" deploy of a vibe-coded application via [Basecamp's ONCE](https://github.com/basecamp/once).
 
-It depends on the `big-config` Python package (pinned to a GitHub commit in `pyproject.toml`) for the workflow engine, template renderer, step runner, and plugin system. The runtime is stdlib-only outside of `big-config`.
+It depends on the Python SDK (`big-config` package, pinned to a GitHub commit in `pyproject.toml`) for the workflow engine, template renderer, step runner, and plugin system. The runtime is stdlib-only outside of `big-config`.
 
 ## Tech Stack
 
@@ -98,9 +98,9 @@ once ansible-local render -- ansible-playbook main.yml
 
 `validate` and `describe` are opt-in workflow steps exposed through `once package validate` / `once package describe`. They do not run automatically before `create`.
 
-### The Workflow Engine (`big-config` package)
+### The Workflow Engine (Python SDK)
 
-ONCE uses the shared `big-config` Python package for the workflow engine and template rendering. An `opts` dict (`dict[str, Any]`) is threaded through a series of steps; BigConfig's `workflow`, `workflow_star`, and `run_steps` compose build/create/delete pipelines.
+ONCE uses the Python SDK (`big-config` package) for the workflow engine and template rendering. An `opts` dict (`dict[str, Any]`) is threaded through a series of steps; the SDK's `workflow`, `workflow_star`, and `run_steps` compose build/create/delete pipelines.
 
 ### Template Rendering (`big_config.render`)
 
@@ -128,12 +128,12 @@ Sensitive credentials go in `.envrc.private` (gitignored).
 
 ### Plugin System
 
-`tools.py` registers a `render-tofu-backend` step via BigConfig's pluggable step registry. After each `render` step, it injects the remote-state backend config (S3, R2, or local) based on `provider-backend`.
+`tools.py` registers a `render-tofu-backend` step via the SDK's pluggable step registry. After each `render` step, it injects the remote-state backend config (S3, R2, or local) based on `provider-backend`.
 
 ## Code Conventions
 
 - **Modules**: the `big_config` package is the engine; `src/once/*` is the application. Keep that separation.
-- **`opts` keys**: BigConfig engine keys are namespaced strings (`big-config/exit`, `big-config.workflow/params`, etc.) — kept verbatim as Python dict keys, not converted to snake_case. ONCE also mirrors friendly aliases (`exit`, `err`, `params`, `profile`) at the CLI/test boundary via `interop.py`. Profile/template parameter keys are kebab-case strings matching the template variable names (`provider-compute`, `do-token`, `oci-shape`).
+- **`opts` keys**: SDK engine keys are namespaced strings (`big-config/exit`, `big-config.workflow/params`, etc.) — kept verbatim as Python dict keys, not converted to snake_case. ONCE also mirrors friendly aliases (`exit`, `err`, `params`, `profile`) at the CLI/test boundary via `interop.py`. Profile/template parameter keys are kebab-case strings matching the template variable names (`provider-compute`, `do-token`, `oci-shape`).
 - **Entry points**: `*_star` functions (`once_star`, `tofu_star`, …) are the CLI-ready wrappers; `validate` / `describe` are workflow steps, while `validate_report` / `describe_report` are the pure report builders (and accept injected dependencies for testing).
 - **Configuration Profiles (`options.py`)**: private sub-profile maps (`oci`, `hcloud`, `digitalocean`, `no_infra_compute`, `resend`, `cloudflare`, `r2`, `deploy`, …) compose into public application profiles (`profile_alpha`, `profile_beta`, `profile_gamma`, `profile_no_infra`) via `compose`. `profile_alpha` rides on DigitalOcean; `profile_beta` / `profile_gamma` ride on OCI; `profile_no_infra` targets an existing server. The active profile is `bb: Opts = profile_alpha` — change it to switch profiles. CamelCase aliases (`profileAlpha`, …) are exposed for cross-language parity.
 - **Templates**: `.dist/` is generated output, not source — do not edit it.
@@ -146,9 +146,9 @@ Functions designed for testing take their side-effecting collaborators as inject
 
 ## What to Avoid
 
-- Do not add error handling for cases that cannot happen — the workflow engine reports step failure via `exit` / `err`.
+- Do not add error handling for cases that cannot happen — the SDK reports step failure via `exit` / `err`.
 - Do not edit `.dist/` — it is generated output.
-- Do not convert BigConfig's namespaced string keys (e.g., `big-config/exit`) to snake_case — they are preserved verbatim across all three language implementations for parity.
+- Do not convert the SDK's namespaced string keys (e.g., `big-config/exit`) to snake_case — they are preserved verbatim across all three language implementations for parity.
 - Credentials and tokens never go in source files; use `.envrc.private` (gitignored).
 
 ## Git
