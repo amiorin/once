@@ -6,7 +6,7 @@ This file describes the `once` codebase for AI assistants. Read it before making
 
 `once` is a Clojure library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment via [Basecamp's ONCE](https://github.com/basecamp/once).
 
-Built on top of [big-config](https://github.com/bigconfig-ai/big-config), which provides workflow orchestration, template rendering, and step execution primitives.
+Built on top of BigConfig SDK (the [`big-config`](https://github.com/bigconfig-ai/big-config) package), which provides workflow orchestration, template rendering, and step execution primitives.
 
 ## Tech Stack
 
@@ -14,7 +14,7 @@ Built on top of [big-config](https://github.com/bigconfig-ai/big-config), which 
 - **CLI runner**: Babashka (`run` script; `bb.edn` only supplies deps)
 - **Infrastructure**: OpenTofu (Terraform fork)
 - **Config management**: Ansible
-- **Key libraries**: `big-config`, `big-tofu`, `cheshire` (JSON), `babashka/process`, `com.rpl/specter`
+- **Key libraries**: BigConfig SDK (`big-config`), `big-tofu`, `cheshire` (JSON), `babashka/process`, `com.rpl/specter`
 - **Dev environment**: Nix via `devenv` + `direnv`
 
 ## Repository Structure
@@ -112,10 +112,10 @@ The active profile is selected by editing `(def bb ...)` in `options.clj` (see C
 
 Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb run once package delete`.
 
-`validate` and `describe` are opt-in `big-config.workflow/run-steps` steps exposed through `bb run once package validate` and `bb run once package describe`. Validation is also exposed as a top-level `bb run validate` shortcut, which accepts no extra args and exits non-zero when `*command-line-args*` is non-empty. These steps do not run automatically before `create`.
+`validate` and `describe` are opt-in workflow steps implemented with `big-config.workflow/run-steps` and exposed through `bb run once package validate` and `bb run once package describe`. Validation is also exposed as a top-level `bb run validate` shortcut, which accepts no extra args and exits non-zero when `*command-line-args*` is non-empty. These steps do not run automatically before `create`.
 
 ### Template Rendering
-`big-config` renders templates from `src/resources/` into `.dist/` using parameters. The Selmer parser is configured in `tools.clj` with custom delimiters (`:tag-open \<`, `:tag-close \>`, `:filter-open \{`, `:filter-close \}`), so variables in template file content are written as `<{ var }>` — this leaves literal `{{ ... }}` untouched so downstream tools like Ansible can interpret them. Provider switching is directory-level: each render step passes a `:transform [[<provider> delimiters]]` entry (e.g., `[["digitalocean" delimiters]]`) and the renderer copies only the matching subdirectory under `tools/<step>/`.
+BigConfig SDK renders templates from `src/resources/` into `.dist/` using parameters. The Selmer parser is configured in `tools.clj` with custom delimiters (`:tag-open \<`, `:tag-close \>`, `:filter-open \{`, `:filter-close \}`), so variables in template file content are written as `<{ var }>` — this leaves literal `{{ ... }}` untouched so downstream tools like Ansible can interpret them. Provider switching is directory-level: each render step passes a `:transform [[<provider> delimiters]]` entry (e.g., `[["digitalocean" delimiters]]`) and the renderer copies only the matching subdirectory under `tools/<step>/`.
 
 ### Parameter Flow
 1. Options maps in `options.clj` define base params under `::workflow/params`
@@ -188,11 +188,11 @@ All cloud profiles combine with `resend` (SMTP) and `cloudflare` (DNS) sub-profi
 
 ## Dependencies
 
-`deps.edn` currently pins `big-config` to a Git SHA from GitHub:
+`deps.edn` currently pins the Clojure SDK package (`big-config`) to a Git SHA from GitHub:
 ```clojure
 io.github.amiorin/big-config {:git/sha "c20a1ab26c541f9080d6ef220fdc969058d622af"}
 ```
-A `:local/root "../../big-config/clojure"` coordinate is kept commented beside it with `#_#_` so it can be swapped in for local-source development. To switch, comment out the `:git/sha` line and uncomment the `:local/root` one, then re-run `clojure -P`.
+A `:local/root "../../big-config/clojure"` coordinate is kept commented beside it with `#_#_` so it can be swapped in for local SDK development. To switch, comment out the `:git/sha` line and uncomment the `:local/root` one, then re-run `clojure -P`.
 
 ## Git Conventions
 
@@ -206,7 +206,7 @@ Stay on `clojure` (each language has its own branch in this repo). Commit only w
 
 ## What to Avoid
 
-- Do not add error handling for cases that cannot happen (big-config handles step failure via `::bc/exit` and `::bc/err`)
+- Do not add error handling for cases that cannot happen (the SDK handles step failure via `::bc/exit` and `::bc/err`)
 - Do not create new namespaces unless a genuine new concern arises; the existing namespaces (`cli`, `options`, `package`, `params`, `tools`, `validation`, `describe`, `utils`) map cleanly to their responsibilities
 - Do not modify `.dist/` — it is generated output, not source
 - Credentials and tokens never go in source files; use `.envrc.private` (already gitignored via the whitelist `.gitignore`)

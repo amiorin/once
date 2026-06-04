@@ -2,7 +2,7 @@
 
 `once` is a BigConfig package for [ONCE](https://github.com/basecamp/once). This BigConfig package is an infrastructure automation tool that simplifies the provisioning and configuration of cloud resources using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). The audience is the vibe coder who wants to deploy his vibe coded application with a "one-click" experience.
 
-It is built on top of [big-config](https://github.com/bigconfig-ai/big-config), leveraging its workflow and configuration management capabilities.
+It is built on top of BigConfig SDK (the [`big-config`](https://github.com/bigconfig-ai/big-config) package), leveraging its workflow and configuration management capabilities.
 
 ![Demo](.github/media/demo.gif)
 
@@ -192,7 +192,7 @@ The pure report builders remain available for tests and tooling:
 
 ## How It Works
 
-1. **Template Rendering**: `big-config` takes templates from `src/resources` and your options to generate valid Tofu and Ansible files in `.dist/`.
+1. **Template Rendering**: BigConfig SDK takes templates from `src/resources` and your options to generate valid Tofu and Ansible files in `.dist/`.
 2. **Infrastructure Hook**: When `create` runs, it first executes OpenTofu to provision resources.
 3. **Inventory & Config Bridging**: The Tofu output (like the new server IP or SMTP records) is captured using `tofu output --json` and injected into the DNS configuration and Ansible inventory generation logic.
 4. **Local Finalization**: The local Ansible playbook updates your local environment (e.g., `~/.ssh/config`) so the new server is reachable as `Host once` before the remote stage runs.
