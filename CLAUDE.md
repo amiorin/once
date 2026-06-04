@@ -6,7 +6,7 @@ This file describes the `once` codebase for AI assistants. Read it before making
 
 `once` is a TypeScript library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment via [Basecamp's ONCE](https://github.com/basecamp/once).
 
-It depends on the `big-config` TypeScript package (`bigconfig-ai/big-config`, pinned to a GitHub commit in `package.json`) for the workflow engine, template renderer, step runner, and plugin system. To develop against a local checkout instead, override the `big-config` dependency in `package.json` with `"big-config": "file:../../big-config/typescript"` and re-run `npm install`.
+It depends on the TypeScript SDK (`big-config` package, `bigconfig-ai/big-config`, pinned to a GitHub commit in `package.json`) for the workflow engine, template renderer, step runner, and plugin system. To develop against a local SDK checkout instead, override the `big-config` dependency in `package.json` with `"big-config": "file:../../big-config/typescript"` and re-run `npm install`.
 
 ## Tech Stack
 
@@ -101,8 +101,8 @@ During development, prefix with `npm run once --` (e.g. `npm run once -- package
 
 `validate` and `describe` are opt-in workflow steps exposed through `once package validate` / `once package describe`. They do not run automatically before `create`.
 
-### The Workflow Engine (`../../big-config/typescript`)
-ONCE uses the shared `big-config` TypeScript package for the workflow engine and template rendering. An `opts` object (`Record<string, any>`) is threaded through a series of steps; BigConfig's `createWorkflow`, `createWorkflowStar`, `runSteps`, and `createWorkflowStar` composition support build/create/delete pipelines.
+### The Workflow Engine (TypeScript SDK: `../../big-config/typescript`)
+ONCE uses the TypeScript SDK (`big-config` package) for the workflow engine and template rendering. An `opts` object (`Record<string, any>`) is threaded through a series of steps; the SDK's `createWorkflow`, `createWorkflowStar`, and `runSteps` composition helpers support build/create/delete pipelines.
 
 ### Template Rendering (`../../big-config/typescript/src/render.ts`)
 Templates are copied from `src/resources/` into `.dist/` with placeholder substitution. File content uses `<{ var }>` delimiters; directory selection (e.g. picking `tofu/oci` vs `tofu/hcloud`) uses `{{ var }}`. The render data is the merged `params` plus `target-object` / `module` / `profile`.
@@ -124,12 +124,12 @@ export BC_PAR_HCLOUD_TOKEN="xxx"
 Sensitive credentials go in `.envrc.private` (gitignored).
 
 ### Plugin System
-`tools.ts` registers a `render-tofu-backend` step via BigConfig's pluggable step registry. After each `render` step, it injects the remote-state backend config (S3, R2, or local) based on `provider-backend`.
+`tools.ts` registers a `render-tofu-backend` step via the SDK's pluggable step registry. After each `render` step, it injects the remote-state backend config (S3, R2, or local) based on `provider-backend`.
 
 ## Code Conventions
 
 - **Modules**: the `big-config` npm package is the engine; `src/once/*` is the application. Keep that separation.
-- **`opts` keys**: BigConfig engine keys are namespaced strings (`big-config/exit`, `big-config.workflow/params`, etc.). ONCE also mirrors friendly aliases (`exit`, `err`, `params`, `profile`) at the CLI/test boundary. Profile/template parameter keys are kebab-case strings matching the template variable names (`provider-compute`, `do-token`, `oci-shape`).
+- **`opts` keys**: SDK engine keys are namespaced strings (`big-config/exit`, `big-config.workflow/params`, etc.). ONCE also mirrors friendly aliases (`exit`, `err`, `params`, `profile`) at the CLI/test boundary. Profile/template parameter keys are kebab-case strings matching the template variable names (`provider-compute`, `do-token`, `oci-shape`).
 - **Entry points**: `*Star` functions (`onceStar`, `tofuStar`, …) are the CLI-ready wrappers; `validate` / `describe` are workflow steps, while `validateReport` / `describeReport` are the pure report builders (and accept injected dependencies for testing).
 - **Configuration Profiles (`options.ts`)**: private sub-profile maps (`oci`, `hcloud`, `digitalocean`, `noInfraCompute`, `resend`, `cloudflare`, `r2`, `deploy`, …) compose into public application profiles (`profileAlpha`, `profileBeta`, `profileGamma`, `profileNoInfra`) via `compose`. Each application profile pins a `domain`, `package`, and the `once.applications` list. `profileAlpha` rides on DigitalOcean; `profileBeta` / `profileGamma` ride on OCI; `profileNoInfra` targets an existing server. The active profile is `export const bb = profileAlpha;` — change it to switch profiles.
 - **Templates**: `.dist/` is generated output, not source — do not edit it.
@@ -142,7 +142,7 @@ Functions designed for testing take their side-effecting collaborators as inject
 
 ## What to Avoid
 
-- Do not add error handling for cases that cannot happen — the workflow engine reports step failure via `exit` / `err`.
+- Do not add error handling for cases that cannot happen — the SDK reports step failure via `exit` / `err`.
 - Do not edit `.dist/` — it is generated output.
 - Credentials and tokens never go in source files; use `.envrc.private` (gitignored).
 - Keep imports using explicit `.js` extensions (required by `NodeNext` module resolution).

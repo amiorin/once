@@ -388,7 +388,7 @@
         <li><a href="#templates">Template rendering</a></li>
         <li><a href="#paramflow">Parameter flow</a></li>
         <li><a href="#plugins">Plugin: backend</a></li>
-        <li><a href="#bigconfig">big-config primitives</a></li>
+        <li><a href="#bigconfig">BigConfig SDK primitives</a></li>
       </ul>
 
       <div class="group">Configuration</div>
@@ -426,7 +426,7 @@
         <li><a href="#conventions">Code conventions</a></li>
         <li><a href="#testing">Testing</a></li>
         <li><a href="#avoid">What to avoid</a></li>
-        <li><a href="#deps-local">Local big-config</a></li>
+        <li><a href="#deps-local">Local BigConfig SDK</a></li>
       </ul>
 
       <div class="group">Reference</div>
@@ -455,7 +455,7 @@
   <!-- ============================================================ -->
   <section id="intro">
     <h2>Introduction</h2>
-    <p><code>once</code> wraps OpenTofu and Ansible into a single, six-stage pipeline that takes you from <em>nothing</em> to a running container on a public domain with verified SMTP and DNS — in one command. It is built on top of <a href="https://github.com/amiorin/big-config">big-config</a>, which provides workflow orchestration, template rendering, and step execution primitives.</p>
+    <p><code>once</code> wraps OpenTofu and Ansible into a single, six-stage pipeline that takes you from <em>nothing</em> to a running container on a public domain with verified SMTP and DNS — in one command. It is built on top of the <a href="https://github.com/amiorin/big-config">BigConfig SDK</a>, which provides workflow orchestration, template rendering, and step execution primitives.</p>
     <p>The deployment target is <a href="https://github.com/basecamp/once">Basecamp's ONCE</a>: you supply a domain, a list of containerized apps (image + host + env), and credentials; <code>once</code> provisions a server, configures DNS, sets up email, installs ONCE, and reconciles the apps onto the host.</p>
     <h3>What you give it</h3>
     <ul>
@@ -560,7 +560,7 @@ source_env_if_exists .envrc.private</code></pre>
   <!-- ============================================================ -->
   <section id="overview">
     <h2>Architecture overview</h2>
-    <p><code>once</code> is intentionally thin: a handful of namespaces, each pinned to one responsibility, layered on top of <code>big-config</code>'s workflow primitives.</p>
+    <p><code>once</code> is intentionally thin: a handful of namespaces, each pinned to one responsibility, layered on top of the BigConfig SDK's workflow primitives.</p>
     <table>
       <thead><tr><th>Namespace</th><th>Responsibility</th></tr></thead>
       <tbody>
@@ -578,7 +578,7 @@ source_env_if_exists .envrc.private</code></pre>
   <!-- ============================================================ -->
   <section id="pipeline">
     <h2>The six-stage create pipeline</h2>
-    <p>Defined in <code>package.clj</code>. Each stage is a <code>big-config</code> step that <em>renders</em> templates into <code>.dist/&lt;stage&gt;/</code> and then runs the embedded tool against them.</p>
+    <p>Defined in <code>package.clj</code>. Each stage is a BigConfig SDK step that <em>renders</em> templates into <code>.dist/&lt;stage&gt;/</code> and then runs the embedded tool against them.</p>
 
     <div class="pipeline">
       <div class="stage"><span class="n">1</span><div class="label">tofu</div><div class="sub">compute VM</div></div>
@@ -693,7 +693,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   <!-- ============================================================ -->
   <section id="plugins">
     <h2>Plugin: backend rendering</h2>
-    <p>Every Tofu stage needs a <code>terraform { backend … }</code> block. Rather than hard-coding the backend in every stage's template, <code>once</code> registers a single <code>big-config</code> plugin step that runs <em>after each <code>render</code></em> and stamps <code>backend.tf</code> into the rendered directory:</p>
+    <p>Every Tofu stage needs a <code>terraform { backend … }</code> block. Rather than hard-coding the backend in every stage's template, <code>once</code> registers a single BigConfig SDK plugin step that runs <em>after each <code>render</code></em> and stamps <code>backend.tf</code> into the rendered directory:</p>
 <pre><code>(<span class="kw">defmethod</span> pluggable/handle-step ::tools/render-tofu-backend
   [_f _step step-fns {:keys [::workflow/name] :as opts}]
   …)</code></pre>
@@ -711,8 +711,8 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
 
   <!-- ============================================================ -->
   <section id="bigconfig">
-    <h2>big-config primitives</h2>
-    <p>A short glossary of the <code>big-config</code> concepts <code>once</code> leans on:</p>
+    <h2>BigConfig SDK primitives</h2>
+    <p>A short glossary of the SDK concepts <code>once</code> leans on:</p>
     <table>
       <thead><tr><th>Symbol</th><th>Role</th></tr></thead>
       <tbody>
@@ -1168,7 +1168,7 @@ Applications:
 (<span class="fn">require</span> '[io.github.bigconfig-ai.once.options <span class="kw">:as</span> options])
 
 (once/once* <span class="str">"create"</span> options/oci)</code></pre>
-    <p>The <code>debug</code> macro from <code>big-config.utils</code> wraps a form so its <code>tap&gt;</code>'d values are accessible as <code>tap-values</code> afterwards:</p>
+    <p>The <code>debug</code> macro from the SDK's <code>big-config.utils</code> wraps a form so its <code>tap&gt;</code>'d values are accessible as <code>tap-values</code> afterwards:</p>
 <pre><code>(<span class="fn">debug</span> tap-values
   (once/once* <span class="str">"create"</span> options/oci))
 (-&gt; tap-values)  <span class="com">;; inspect</span></code></pre>
@@ -1210,7 +1210,7 @@ Applications:
   <section id="avoid">
     <h2>What to avoid</h2>
     <ul>
-      <li><strong>Don't add error handling for cases that cannot happen.</strong> <code>big-config</code> already routes step failure via <code>::bc/exit</code> and <code>::bc/err</code>; piling try/catches on top obscures the actual signal.</li>
+      <li><strong>Don't add error handling for cases that cannot happen.</strong> the SDK already routes step failure via <code>::bc/exit</code> and <code>::bc/err</code>; piling try/catches on top obscures the actual signal.</li>
       <li><strong>Don't create new namespaces speculatively.</strong> The six existing namespaces (<code>options</code>, <code>package</code>, <code>params</code>, <code>tools</code>, <code>validation</code>, <code>describe</code>) map cleanly to their responsibilities. Resist splitting until a real new concern appears.</li>
       <li><strong>Don't modify <code>.dist/</code>.</strong> It is generated output. If a template needs to change, change the source under <code>src/resources/</code>.</li>
       <li><strong>No credentials in source.</strong> Use <code>BC_PAR_*</code> via <code>.envrc.private</code>.</li>
@@ -1219,8 +1219,8 @@ Applications:
 
   <!-- ============================================================ -->
   <section id="deps-local">
-    <h2>Working against local <code>big-config</code></h2>
-    <p>To iterate on <code>big-config</code> changes, swap the dep in <code>deps.edn</code>:</p>
+    <h2>Working against a local BigConfig SDK checkout</h2>
+    <p>To iterate on SDK changes, swap the dep in <code>deps.edn</code>:</p>
 <pre><code><span class="com">;; comment out the pinned git/sha:</span>
 io.github.amiorin/big-config {:git/sha <span class="str">"f9508c7b…"</span>}
 <span class="com">;; uncomment the local checkout:</span>
@@ -1363,7 +1363,7 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
     <h2>License</h2>
     <p>Copyright © 2026 Alberto Miorin. Distributed under the MIT License.</p>
     <hr>
-    <p class="header-meta">Built on top of <a href="https://github.com/amiorin/big-config">big-config</a>. Targets <a href="https://github.com/basecamp/once">Basecamp ONCE</a>.</p>
+    <p class="header-meta">Built on top of the <a href="https://github.com/amiorin/big-config">BigConfig SDK</a>. Targets <a href="https://github.com/basecamp/once">Basecamp ONCE</a>.</p>
   </section>
 
   </main>

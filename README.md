@@ -2,7 +2,7 @@
 
 `once` is an infrastructure automation tool for [ONCE](https://github.com/basecamp/once). It simplifies the provisioning and configuration of cloud resources using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). The audience is the vibe coder who wants to deploy a vibe-coded application with a "one-click" experience.
 
-It is a TypeScript application built on the [`big-config`](https://github.com/bigconfig-ai/big-config) TypeScript package — pinned to a GitHub commit in `package.json` — for the workflow engine, template renderer, and step runner. To develop against a local checkout, override the dependency with `"big-config": "file:../../big-config/typescript"` and re-run `npm install`.
+It is a TypeScript application built on the TypeScript SDK (the [`big-config`](https://github.com/bigconfig-ai/big-config) package) — pinned to a GitHub commit in `package.json` — for the workflow engine, template renderer, and step runner. To develop against a local SDK checkout, override the dependency with `"big-config": "file:../../big-config/typescript"` and re-run `npm install`.
 
 ![Demo](.github/media/demo.gif)
 
@@ -143,7 +143,7 @@ describeReport(bb);
 
 ## How It Works
 
-1. **Template Rendering**: `big-config` takes templates from `src/resources/` and the merged parameters to generate valid Tofu and Ansible files in `.dist/`.
+1. **Template Rendering**: BigConfig SDK takes templates from `src/resources/` and the merged parameters to generate valid Tofu and Ansible files in `.dist/`.
 2. **Infrastructure Hook**: `create` first runs OpenTofu to provision resources.
 3. **Inventory & Config Bridging**: Tofu output (the new server IP, SMTP records) is captured with `tofu output --json` and injected into the DNS configuration and Ansible inventory.
 4. **Local Finalization**: The local Ansible playbook updates `~/.ssh/config` so the new server is reachable before the remote stage runs.
