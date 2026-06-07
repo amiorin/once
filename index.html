@@ -404,9 +404,9 @@
 
       <div class="group">CLI Reference</div>
       <ul>
-        <li><a href="#once-cmd">bb run once package</a></li>
-        <li><a href="#validate">bb run validate</a></li>
-        <li><a href="#describe">bb run once package describe</a></li>
+        <li><a href="#once-cmd">bb run package</a></li>
+        <li><a href="#validate">bb run package validate</a></li>
+        <li><a href="#describe">bb run package describe</a></li>
         <li><a href="#tools-cmd">bb run tofu / ansible</a></li>
         <li><a href="#tidy">clojure-lsp</a></li>
       </ul>
@@ -499,7 +499,7 @@ $EDITOR src/clj/io/github/bigconfig_ai/once/options.clj</code></pre>
 
     <h3>3. Pre-flight</h3>
 <pre><code><span class="kw">bb</span> run validate</code></pre>
-    <p><code>bb run validate</code> is a strict shortcut for <code>bb run once package validate</code>: it accepts no extra arguments and exits non-zero if any are supplied. It verifies schema, required CLIs, credentials (live API calls including a Cloudflare zone lookup), that every <code>:image</code> resolves on its registry, and that <code>:compute-pubkey</code> is loaded in <code>ssh-agent</code> for cloud compute profiles.</p>
+    <p><code>bb run package validate</code> verifies schema, required CLIs, credentials (live API calls including a Cloudflare zone lookup), that every <code>:image</code> resolves on its registry, and that <code>:compute-pubkey</code> is loaded in <code>ssh-agent</code> for cloud compute profiles.</p>
 
     <h3>4. Provision</h3>
 <pre><code><span class="kw">bb</span> run once package create</code></pre>
@@ -512,13 +512,13 @@ $EDITOR src/clj/io/github/bigconfig_ai/once/options.clj</code></pre>
     <h3>6. Tear down</h3>
 <pre><code><span class="kw">export</span> BC_PAR_COMPUTE_PREVENT_DESTROY=<span class="str">false</span>
 <span class="kw">bb</span> run once package delete</code></pre>
-    <div class="note warn"><span class="label">Warn</span>Compute resources render with <code>lifecycle { prevent_destroy = true }</code> by default. <code>bb run once package delete</code> will fail until you flip the flag — that is the intended safety net.</div>
+    <div class="note warn"><span class="label">Warn</span>Compute resources render with <code>lifecycle { prevent_destroy = true }</code> by default. <code>bb run package delete</code> will fail until you flip the flag — that is the intended safety net.</div>
   </section>
 
   <!-- ============================================================ -->
   <section id="prereqs">
     <h2>Prerequisites</h2>
-    <p>The exact list of CLIs depends on your active profile. <code>bb run validate</code> / <code>bb run once package validate</code> tell you which ones are missing.</p>
+    <p>The exact list of CLIs depends on your active profile. <code>bb run package validate</code> tell you which ones are missing.</p>
     <table>
       <thead><tr><th>Tool</th><th>Required for</th><th>Install hint</th></tr></thead>
       <tbody>
@@ -619,7 +619,7 @@ source_env_if_exists .envrc.private</code></pre>
     </ul>
 
     <h3>Delete order</h3>
-    <p><code>bb run once package delete</code> reverses the four Tofu stages in destroy order: <code>tofu-smtp-post → tofu-dns → tofu-smtp → tofu</code>. Ansible stages are not "destroyed" — they were configuration, not resources.</p>
+    <p><code>bb run package delete</code> reverses the four Tofu stages in destroy order: <code>tofu-smtp-post → tofu-dns → tofu-smtp → tofu</code>. Ansible stages are not "destroyed" — they were configuration, not resources.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -891,7 +891,7 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
                       :deploy-pubkey
                       <span class="str">"ssh-ed25519 AAAAC3… deploy@bigconfig.ai"</span>}})</code></pre>
     <ul>
-      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb run once package create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb run validate</code> / <code>bb run once package validate</code> reject the run if it isn't loaded (for cloud compute profiles).</li>
+      <li><code>:compute-pubkey</code> — the key whose <em>private half</em> must be loaded in <code>ssh-agent</code> on the machine running <code>bb run package create</code>. Ansible uses the agent to reach the freshly provisioned VM, so <code>bb run package validate</code> reject the run if it isn't loaded (for cloud compute profiles).</li>
       <li><code>:deploy-pubkey</code> — the key authorized on the remote <code>deploy</code> user with <code>ForceCommand</code>. See <a href="#deploy-user">Restricted deploy SSH</a>.</li>
     </ul>
     <p>Override either per-environment:</p>
@@ -926,23 +926,24 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
 
   <!-- ============================================================ -->
   <section id="once-cmd">
-    <h2><code>bb run once package</code></h2>
-<pre><code><span class="kw">bb</span> run validate                         <span class="com"># strict shortcut for bb run once package validate</span>
-<span class="kw">bb</span> run once package validate            <span class="com"># opt-in pre-flight checks; can be chained</span>
-<span class="kw">bb</span> run once package describe            <span class="com"># opt-in post-provisioning report</span>
-<span class="kw">bb</span> run once package create              <span class="com"># full 6-stage pipeline</span>
-<span class="kw">bb</span> run once package delete              <span class="com"># reverse 4 Tofu stages</span>
-<span class="kw">bb</span> run once package validate create     <span class="com"># validate, then create if validation passes</span>
-<span class="kw">bb</span> run once package delete create       <span class="com"># clean-slate redeploy</span></code></pre>
-    <p><code>bb run</code> executes the root <code>run</code> Babashka script, which delegates to <code>io.github.bigconfig-ai.once.cli/main*</code>. The CLI strips the <code>once package</code> prefix and calls <code>package/once*</code> with the remaining workflow steps. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested. The top-level <code>bb run validate</code> command calls the same validation step with no args, and exits with an error if extra args are supplied.</p>
+    <h2><code>bb run package</code></h2>
+<pre><code><span class="kw">bb</span> run package validate                 <span class="com"># opt-in pre-flight checks; can be chained</span>
+<span class="kw">bb</span> run package describe                 <span class="com"># opt-in post-provisioning report</span>
+<span class="kw">bb</span> run package build                    <span class="com"># render without applying/provisioning</span>
+<span class="kw">bb</span> run package create                   <span class="com"># full 6-stage pipeline</span>
+<span class="kw">bb</span> run package delete                   <span class="com"># reverse 4 Tofu stages</span>
+<span class="kw">bb</span> run package validate create          <span class="com"># validate, then create if validation passes</span>
+<span class="kw">bb</span> run package git-check lock build unlock-any <span class="com"># advanced Git/lock helpers</span>
+<span class="kw">bb</span> run package delete create            <span class="com"># clean-slate redeploy</span></code></pre>
+    <p><code>bb run</code> executes the root <code>run</code> Babashka script, which delegates to <code>io.github.bigconfig-ai.once.cli/main*</code>. The CLI strips the <code>once package</code> prefix and calls <code>package/once*</code> with the remaining workflow steps. The <code>once*</code> entry parses the args via <code>workflow/parse-args</code>, builds a <code>::workflow/steps</code> list (<code>:validate</code>, <code>:describe</code>, <code>:create</code>, <code>:delete</code>), and dispatches to workflow functions wired in <code>package.clj</code>. <code>validate</code> and <code>describe</code> run only when explicitly requested. The <code>bb run package validate</code> command calls the validation workflow step explicitly.</p>
     <h3>Step skipping &amp; partial runs</h3>
     <p>You can pass tool-level args to override what each stage does. For example, replace the default <code>render tofu:init tofu:apply:-auto-approve</code> sequence by editing <code>package.clj</code>'s pipeline — or by invoking individual stage commands (see <a href="#tools-cmd">bb run tofu / ansible</a>).</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="validate">
-    <h2><code>bb run validate</code> / <code>bb run once package validate</code></h2>
-    <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> is an opt-in workflow step and never short-circuits internally. Use <code>bb run validate</code> for validation by itself; use <code>bb run once package validate</code> when chaining with other workflow steps such as <code>create</code>.</p>
+    <h2><code>bb run package validate</code></h2>
+    <p>Pre-flight in four phases. Errors from all phases are collected and printed at the end — <code>validate</code> is an opt-in workflow step and never short-circuits internally. Use <code>bb run package validate</code> for validation by itself or chain it with other workflow steps such as <code>create</code>.</p>
     <ol>
       <li><strong>Schema</strong> (<code>malli</code>): every required key is present and well-typed; every <code>:once :applications :host</code> equals or is a subdomain of <code>:domain</code>; both <code>:compute-pubkey</code> and <code>:deploy-pubkey</code> look like SSH public keys.</li>
       <li><strong>Tools</strong>: required CLIs are on <code>PATH</code> (base + per-provider).</li>
@@ -971,12 +972,12 @@ tofu-params             <span class="com">;; merge `tofu output --json` from tof
   Credentials:
     - Cloudflare zone: example.com not found or not active
     - SSH agent: :compute-pubkey is not loaded in ssh-agent at SSH_AUTH_SOCK=/tmp/ssh-…/agent.123</code></pre>
-    <p>Programmatic API: <code>(validation/validate-report options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests). <code>validation/validate</code> is the workflow step function used by <code>bb run once package validate</code>; the <code>bb run validate</code> command invokes it as a no-argument shortcut.</p>
+    <p>Programmatic API: <code>(validation/validate-report options/bb) ; =&gt; {:ok? false :errors […]}</code>. Pass an env map as the second arg to inject custom environment values (used by tests). <code>validation/validate</code> is the workflow step function used by <code>bb run package validate</code>.</p>
   </section>
 
   <!-- ============================================================ -->
   <section id="describe">
-    <h2><code>bb run once package describe</code></h2>
+    <h2><code>bb run package describe</code></h2>
     <p>Post-provisioning report. Given the active profile, <code>describe</code> renders the params, queries the live infrastructure, and prints a human-readable summary:</p>
     <ul>
       <li><strong>Profile</strong>: <code>::render/profile</code> (e.g. <code>website</code>, <code>space</code>).</li>
@@ -1008,7 +1009,7 @@ Applications:
     digest: sha256:1a2b…
     registry digest: sha256:1a2b…
     update available: no</code></pre>
-    <p>Programmatic API: <code>(describe/describe-report options/bb)</code> returns the same shape as a map (<code>:profile</code>, <code>:providers</code>, <code>:compute</code>, <code>:applications</code>, <code>:applications-error</code>, <code>:fatal-error?</code>) so tests and tooling can consume it directly. The 3-arg arity <code>(describe-report opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and stubbed params resolver. <code>describe/describe</code> is the workflow step function used by <code>bb run once package describe</code>.</p>
+    <p>Programmatic API: <code>(describe/describe-report options/bb)</code> returns the same shape as a map (<code>:profile</code>, <code>:providers</code>, <code>:compute</code>, <code>:applications</code>, <code>:applications-error</code>, <code>:fatal-error?</code>) so tests and tooling can consume it directly. The 3-arg arity <code>(describe-report opts run-fn once-opts-fn)</code> lets tests inject a stub command runner and stubbed params resolver. <code>describe/describe</code> is the workflow step function used by <code>bb run package describe</code>.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1157,7 +1158,7 @@ clojure-lsp format</code></pre>
         </tr>
       </tbody>
     </table>
-    <p>Functions ending in <code>*</code> are CLI/REPL entry points: they accept a string of args and merge default <code>::bc/env :shell</code>. Validation and description are exposed as <code>bb run once package validate</code> / <code>bb run once package describe</code> workflow steps rather than standalone star wrappers; <code>bb run validate</code> is only a strict no-argument Babashka shortcut for the validation step.</p>
+    <p>Functions ending in <code>*</code> are CLI/REPL entry points: they accept a string of args and merge default <code>::bc/env :shell</code>. Validation and description are exposed as <code>bb run package validate</code> / <code>bb run package describe</code> workflow steps rather than standalone star wrappers; <code>bb run package validate</code> invokes the validation workflow step.</p>
   </section>
 
   <!-- ============================================================ -->
@@ -1324,7 +1325,7 @@ io.github.amiorin/big-config {:local/root <span class="str">"../big-config/main"
     </table>
 
     <h3>Compute (provider-specific keys)</h3>
-    <p>See the <a href="#compute">Compute providers</a> cards above. All listed keys are <em>required</em> per provider; <code>bb run validate</code> / <code>bb run once package validate</code> list the missing ones.</p>
+    <p>See the <a href="#compute">Compute providers</a> cards above. All listed keys are <em>required</em> per provider; <code>bb run package validate</code> list the missing ones.</p>
   </section>
 
   <!-- ============================================================ -->

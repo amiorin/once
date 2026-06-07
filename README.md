@@ -95,7 +95,7 @@ In `src/clj/io/github/bigconfig_ai/once/options.clj`, you can switch the active 
 `online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `digitalocean`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
 
 All four profiles also merge in the `deploy` sub-profile, which carries two SSH public keys:
-- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb run validate` / `bb run once package validate` check this).
+- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb run package validate` checks this).
 - `deploy-pubkey` — the key authorized on the remote `deploy` user with `ForceCommand` (CI-driven redeploys).
 
 Override either per-environment via `BC_PAR_COMPUTE_PUBKEY` and `BC_PAR_DEPLOY_PUBKEY`.
@@ -107,23 +107,25 @@ Note: If you are using the `no-infra` profile, ensure your parameters are correc
 Before provisioning, run a quick check that the active profile is well-formed, the required CLIs are installed, the credentials work, the referenced Docker images exist, and (for cloud compute profiles) `:compute-pubkey` is loaded in `ssh-agent` so Ansible can connect to the new host:
 
 ```bash
-bb run validate
+bb run package validate
 ```
 
-`bb run validate` is a strict shortcut for `bb run once package validate`: it accepts no extra arguments and exits non-zero if any are supplied. For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
+For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
 
 #### 3. Main Workflow
 
-The `run` script handles the full lifecycle through the `once package` command. `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`. You can pass multiple commands to `bb run once package`; use the top-level `bb run validate` shortcut only for validation by itself.
+The `run` script handles the full lifecycle through the `package` command. `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`. You can pass multiple steps to `bb run package`.
 
-- **Pre-flight Validation**: `bb run validate` (same as `bb run once package validate`)
-- **Build only**: `bb run once package build` (render all stages without applying/provisioning)
-- **Full Setup**: `bb run once package create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible Local -> Ansible)
-- **Tear Down**: `bb run once package delete` (Tofu SMTP Post Destroy -> Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
-- **Sequential**: `bb run once package validate create` (Validate, then create only if validation passes)
-- **Clean slate**: `bb run once package delete create` (Clean slate redeploy)
+- **Pre-flight Validation**: `bb run package validate`
+- **Post-provisioning Report**: `bb run package describe`
+- **Build only**: `bb run package build` (render all stages without applying/provisioning)
+- **Full Setup**: `bb run package create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible Local -> Ansible)
+- **Tear Down**: `bb run package delete` (Tofu SMTP Post Destroy -> Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
+- **Sequential**: `bb run package validate create` (Validate, then create only if validation passes)
+- **Locking/Git helpers**: `bb run package git-check lock build unlock-any`
+- **Clean slate**: `bb run package delete create` (Clean slate redeploy)
 
-Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb run once package delete`, first override it:
+Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb run package delete`, first override it:
 
 ```bash
 export BC_PAR_COMPUTE_PREVENT_DESTROY=false
@@ -131,10 +133,10 @@ export BC_PAR_COMPUTE_PREVENT_DESTROY=false
 
 #### 4. Post-provisioning Report
 
-Once a stack is up, `bb run once package describe` prints a human-readable status for the active profile: configured providers (compute, backend, SMTP, DNS), SSH reachability of the compute host, and every ONCE application discovered on the server with image, tag, running digest, registry digest, and whether an update is available. Most checks are soft failures; only a missing remote `once` command causes a non-zero exit.
+Once a stack is up, `bb run package describe` prints a human-readable status for the active profile: configured providers (compute, backend, SMTP, DNS), SSH reachability of the compute host, and every ONCE application discovered on the server with image, tag, running digest, registry digest, and whether an update is available. Most checks are soft failures; only a missing remote `once` command causes a non-zero exit.
 
 ```bash
-bb run once package describe
+bb run package describe
 ```
 
 #### 5. Targeted Tools

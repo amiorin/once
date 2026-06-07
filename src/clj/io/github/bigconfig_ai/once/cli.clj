@@ -9,17 +9,29 @@
   "Usage: bb run <command> [args...]
 
 Commands:
-  package <step>...       Build, provision, or tear down infrastructure for the active profile.
+  package <step>...       Run package workflow steps for the active profile.
                             bb run package validate
                             bb run package describe
                             bb run package build
                             bb run package create
                             bb run package delete
+                            bb run package git-check lock build unlock-any
   once package <step>...  Backwards-compatible nested form.
-  validate                Strict shortcut for `bb run package validate`.
 
-  Individual tools (each requires `render` first):
+  Package steps:
+    validate              Pre-flight profile, tool, credential, image, and SSH-agent checks.
+    describe              Post-provisioning providers, SSH reachability, apps, and updates report.
+    build                 Render all stages without applying/provisioning.
+    create                Provision and configure the full ONCE stack.
+    delete                Tear down the Tofu stages in reverse order.
+    lock                  Acquire the BigConfig Git-tag lock.
+    git-check             Verify the Git working tree/upstream state is clean.
+    git-push              Run git push through the BigConfig workflow.
+    unlock-any            Force-release the computed BigConfig lock tag.
+
+  Individual tools (accept SDK workflow steps and exec commands):
   tofu <args>             e.g. bb run tofu render tofu:init tofu:apply:-auto-approve
+                          e.g. bb run tofu git-check lock render tofu:init tofu:plan unlock-any
   tofu-smtp <args>
   tofu-dns <args>
   tofu-smtp-post <args>
@@ -33,7 +45,8 @@ Notes:
 
 See: https://www.bigconfig.ai/manual")
 
-(def package-commands #{"validate" "describe" "build" "create" "delete"})
+(def package-commands #{"validate" "describe" "build" "create" "delete"
+                        "lock" "git-check" "git-push" "unlock-any"})
 
 (defn- die!
   [& lines]
@@ -61,28 +74,34 @@ See: https://www.bigconfig.ai/manual")
           (println help-text)
 
           (= subcommand "package")
-          (if (seq package-args)
+          (cond
+            (some #{(first package-args)} ["help" "--help" "-h"])
+            (println help-text)
+
+            (seq package-args)
             (package/once* package-args opts)
+
+            :else
             (die! "Missing package step."
-                  "Usage: bb run once package <validate|describe|build|create|delete>..."))
+                  "Usage: bb run once package <step>..."))
 
           (contains? package-commands subcommand)
           (die! (str "Use `bb run once package " subcommand "`.") "" help-text)
 
           :else
-          (die! "Usage: bb run once package <validate|describe|build|create|delete>..." "" help-text)))
-
-      (= command "validate")
-      (if (seq rest-args)
-        (die! "Error: bb run validate does not accept arguments."
-              "Usage: bb run validate")
-        (package/once* ["validate"] opts))
+          (die! "Usage: bb run once package <step>..." "" help-text)))
 
       (= command "package")
-      (if (seq rest-args)
+      (cond
+        (some #{(first rest-args)} ["help" "--help" "-h"])
+        (println help-text)
+
+        (seq rest-args)
         (package/once* rest-args opts)
+
+        :else
         (die! "Missing package step."
-              "Usage: bb run package <validate|describe|build|create|delete>..."))
+              "Usage: bb run package <step>..."))
 
       (contains? package-commands command)
       (die! (str "Use `bb run package " command "`.") "" help-text)

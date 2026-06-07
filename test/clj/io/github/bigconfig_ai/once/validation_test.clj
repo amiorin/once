@@ -4,6 +4,7 @@
    [big-config.workflow :as workflow]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [io.github.bigconfig-ai.once.cli :as cli]
    [io.github.bigconfig-ai.once.options :as options]
    [io.github.bigconfig-ai.once.validation :as v]))
 
@@ -248,3 +249,13 @@
       (doseq [i ["nginx" "" "/no-registry" "Foo/Bar" "ghcr.io/foo/bar:bad tag"]]
         (is (seq (v/schema-errors (params-of i)))
             (str i " should be invalid"))))))
+
+(deftest cli-help-exposes-package-and-tool-workflow-verbs
+  (doseq [command ["validate" "describe" "build" "create" "delete"
+                   "lock" "git-check" "git-push" "unlock-any"]]
+    (is (contains? cli/package-commands command))
+    (is (str/includes? cli/help-text command)))
+  (is (str/includes? cli/help-text "bb run package validate"))
+  (is (str/includes? cli/help-text "bb run package describe"))
+  (is (str/includes? cli/help-text "git-check lock render"))
+  (is (not (str/includes? cli/help-text "bb run validate"))))
