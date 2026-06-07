@@ -13,16 +13,28 @@ from .tools import ansible_local_star, ansible_star, tofu_dns_star, tofu_smtp_po
 HELP = """Usage: once <command> [args...]
 
 Commands:
-  package <step>...  Build, provision, or tear down infrastructure for the active profile.
+  package <step>...  Run package workflow steps for the active profile.
                        once package validate
                        once package describe
                        once package build
                        once package create
                        once package delete
-  validate           Shortcut for `once package validate`.
+                       once package git-check lock build unlock-any
 
-  Individual tools (each requires `render` first):
+  Package steps:
+    validate              Pre-flight profile, tool, credential, image, and SSH-agent checks.
+    describe              Post-provisioning providers, SSH reachability, apps, and updates report.
+    build                 Render all stages without applying/provisioning.
+    create                Provision and configure the full ONCE stack.
+    delete                Tear down the Tofu stages in reverse order.
+    lock                  Acquire the BigConfig Git-tag lock.
+    git-check             Verify the Git working tree/upstream state is clean.
+    git-push              Run git push through the BigConfig workflow.
+    unlock-any            Force-release the computed BigConfig lock tag.
+
+  Individual tools (accept SDK workflow steps and exec commands):
   tofu <args>             e.g. once tofu render tofu:init tofu:apply:-auto-approve
+                          e.g. once tofu git-check lock render tofu:init tofu:plan unlock-any
   tofu-smtp <args>
   tofu-dns <args>
   tofu-smtp-post <args>
@@ -36,7 +48,13 @@ Notes:
 
 See: https://www.bigconfig.ai/manual"""
 
-PACKAGE_COMMANDS = {"validate", "describe", "build", "create", "delete"}
+PACKAGE_COMMANDS = {"validate", "describe", "build", "create", "delete", "lock", "git-check", "git-push", "unlock-any"}
+
+
+def die(*lines: str) -> None:
+    for line in lines:
+        print(line, file=sys.stderr)
+    raise SystemExit(1)
 
 
 def main(argv: list[str] | None = None, opts: Opts | None = None) -> None:
@@ -49,11 +67,13 @@ def main(argv: list[str] | None = None, opts: Opts | None = None) -> None:
         print(HELP)
         return
     if command in {"package", "once"}:  # "once" kept as a backwards-compatible alias.
+        if rest and rest[0] in {"help", "--help", "-h"}:
+            print(HELP)
+            return
         once_star(rest, active_profile)
         return
     if command == "validate":
-        once_star(argv if rest else ["validate"], active_profile)
-        return
+        die("Use `once package validate`.", "", HELP)
     if command in PACKAGE_COMMANDS:
         once_star(argv, active_profile)
         return

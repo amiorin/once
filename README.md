@@ -95,7 +95,7 @@ uv run once -- package build          # render all stages without applying/provi
 uv run once -- package create         # full 6-stage create pipeline
 uv run once -- package delete         # reverse the 4 Tofu stages
 uv run once -- package validate create # validate, then create only if validation passes
-uv run once -- validate               # shortcut for `once package validate`
+uv run once -- package git-check lock build unlock-any # advanced Git/lock workflow helpers
 ```
 
 Compute resources render with `lifecycle { prevent_destroy = true }` by default. To run `once package delete`, first override it:
@@ -110,6 +110,7 @@ Each tool requires a `render` step first to generate config files into `.dist/`:
 
 ```bash
 uv run once -- tofu render tofu:init tofu:apply:-auto-approve
+uv run once -- tofu git-check lock render tofu:init tofu:plan unlock-any
 uv run once -- tofu-smtp render tofu:init tofu:apply:-auto-approve
 uv run once -- tofu-dns render tofu:init tofu:apply:-auto-approve
 uv run once -- tofu-smtp-post render tofu:init tofu:apply:-auto-approve

@@ -576,7 +576,7 @@ def print_report(result: ValidateResult) -> None:
 
 
 def validate(_step_fns: Any, opts: Opts, report_fn: Callable[[Opts], ValidateResult] = validate_report) -> Opts:
-    """Workflow step for ``once validate``."""
+    """Workflow step for ``once package validate``."""
     result = report_fn(opts)
     print_report(result)
     base = {**opts, "validation/result": result}

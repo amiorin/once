@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from once.options import profile_alpha, profile_beta, profile_gamma, profile_no_infra
+import pytest
+
+from once import cli
+from once.options import bb, profile_alpha, profile_beta, profile_gamma, profile_no_infra
 from once.validation import (
     credential_errors,
     provider_tools,
@@ -112,6 +115,19 @@ def test_cross_field_apex_and_subdomain_pass():
         },
     )
     assert schema_errors(ok_profile) is None
+
+
+def test_cli_help_exposes_package_and_tool_workflow_verbs(capsys):
+    for command in ["validate", "describe", "build", "create", "delete", "lock", "git-check", "git-push", "unlock-any"]:
+        assert command in cli.PACKAGE_COMMANDS
+        assert command in cli.HELP
+    assert "once package validate" in cli.HELP
+    assert "once package describe" in cli.HELP
+    assert "git-check lock render" in cli.HELP
+    assert "once validate" not in cli.HELP
+    with pytest.raises(SystemExit):
+        cli.main(["validate"], bb)
+    assert "once package validate" in capsys.readouterr().err
 
 
 def test_validate_workflow_step_sets_exit_status_success():

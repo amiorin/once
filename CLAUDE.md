@@ -69,13 +69,14 @@ once package build            # render everything without applying/provisioning
 once package create           # provision everything (all 6 stages)
 once package delete           # tear down (reverse 4 Tofu stages)
 once package validate create  # validate, then create only if validation passes
-once validate                 # shortcut for `once package validate`
+once package git-check lock build unlock-any  # advanced Git/lock workflow helpers
 ```
 
 Individual tools (each requires `render` first):
 
 ```bash
 once tofu render tofu:init tofu:apply:-auto-approve
+once tofu git-check lock render tofu:init tofu:plan unlock-any
 once tofu-smtp render tofu:init tofu:apply:-auto-approve
 once tofu-dns render tofu:init tofu:apply:-auto-approve
 once tofu-smtp-post render tofu:init tofu:apply:-auto-approve
@@ -96,7 +97,7 @@ once ansible-local render -- ansible-playbook main.yml
 
 `delete` reverses the Tofu stages (4→3→2→1 destroy order). Compute resources render with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `once package delete`.
 
-`validate` and `describe` are opt-in workflow steps exposed through `once package validate` / `once package describe`. They do not run automatically before `create`.
+`validate` and `describe` are opt-in workflow steps exposed through `once package validate` / `once package describe`. Advanced SDK workflow steps (`lock`, `git-check`, `git-push`, `unlock-any`) can be chained in both package and tool workflows. They do not run automatically before `create`.
 
 ### The Workflow Engine (Python SDK)
 
