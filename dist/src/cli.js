@@ -10,16 +10,28 @@ import { ansibleLocalStar, ansibleStar, tofuDnsStar, tofuSmtpPostStar, tofuSmtpS
 const HELP = `Usage: once <command> [args...]
 
 Commands:
-  package <step>...  Build, provision, or tear down infrastructure for the active profile.
+  package <step>...  Run package workflow steps for the active profile.
                        once package validate
                        once package describe
                        once package build
                        once package create
                        once package delete
-  validate           Shortcut for \`once package validate\`.
+                       once package git-check lock build unlock-any
 
-  Individual tools (each requires \`render\` first):
+  Package steps:
+    validate              Pre-flight profile, tool, credential, image, and SSH-agent checks.
+    describe              Post-provisioning providers, SSH reachability, apps, and updates report.
+    build                 Render all stages without applying/provisioning.
+    create                Provision and configure the full ONCE stack.
+    delete                Tear down the Tofu stages in reverse order.
+    lock                  Acquire the BigConfig Git-tag lock.
+    git-check             Verify the Git working tree/upstream state is clean.
+    git-push              Run git push through the BigConfig workflow.
+    unlock-any            Force-release the computed BigConfig lock tag.
+
+  Individual tools (accept SDK workflow steps and exec commands):
   tofu <args>             e.g. once tofu render tofu:init tofu:apply:-auto-approve
+                          e.g. once tofu git-check lock render tofu:init tofu:plan unlock-any
   tofu-smtp <args>
   tofu-dns <args>
   tofu-smtp-post <args>
@@ -32,9 +44,16 @@ Notes:
   * Any param can be overridden with BC_PAR_* environment variables.
 
 See: https://www.bigconfig.ai/manual`;
-const PACKAGE_COMMANDS = new Set(["describe", "build", "create", "delete"]);
+const PACKAGE_COMMANDS = new Set(["validate", "describe", "build", "create", "delete", "lock", "git-check", "git-push", "unlock-any"]);
+function die(...lines) {
+    for (const line of lines)
+        console.error(line);
+    process.exit(1);
+}
 export function main(argv, opts = bb) {
     const [command, ...rest] = argv;
+    if (command === "validate")
+        die("Use `once package validate`.", "", HELP);
     if (command && PACKAGE_COMMANDS.has(command)) {
         onceStar(argv, opts);
         return;
@@ -48,10 +67,11 @@ export function main(argv, opts = bb) {
             return;
         case "package":
         case "once": // Backwards-compatible alias for the old nested form.
+            if (["help", "--help", "-h"].includes(rest[0] ?? "")) {
+                console.log(HELP);
+                return;
+            }
             onceStar(rest, opts);
-            return;
-        case "validate":
-            onceStar(rest.length > 0 ? argv : ["validate"], opts);
             return;
         case "tofu":
             tofuStar(rest, onceOpts(opts));

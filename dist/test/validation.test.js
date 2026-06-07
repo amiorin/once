@@ -1,8 +1,9 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { profileAlpha, profileBeta, profileGamma, profileNoInfra, } from "../src/once/options.js";
+import { describe, expect, it, vi } from "vitest";
+import { main } from "../src/cli.js";
+import { bb, profileAlpha, profileBeta, profileGamma, profileNoInfra, } from "../src/once/options.js";
 import { credentialErrors, providerTools, schemaErrors, sshAgentErrors, toolErrors, validate, validateReport, } from "../src/once/validation.js";
 const testComputePubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHDKdUkY+SfRm6ttOz2EEZ2+i/zm+o1mpMOdMeGUr0t4 test@example.com";
 const testDeployPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII1Lbgxiv2OnDKwc8Wx25SQlGyI+iY1drUii/IMZ3YSh deploy@example.com";
@@ -132,6 +133,23 @@ describe("schema validation", () => {
             },
         });
         expect(schemaErrors(okProfile)).toBeUndefined();
+    });
+});
+describe("cli", () => {
+    it("exposes package and tool workflow verbs and rejects bare validate", () => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(((code) => { throw new Error(`exit:${code}`); }));
+        const err = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        expect(() => main(["validate"], bb)).toThrow("exit:1");
+        const output = err.mock.calls.flat().join("\n");
+        for (const command of ["validate", "describe", "build", "create", "delete", "lock", "git-check", "git-push", "unlock-any"]) {
+            expect(output).toContain(command);
+        }
+        expect(output).toContain("once package validate");
+        expect(output).toContain("once package describe");
+        expect(output).toContain("git-check lock render");
+        expect(output).not.toContain("once validate");
+        exit.mockRestore();
+        err.mockRestore();
     });
 });
 describe("validate workflow step sets exit status", () => {

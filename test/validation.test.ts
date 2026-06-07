@@ -1,9 +1,11 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Opts } from "big-config";
+import { main } from "../src/cli.js";
 import {
+  bb,
   profileAlpha,
   profileBeta,
   profileGamma,
@@ -169,6 +171,24 @@ describe("schema validation", () => {
       },
     });
     expect(schemaErrors(okProfile)).toBeUndefined();
+  });
+});
+
+describe("cli", () => {
+  it("exposes package and tool workflow verbs and rejects bare validate", () => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: string | number | null) => { throw new Error(`exit:${code}`); }) as never);
+    const err = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(() => main(["validate"], bb)).toThrow("exit:1");
+    const output = err.mock.calls.flat().join("\n");
+    for (const command of ["validate", "describe", "build", "create", "delete", "lock", "git-check", "git-push", "unlock-any"]) {
+      expect(output).toContain(command);
+    }
+    expect(output).toContain("once package validate");
+    expect(output).toContain("once package describe");
+    expect(output).toContain("git-check lock render");
+    expect(output).not.toContain("once validate");
+    exit.mockRestore();
+    err.mockRestore();
   });
 });
 

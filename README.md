@@ -98,7 +98,7 @@ once package build          # render all stages without applying/provisioning
 once package create         # full 6-stage create pipeline
 once package delete         # reverse the 4 Tofu stages
 once package validate create # validate, then create only if validation passes
-once validate               # shortcut for `once package validate`
+once package git-check lock build unlock-any # advanced Git/lock workflow helpers
 ```
 
 Compute resources render with `lifecycle { prevent_destroy = true }` by default. To run `once package delete`, first override it:
@@ -113,6 +113,7 @@ Each tool requires a `render` step first to generate config files into `.dist/`:
 
 ```bash
 once tofu render tofu:init tofu:apply:-auto-approve
+once tofu git-check lock render tofu:init tofu:plan unlock-any
 once tofu-smtp render tofu:init tofu:apply:-auto-approve
 once tofu-dns render tofu:init tofu:apply:-auto-approve
 once tofu-smtp-post render tofu:init tofu:apply:-auto-approve
