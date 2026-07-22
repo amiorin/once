@@ -1,1 +1,2 @@
-{:deps {io.github.bigconfig-ai/once {:local/root "."}}}
+{:deps {io.github.amiorin/green      {:local/root "/home/ubuntu/code/green"}
+        io.github.bigconfig-ai/once {:local/root "."}}}

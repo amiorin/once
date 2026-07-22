@@ -1,233 +1,115 @@
 # Once
 
-`once` is a BigConfig package for [ONCE](https://github.com/basecamp/once). This BigConfig package is an infrastructure automation tool that simplifies the provisioning and configuration of cloud resources using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). The audience is the vibe coder who wants to deploy his vibe coded application with a "one-click" experience.
+`once` provisions a single-server [ONCE](https://github.com/basecamp/once)
+installation with OpenTofu and Ansible. It uses the
+[`green`](https://github.com/amiorin/green) DAG workflow engine.
 
-It is built on top of BigConfig SDK (the [`big-config`](https://github.com/bigconfig-ai/big-config) package), leveraging its workflow and configuration management capabilities.
+## Workflow
 
-![Demo](.github/media/demo.gif)
+Create and build use this graph:
 
-## Features
-
-- **End-to-End Orchestration**: A seamless six-stage workflow:
-  1. **Infrastructure**: Provisioning with OpenTofu.
-  2. **SMTP**: Email infrastructure with OpenTofu (Resend).
-  3. **DNS**: Domain configuration with OpenTofu (Cloudflare provider v5), including automatic SMTP records, apex (`@`) and wildcard (`*`) A records proxied through Cloudflare, and a curated bundle of zone settings (TLS 1.3, strict SSL, always-use-HTTPS, etc.).
-  4. **SMTP Post-Verification**: Finalizing SMTP setup (e.g., domain verification) with OpenTofu.
-  5. **Local Config**: Ansible on the local machine wires up `~/.ssh/config` so the freshly provisioned host is reachable as `Host once` for the next stage.
-  6. **Remote Config**: Ansible on the remote host installs Docker and ONCE, provisions a restricted `deploy` user for one-command redeploys, and reconciles the configured applications.
-- **OpenTofu Remote Backend**: Support for remote state management using S3 or Cloudflare R2, automatically rendered for all Tofu-based stages.
-- **Multi-Cloud Support**: Native templates for:
-  - **DigitalOcean** (`digitalocean`)
-  - **Hetzner Cloud** (`hcloud`)
-  - **Oracle Cloud Infrastructure** (`oci`)
-  - **No-Infra** (`no-infra`): For when the server is already there.
-- **Dynamic Inventory**: Automatically bridge the gap by generating Ansible inventory directly from OpenTofu outputs.
-- **SMTP Testing Ready**: Automatically installs `s-nail` and configures `.mailrc` on the remote host for immediate SMTP verification.
-- **Restricted Deploy SSH**: Provisions a `deploy` user with NOPASSWD sudo limited to `once`, and an SSH `ForceCommand` Babashka script that accepts only `sudo once update <host>` for hosts present in `once list` (CI-friendly redeploys without root SSH).
-- **Environment Overrides**: Support for overriding any configuration parameter via environment variables (e.g., `BC_PAR_DOMAIN`).
-- **Configurable Workflows**: Execute complex multi-step processes like `tofu init/apply` followed by multiple `ansible-playbook` runs.
-
-## Prerequisites
-
-To use `once`, you need the following tools installed:
-
-- **[Clojure](https://clojure.org/guides/install_clojure)**: The core engine.
-- **[Babashka](https://babashka.org/)**: Recommended for running the root `run` script.
-- **[OpenTofu](https://opentofu.org/docs/intro/install/)**: For infrastructure management.
-- **[Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html)**: For configuration management.
-- **[AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)**: Required for S3 backend management.
-- **Cloud Credentials**: e.g., `DIGITALOCEAN_TOKEN`, `HCLOUD_TOKEN`, `CLOUDFLARE_API_TOKEN`, `RESEND_API_KEY`, or OCI configuration.
-
-## Usage
-
-### Configuration Overrides
-
-You can override any parameter defined in `options.clj` using environment variables prefixed with `BC_PAR_`. The variable name is converted to lowercase, and underscores or dots are replaced with hyphens.
-
-Example:
-```bash
-export BC_PAR_DO_TOKEN="your-digitalocean-token"
-export BC_PAR_RESEND_PASSWORD="your-smtp-password"
-export BC_PAR_DOMAIN="example.com"
+```text
+tofu-compute ─┐                                      ┌─ ansible-local
+               ├─ tofu-dns ─ tofu-smtp-post ─────────┤
+tofu-smtp ────┘                                      └─ ansible-remote
 ```
 
-To enable the S3 backend for OpenTofu, set the following parameters:
-```bash
-export BC_PAR_PROVIDER_BACKEND="s3"
-export BC_PAR_S3_BUCKET="your-tf-state-bucket"
-export BC_PAR_S3_REGION="eu-west-1"
-```
+Compute and SMTP run concurrently. DNS joins their outputs, SMTP verification
+runs after DNS, and the two Ansible stages then run concurrently. Build renders
+the same files without invoking OpenTofu or Ansible. Delete destroys DNS first,
+then destroys SMTP and compute concurrently.
 
-To enable the Cloudflare R2 backend instead:
-```bash
-export BC_PAR_PROVIDER_BACKEND="r2"
-export BC_PAR_R2_BUCKET="your-tf-state-bucket"
-export BC_PAR_R2_ENDPOINT="https://<account-id>.r2.cloudflarestorage.com"   # add `.eu` / `.fedramp` before `r2` for jurisdictioned buckets
-export BC_PAR_R2_ACCESS_KEY_ID="your-r2-access-key"
-export BC_PAR_R2_SECRET_ACCESS_KEY="your-r2-secret"
-```
+Generated files and isolated OpenTofu state directories live under
+`.dist/<profile>/`.
 
-These will be automatically merged into the workflow parameters.
+## Requirements
 
-### Via Babashka (Recommended)
+- Babashka
+- OpenTofu
+- Ansible
+- `skopeo` for registry comparisons in `describe`
 
-The easiest way to interact with `once` is through the root Babashka `run` script.
+Cloud-provider credentials are needed only for the providers selected in
+`green.edn`.
 
-#### 1. Setup
+## Configuration
 
-Clone the repository and configure your options:
-
-```bash
-git clone https://github.com/bigconfig-ai/once
-cd once
-# Edit your chosen provider options
-edit src/clj/io/github/bigconfig_ai/once/options.clj
-```
-
-In `src/clj/io/github/bigconfig_ai/once/options.clj`, you can switch the active profile used by Babashka by changing the `bb` definition:
+Desired state is the flat map in [`green.edn`](green.edn). Select compute,
+SMTP, DNS, and backend providers with:
 
 ```clojure
-;; options.clj
-;; Switch between online, space, website, or no-infra
-(def bb website)
+{:provider-compute "digitalocean" ; digitalocean, hcloud, oci, no-infra
+ :provider-smtp "resend"          ; resend, no-infra
+ :provider-dns "cloudflare"       ; cloudflare, no-infra
+ :provider-backend "r2"}          ; r2, s3, local
 ```
 
-`online`, `space`, and `website` are application profiles — they pin a domain, package, and the list of containerized apps deployed by Ansible. `online` and `space` ride on `oci`; `website` rides on `digitalocean`. The `space` profile, for example, deploys a templated Pocketbase instance, while `website` deploys the bigconfig.ai sites.
-
-All four profiles also merge in the `deploy` sub-profile, which carries two SSH public keys:
-- `compute-pubkey` — the operator's key (its private half must be loaded in `ssh-agent` for Ansible to reach the new VM on cloud providers; `bb run package validate` checks this).
-- `deploy-pubkey` — the key authorized on the remote `deploy` user with `ForceCommand` (CI-driven redeploys).
-
-Override either per-environment via `BC_PAR_COMPUTE_PUBKEY` and `BC_PAR_DEPLOY_PUBKEY`.
-
-Note: If you are using the `no-infra` profile, ensure your parameters are correctly prefixed (e.g., `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-smtp-server`).
-
-#### 2. Pre-flight Validation
-
-Before provisioning, run a quick check that the active profile is well-formed, the required CLIs are installed, the credentials work, the referenced Docker images exist, and (for cloud compute profiles) `:compute-pubkey` is loaded in `ssh-agent` so Ansible can connect to the new host:
+Secrets can remain as `REPLACE_ME` in the committed file. Any flat key can be
+overridden with `GREEN_PAR_*`; names are lowercased and underscores become
+hyphens:
 
 ```bash
-bb run package validate
+export GREEN_PAR_DO_TOKEN="..."
+export GREEN_PAR_CLOUDFLARE_API_TOKEN="..."
+export GREEN_PAR_RESEND_API_KEY="..."
+export GREEN_PAR_RESEND_PASSWORD="..."
+export GREEN_PAR_R2_ACCESS_KEY_ID="..."
+export GREEN_PAR_R2_SECRET_ACCESS_KEY="..."
 ```
 
-For Cloudflare DNS profiles, validation also confirms the configured `:domain` is an active zone on the supplied Cloudflare account.
-
-#### 3. Main Workflow
-
-The `run` script handles the full lifecycle through the `package` command. `validate` and `describe` are explicit workflow steps; they do not run automatically before or after `create`. You can pass multiple steps to `bb run package`.
-
-- **Pre-flight Validation**: `bb run package validate`
-- **Post-provisioning Report**: `bb run package describe`
-- **Build only**: `bb run package build` (render all stages without applying/provisioning)
-- **Full Setup**: `bb run package create` (Tofu -> Tofu SMTP -> Tofu DNS -> Tofu SMTP Post -> Ansible Local -> Ansible)
-- **Tear Down**: `bb run package delete` (Tofu SMTP Post Destroy -> Tofu DNS Destroy -> Tofu SMTP Destroy -> Tofu Destroy)
-- **Sequential**: `bb run package validate create` (Validate, then create only if validation passes)
-- **Locking/Git helpers**: `bb run package git-check lock build unlock-any`
-- **Clean slate**: `bb run package delete create` (Clean slate redeploy)
-
-Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default as a safeguard. To run `bb run package delete`, first override it:
+Use `.envrc.private` for local secrets. To permit compute destruction when the
+default safeguard is enabled:
 
 ```bash
-export BC_PAR_COMPUTE_PREVENT_DESTROY=false
+export GREEN_PAR_COMPUTE_PREVENT_DESTROY=false
 ```
 
-#### 4. Post-provisioning Report
+## Commands
 
-Once a stack is up, `bb run package describe` prints a human-readable status for the active profile: configured providers (compute, backend, SMTP, DNS), SSH reachability of the compute host, and every ONCE application discovered on the server with image, tag, running digest, registry digest, and whether an update is available. Most checks are soft failures; only a missing remote `once` command causes a non-zero exit.
+Run from the repository root:
 
 ```bash
-bb run package describe
+bb green build                 # render .dist/<profile>/ only
+bb green create                # provision and configure
+bb green create --dry-run      # print the DAG actions, touch nothing
+bb green delete                # destroy infrastructure
+bb green delete --dry-run
+bb green describe              # providers, SSH status, apps, image updates
 ```
 
-#### 5. Targeted Tools
+Use another desired-state file with `-f` or `--file`:
 
-You can also run the underlying tools individually. Most commands require a `render` step first to generate the necessary config files from templates into the `.dist/` directory.
-
-- **OpenTofu (Infrastructure)**:
-  ```bash
-  bb run tofu render tofu:init tofu:apply:-auto-approve
-  ```
-- **OpenTofu (SMTP)**:
-  ```bash
-  bb run tofu-smtp render tofu:init tofu:apply:-auto-approve
-  ```
-- **OpenTofu (DNS)**:
-  ```bash
-  bb run tofu-dns render tofu:init tofu:apply:-auto-approve
-  ```
-- **OpenTofu (SMTP Post-Verification)**:
-  ```bash
-  bb run tofu-smtp-post render tofu:init tofu:apply:-auto-approve
-  ```
-- **Remote Ansible**:
-  ```bash
-  bb run ansible render -- ansible-playbook main.yml
-  ```
-- **Local Ansible**:
-  ```bash
-  bb run ansible-local render -- ansible-playbook main.yml
-  ```
-
-### Programmatic Usage
-
-You can trigger workflows directly from a Clojure REPL:
-
-```clojure
-(require '[io.github.bigconfig-ai.once.package :as once])
-(require '[io.github.bigconfig-ai.once.options :as options])
-
-;; Run workflow steps using the active profile
-(once/once* "validate" options/bb)
-(once/once* "create" options/bb)
-(once/once* "describe" options/bb)
+```bash
+bb green build -f production.edn
 ```
 
-The pure report builders remain available for tests and tooling:
+`describe` reads compute and SMTP values from their OpenTofu state before
+probing the remote host. Infrastructure connectivity failures are reported as
+soft failures; a missing remote `once` command produces a non-zero exit.
 
-```clojure
-(require '[io.github.bigconfig-ai.once.validation :as validation])
-(require '[io.github.bigconfig-ai.once.describe :as describe])
+## Providers and generated configuration
 
-(validation/validate-report options/bb)
-(describe/describe-report options/bb)
-```
-
-## How It Works
-
-1. **Template Rendering**: BigConfig SDK takes templates from `src/resources` and your options to generate valid Tofu and Ansible files in `.dist/`.
-2. **Infrastructure Hook**: When `create` runs, it first executes OpenTofu to provision resources.
-3. **Inventory & Config Bridging**: The Tofu output (like the new server IP or SMTP records) is captured using `tofu output --json` and injected into the DNS configuration and Ansible inventory generation logic.
-4. **Local Finalization**: The local Ansible playbook updates your local environment (e.g., `~/.ssh/config`) so the new server is reachable as `Host once` before the remote stage runs.
-5. **Configuration**: Ansible then connects to the new host using the dynamically generated inventory to apply your playbooks.
-
-## Project Structure
-
-- `src/clj/.../once/`:
-  - `options.clj`: Where you define your cloud profiles and credentials.
-  - `package.clj`: Defines the high-level `create`/`delete` workflows and wires the `validate`/`describe` workflow steps.
-  - `params.clj`: Logic for extracting parameters from Tofu outputs.
-  - `tools.clj`: Implementation details for Tofu, Tofu SMTP, Tofu DNS, and Ansible wrappers.
-  - `validation.clj`: Profile schema, tool, credential, image, and ssh-agent checks (`validate` workflow step + `validate-report`).
-  - `describe.clj`: Post-provisioning report (`describe` workflow step + `describe-report`).
-- `src/resources/.../once/tools/`:
-  - `tofu/`: Multi-cloud `.tf` templates.
-  - `tofu-backend/`: OpenTofu backend templates (S3, Cloudflare R2, local).
-  - `tofu-smtp/`: SMTP configuration templates (Resend).
-  - `tofu-dns/`: DNS configuration templates (Cloudflare).
-  - `tofu-smtp-post/`: SMTP post-verification templates (Resend).
-  - `ansible/`: Remote system playbooks.
-  - `ansible-local/`: Local machine configuration playbooks.
+- Compute templates: DigitalOcean, Hetzner Cloud, OCI, and an existing
+  `no-infra` host.
+- SMTP templates: Resend or `no-infra` SMTP settings.
+- DNS templates: Cloudflare or `no-infra`; Resend DNS records are generated at
+  the compute/SMTP join.
+- Backends: local, S3, and Cloudflare R2, isolated by profile and tool.
+- `ansible-local` scaffolds local SSH configuration files.
+- `ansible-remote` generates inventory and the ONCE reconciliation task, then
+  runs `ansible-playbook` during create.
 
 ## Development
 
-If you are contributing to `once`, use `clojure-lsp` to keep the code clean:
-
 ```bash
+clojure -M:test
 clojure-lsp clean-ns
 clojure-lsp format
 ```
 
-This cleans namespaces and formats the source code.
+Source namespaces are under `src/clj/io/github/bigconfig_ai/once/`; templates
+are under `src/resources/io/github/bigconfig-ai/once/tools/`. `.dist/` is
+generated and must not be edited.
 
 ## License
 

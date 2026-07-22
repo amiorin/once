@@ -1,0 +1,153 @@
+#!/usr/bin/env bb
+
+(require '[babashka.cli :as bb-cli]
+         '[clojure.edn :as edn]
+         '[clojure.java.io :as io]
+         '[clojure.string :as str]
+         '[green.cli :as green-cli]
+         '[green.dry-run :as dry-run]
+         '[green.progress :as progress]
+         '[green.scaffold :as sc]
+         '[green.tofu :as tofu]
+         '[green.workflow :as wf]
+         '[io.github.bigconfig-ai.once.describe :as describe]
+         '[io.github.bigconfig-ai.once.tools :as tools]
+         '[io.github.bigconfig-ai.once.utils :as utils])
+
+(def script-dir
+  (let [file (if (= "NO_SOURCE_PATH" *file*)
+               (io/file (System/getProperty "user.dir") "green")
+               (io/file *file*))]
+    (str (.getParentFile (.getCanonicalFile file)))))
+
+(def tofu-steps
+  [:once/tofu-compute :once/tofu-smtp :once/tofu-dns :once/tofu-smtp-post])
+
+(def side-effecting-steps
+  (into tofu-steps [:once/ansible-local :once/ansible-remote]))
+
+(defn start-step
+  [opts]
+  (utils/read-green-pars opts))
+
+(defn wire-fn
+  [step run-opts]
+  (if (= :delete (:green/event run-opts))
+    (case step
+      :once/start        [start-step :once/tofu-dns]
+      :once/tofu-dns     [tools/tofu-dns-step :once/tofu-smtp :once/tofu-compute]
+      :once/tofu-smtp    [tools/tofu-smtp-step]
+      :once/tofu-compute [tools/tofu-compute-step])
+    (case step
+      :once/start           [start-step :once/tofu-compute :once/tofu-smtp]
+      :once/tofu-compute    [tools/tofu-compute-step :once/tofu-dns]
+      :once/tofu-smtp       [tools/tofu-smtp-step :once/tofu-dns]
+      :once/tofu-dns        [tools/tofu-dns-step :once/tofu-smtp-post]
+      :once/tofu-smtp-post  [tools/tofu-smtp-post-step :once/ansible-local :once/ansible-remote]
+      :once/ansible-local   [tools/ansible-local-step]
+      :once/ansible-remote  [tools/ansible-remote-step])))
+
+(defn- r2-backend-advice
+  [dir-fn tool]
+  (fn [opts]
+    (let [target (io/file (dir-fn opts) "backend.tf")
+          data (assoc opts :target-object
+                      (str (or (:profile opts) "default") "/" tool))]
+      (io/make-parents target)
+      (spit target
+            (sc/render-template
+             :io.github.bigconfig-ai.once.tools.tofu-backend.r2/backend.tf
+             data
+             {:tag-open \< :tag-close \> :filter-open \{ :filter-close \}})))
+    opts))
+
+(defn- backend-advice
+  [tool]
+  (let [dir-fn #(tools/tool-dir % tool)]
+    (fn [opts]
+      (case (or (:provider-backend opts) "local")
+        "local" ((tofu/local-backend-advice dir-fn) opts)
+        "s3" ((tofu/s3-backend-advice
+                dir-fn
+                {:bucket (:s3-bucket opts)
+                 :key (str (or (:profile opts) "default") "/" tool ".tfstate")
+                 :region (:s3-region opts)})
+              opts)
+        "r2" ((r2-backend-advice dir-fn tool) opts)
+        (throw (ex-info "unsupported OpenTofu backend"
+                        {:provider-backend (:provider-backend opts)}))))))
+
+(def workflow
+  (-> (wf/workflow {:start :once/start :wire-fn wire-fn})
+      (wf/advice-add :once/tofu-compute :before ::backend
+                     (backend-advice "tofu-compute"))
+      (wf/advice-add :once/tofu-smtp :before ::backend
+                     (backend-advice "tofu-smtp"))
+      (wf/advice-add :once/tofu-dns :before ::backend
+                     (backend-advice "tofu-dns"))
+      (wf/advice-add :once/tofu-smtp-post :before ::backend
+                     (backend-advice "tofu-smtp-post"))
+      progress/advise
+      (dry-run/advise side-effecting-steps)))
+
+(defn- file-arg?
+  [arg]
+  (or (= "-f" arg)
+      (= "--file" arg)
+      (str/starts-with? (str arg) "--file=")))
+
+(defn default-args
+  [args]
+  (let [args (vec args)]
+    (cond-> args
+      (not-any? file-arg? args)
+      (conj "-f" (str (io/file script-dir "green.edn"))))))
+
+(def ^:private describe-cli-spec
+  {:file {:alias :f :default (str (io/file script-dir "green.edn"))}})
+
+(defn- run-describe
+  [args]
+  (try
+    (let [{:keys [opts]} (bb-cli/parse-args (vec (rest args))
+                                            {:spec describe-cli-spec})
+          file (io/file (:file opts))]
+      (if-not (.exists file)
+        {:green/exit 2 :green/err (str "desired state file not found: " file)}
+        (-> (edn/read-string (slurp file))
+            utils/read-green-pars
+            describe/describe)))
+    (catch Throwable t
+      {:green/exit 2 :green/err (or (ex-message t) (str (class t)))})))
+
+(def usage
+  "Usage: bb green <create|delete|build|describe> [-f|--file green.edn] [--dry-run]")
+
+(defn run
+  "REPL-friendly entry point that returns the final opts map."
+  [& args]
+  (let [args (default-args args)
+        command (first args)]
+    (cond
+      (= "describe" command) (run-describe args)
+      (#{"create" "delete" "build"} command) (green-cli/run-cli workflow args)
+      (#{"help" "--help" "-h"} command) {:green/exit 0 :green/err usage}
+      :else {:green/exit 2 :green/err usage})))
+
+(defn -main
+  [& args]
+  (let [{:green/keys [exit err trace]} (apply run args)]
+    (when err
+      (binding [*out* (if (zero? (or exit 0)) *out* *err*)]
+        (println err)
+        (when trace (println trace))))
+    (System/exit (or exit 0))))
+
+(defn- launched-as-script?
+  []
+  (when-let [bb-file (System/getProperty "babashka.file")]
+    (= (.getCanonicalPath (io/file bb-file))
+       (.getCanonicalPath (io/file *file*)))))
+
+(when (launched-as-script?)
+  (apply -main *command-line-args*))

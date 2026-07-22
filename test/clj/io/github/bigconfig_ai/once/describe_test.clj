@@ -1,21 +1,18 @@
 (ns io.github.bigconfig-ai.once.describe-test
   (:require
-   [big-config :as bc]
-   [big-config.render :as render]
-   [big-config.workflow :as workflow]
    [cheshire.core :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [io.github.bigconfig-ai.once.describe :as d]))
 
 (def ^:private base-opts
-  {::render/profile "test"
-   ::workflow/params {:provider-compute "digitalocean"
-                      :provider-backend "r2"
-                      :provider-smtp "resend"
-                      :provider-dns "cloudflare"
-                      :ip "203.0.113.10"
-                      :user "root"}})
+  {:profile "test"
+   :provider-compute "digitalocean"
+   :provider-backend "r2"
+   :provider-smtp "resend"
+   :provider-dns "cloudflare"
+   :ip "203.0.113.10"
+   :user "root"})
 
 (defn- ok
   ([] (ok ""))
@@ -41,7 +38,7 @@
           :backend "r2"
           :smtp "resend"
           :dns "cloudflare"}
-         (d/provider-summary (::workflow/params base-opts)))))
+         (d/provider-summary base-opts))))
 
 (deftest no-infra-compute-target-uses-configured-ip-and-user-when-state-is-missing
   (is (= {:ip "10.0.0.5" :user "ubuntu"}
@@ -101,7 +98,7 @@
                  (when (some #{"once"} args)
                    (throw (ex-info "remote apps should not be checked" {})))
                  (fail "Permission denied"))
-        result (d/describe-report base-opts run-fn identity)]
+        result (d/describe-report base-opts run-fn)]
     (is (false? (get-in result [:compute :running?])))
     (is (= [] (:applications result)))
     (is (str/includes? (:applications-error result) "not checked"))
@@ -115,7 +112,7 @@
                      (= (once-command-check) cmd) (ok)
                      (= ["sudo" "-n" "once" "list"] cmd) (fail "once missing")
                      :else (throw (ex-info "unexpected command" {:args args})))))
-        result (d/describe-report base-opts run-fn identity)]
+        result (d/describe-report base-opts run-fn)]
     (is (true? (get-in result [:compute :running?])))
     (is (= [] (:applications result)))
     (is (false? (:fatal-error? result)))
@@ -131,7 +128,7 @@
                                                    :out ""
                                                    :err "once: command not found"}
                      :else (throw (ex-info "unexpected command" {:args args})))))
-        result (d/describe-report base-opts run-fn identity)]
+        result (d/describe-report base-opts run-fn)]
     (is (true? (get-in result [:compute :running?])))
     (is (= [] (:applications result)))
     (is (true? (:fatal-error? result)))
@@ -146,8 +143,8 @@
                                                  :fatal-error? false})]
       (let [result (atom nil)]
         (with-out-str
-          (reset! result (d/describe [] base-opts)))
-        (is (= 0 (::bc/exit @result)))
+          (reset! result (d/describe base-opts)))
+        (is (= 0 (:green/exit @result)))
         (is (false? (get-in @result [::d/result :fatal-error?]))))))
   (testing "fatal report fails"
     (with-redefs [d/describe-report (constantly {:profile "test"
@@ -157,9 +154,9 @@
                                                  :fatal-error? true})]
       (let [result (atom nil)]
         (with-out-str
-          (reset! result (d/describe [] base-opts)))
-        (is (= 1 (::bc/exit @result)))
-        (is (= "describe failed" (::bc/err @result)))))))
+          (reset! result (d/describe base-opts)))
+        (is (= 1 (:green/exit @result)))
+        (is (= "describe failed" (:green/err @result)))))))
 
 (deftest describe-success-reports-image-digests-and-update-status
   (let [container {:Id "container-1"
@@ -191,7 +188,7 @@
                           (= ["sudo" "-n" "docker" "image" "inspect" "sha256:local-image" "ghcr.io/org/app:latest"] cmd)
                           (ok (json/generate-string [image]))
                           :else (throw (ex-info "unexpected command" {:args args}))))))
-        result    (d/describe-report base-opts run-fn identity)
+        result    (d/describe-report base-opts run-fn)
         app       (first (:applications result))]
     (is (nil? (:applications-error result)))
     (is (= "www.example.com" (:host app)))

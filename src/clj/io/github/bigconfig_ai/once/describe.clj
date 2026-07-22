@@ -1,21 +1,14 @@
 (ns io.github.bigconfig-ai.once.describe
-  "Describe the active profile after provisioning.
+  "Describe the active green desired state after provisioning.
 
-  `describe` is the big-config workflow step behind `bb run package describe`. It
-  prints a human-readable report with configured provider names, SSH
-  reachability for the computed host, and deployed ONCE applications discovered
-  from the remote server. Most live checks are soft failures; a missing remote
-  `once` command marks the step as failed."
+  The report shows configured providers, SSH reachability, and deployed ONCE
+  applications. Most live checks are soft failures; a missing remote `once`
+  command marks the step as failed."
   (:require
-   [babashka.process :as p]
-   [big-config :as bc]
-   [big-config.core :as core]
-   [big-config.render :as render]
-   [big-config.utils :refer [debug]]
-   [big-config.workflow :as workflow]
    [cheshire.core :as json]
    [clojure.string :as str]
-   [io.github.bigconfig-ai.once.params :as params]))
+   [io.github.bigconfig-ai.once.tools :as tools]
+   [io.github.bigconfig-ai.once.utils :as utils]))
 
 ;;; -------------------------------------------------------------- command helpers
 
@@ -25,23 +18,10 @@
 
 (defn- run
   ([args] (run args {}))
-  ([args {:keys [timeout-ms extra-env]
-          :or   {timeout-ms run-timeout-ms}}]
-   (try
-     (let [proc   (p/process args (cond-> {:in  (java.io.ByteArrayInputStream. (byte-array 0))
-                                           :out :string
-                                           :err :string}
-                                    (seq extra-env) (assoc :extra-env extra-env)))
-           result (deref proc timeout-ms ::timeout)]
-       (if (= ::timeout result)
-         (do
-           (p/destroy-tree proc)
-           {:ok? false :exit -1 :out ""
-            :err (format "command timed out after %dms" timeout-ms)})
-         (let [{:keys [exit out err]} result]
-           {:ok? (zero? exit) :exit exit :out out :err err})))
-     (catch Exception e
-       {:ok? false :exit -1 :out "" :err (.getMessage e)}))))
+  ([args {:keys [timeout-ms]
+          :or {timeout-ms run-timeout-ms}
+          :as opts}]
+   (utils/run-with-timeout args (dissoc opts :timeout-ms) timeout-ms)))
 
 (defn- trim-snippet [s]
   (let [s (some-> s str/trim)]
@@ -104,14 +84,15 @@
              ip)]
     {:ip ip
      :user (or (not-empty user)
-               (not-empty no-infra-compute-user)
                (not-empty sudoer)
-               (not-empty no-infra-compute-sudoer)
+               (when (= provider-compute "no-infra")
+                 (or (not-empty no-infra-compute-user)
+                     (not-empty no-infra-compute-sudoer)))
                "root")}))
 
 (defn- compute-status
   [run-fn params]
-  (let [{:keys [ip user] :as target} (compute-target params)]
+  (let [{:keys [ip] :as target} (compute-target params)]
     (cond
       (str/blank? ip)
       (assoc target :running? false :detail "missing IP address")
@@ -353,39 +334,61 @@
 
 ;;; -------------------------------------------------------------- top-level
 
-(defn- resolve-once-opts
-  [opts once-opts-fn]
-  (try
-    {:opts (once-opts-fn opts)}
-    (catch Exception e
-      {:opts opts
-       :detail (str "could not resolve OpenTofu parameters: " (.getMessage e))})))
+(defn- tofu-output-params
+  [run-fn opts tool]
+  (let [dir (tools/tool-dir opts tool)
+        result (run-fn ["tofu" "output" "-json"]
+                       {:dir dir :timeout-ms run-timeout-ms})]
+    (if (:ok? result)
+      (try
+        {:params (or (get-in (json/parse-string (:out result) keyword)
+                             [:params :value])
+                     {})}
+        (catch Exception e
+          {:detail (str tool " output was not valid JSON: " (.getMessage e))}))
+      {:detail (result-detail (str "tofu output in " dir) result)})))
+
+(defn- resolve-tofu-opts
+  [opts run-fn]
+  (let [compute (tofu-output-params run-fn opts "tofu-compute")
+        smtp (tofu-output-params run-fn opts "tofu-smtp")
+        details (remove str/blank? [(:detail compute) (:detail smtp)])]
+    {:opts (merge opts (:params compute) (:params smtp))
+     :detail (when (seq details) (str/join "; " details))}))
+
+(defn- report
+  [opts run-fn resolve-detail]
+  (let [providers (provider-summary opts)
+        compute (cond-> (compute-status run-fn opts)
+                  resolve-detail (update :detail #(str % "; " resolve-detail)))
+        app-result (if (:running? compute)
+                     (remote-applications run-fn compute)
+                     {:ok? false
+                      :detail "not checked because compute is not reachable"})]
+    {:profile (:profile opts)
+     :providers providers
+     :compute compute
+     :applications (vec (:applications app-result))
+     :applications-error (when-not (:ok? app-result) (:detail app-result))
+     :fatal-error? (boolean (:fatal? app-result))}))
 
 (defn describe-report
-  "Build a describe report from `opts`.
+  "Build a describe report from flat green `opts`.
 
-  Returns a map with provider names, compute reachability, and deployed remote
-  applications. Live failures are represented in the return value instead of
-  thrown. Optional arities allow tests to inject a command runner and params
-  resolver."
-  ([opts] (describe-report opts run params/once-opts))
-  ([opts run-fn once-opts-fn]
-   (let [{opts' :opts resolve-detail :detail} (resolve-once-opts opts once-opts-fn)
-         profile       (::render/profile opts')
-         params'       (::workflow/params opts')
-         providers     (provider-summary params')
-         compute       (cond-> (compute-status run-fn params')
-                         resolve-detail (update :detail #(str % "; " resolve-detail)))
-         app-result    (if (:running? compute)
-                         (remote-applications run-fn compute)
-                         {:ok? false
-                          :detail "not checked because compute is not reachable"})]
-     {:profile profile
-      :providers providers
-      :compute compute
-      :applications (vec (:applications app-result))
-      :applications-error (when-not (:ok? app-result) (:detail app-result))
-      :fatal-error? (boolean (:fatal? app-result))})))
+  The default arity reads compute and SMTP values from their OpenTofu state.
+  The two-argument arity accepts an injected command runner and treats `opts`
+  as already resolved, keeping report construction process-free in tests."
+  ([opts]
+   (let [{opts' :opts detail :detail} (resolve-tofu-opts opts run)]
+     (report opts' run detail)))
+  ([opts run-fn]
+   (report opts run-fn nil))
+  ([opts run-fn opts-fn]
+   (try
+     (report (opts-fn opts) run-fn nil)
+     (catch Exception e
+       (report opts run-fn (str "could not resolve OpenTofu parameters: "
+                                (.getMessage e)))))))
 
 ;;; -------------------------------------------------------------- reporting
 
@@ -444,21 +447,13 @@
           (println (format "    registry check: %s" registry-detail)))))))
 
 (defn describe
-  "big-config workflow step for `bb run package describe`.
-
-  Unreachable infrastructure is reported without failing the step, but a missing
-  remote `once` command returns a non-zero workflow exit."
-  [_step-fns opts]
+  "Print the report and return green's Unix-style outcome map."
+  [opts]
   (let [result (describe-report opts)]
     (print-report result)
     (merge opts
            {::result result}
            (if (:fatal-error? result)
-             {::bc/exit 1
-              ::bc/err (or (:applications-error result) "describe failed")}
-             (core/ok)))))
-
-(comment
-  (debug tap-values
-    (describe-report {}))
-  (-> tap-values))
+             {:green/exit 1
+              :green/err (or (:applications-error result) "describe failed")}
+             {:green/exit 0}))))
