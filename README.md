@@ -94,7 +94,8 @@ soft failures; a missing remote `once` command produces a non-zero exit.
 - SMTP templates: Resend or `no-infra` SMTP settings.
 - DNS templates: Cloudflare or `no-infra`; Resend DNS records are generated at
   the compute/SMTP join.
-- Backends: local, S3, and Cloudflare R2, isolated by profile and tool.
+- Backends: local, S3, and Cloudflare R2, emitted as `backend.tf.json` and
+  isolated by profile and tool.
 - `ansible-local` scaffolds local SSH configuration files.
 - `ansible-remote` generates inventory and the ONCE reconciliation task, then
   runs `ansible-playbook` during create.

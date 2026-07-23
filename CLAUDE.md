@@ -31,7 +31,6 @@ once/
 │   │   └── describe.clj     # Post-provisioning report (providers, SSH, deployed apps)
 │   └── resources/io/github/bigconfig-ai/once/tools/
 │       ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
-│       ├── tofu-backend/    # Remote state backend templates (s3, r2, local)
 │       ├── tofu-smtp/       # SMTP (Resend) setup templates
 │       ├── tofu-dns/        # DNS (Cloudflare) templates
 │       ├── tofu-smtp-post/  # SMTP post-verification templates
@@ -131,8 +130,8 @@ export BC_PAR_HCLOUD_TOKEN="xxx"
 ```
 Variable names are uppercased; hyphens become underscores. Sensitive credentials go in `.envrc.private` (gitignored).
 
-### Plugin System
-`tools.clj` uses `pluggable/handle-step` for the remote-state backend plugin (`::render-tofu-backend`). After each `render` step, the plugin injects the backend configuration (S3, R2, or local) based on `:provider-backend` — this is done via `run-steps-with-plugin`.
+### Backend Advice
+The `green` script attaches `:before` advice to each OpenTofu step. The advice writes `backend.tf.json` based on `:provider-backend`, using Green's local and S3 helpers directly and representing Cloudflare R2 as an S3-compatible backend.
 
 ## Code Conventions
 

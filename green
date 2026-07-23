@@ -7,7 +7,6 @@
          '[green.cli :as green-cli]
          '[green.dry-run :as dry-run]
          '[green.progress :as progress]
-         '[green.scaffold :as sc]
          '[green.tofu :as tofu]
          '[green.workflow :as wf]
          '[io.github.bigconfig-ai.once.describe :as describe]
@@ -49,17 +48,20 @@
 
 (defn- r2-backend-advice
   [dir-fn tool]
-  (fn [opts]
-    (let [target (io/file (dir-fn opts) "backend.tf")
-          data (assoc opts :target-object
-                      (str (or (:profile opts) "default") "/" tool))]
-      (io/make-parents target)
-      (spit target
-            (sc/render-template
-             :io.github.bigconfig-ai.once.tools.tofu-backend.r2/backend.tf
-             data
-             {:tag-open \< :tag-close \> :filter-open \{ :filter-close \}})))
-    opts))
+  (tofu/s3-backend-advice
+   dir-fn
+   (fn [opts]
+     {:bucket (:r2-bucket opts)
+      :key (str (or (:profile opts) "default") "/" tool ".tfstate")
+      :region "auto"
+      :access_key (:r2-access-key-id opts)
+      :secret_key (:r2-secret-access-key opts)
+      :endpoints {:s3 (:r2-endpoint opts)}
+      :skip_credentials_validation true
+      :skip_metadata_api_check true
+      :skip_region_validation true
+      :skip_requesting_account_id true
+      :use_path_style false})))
 
 (defn- backend-advice
   [tool]
