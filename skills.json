@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/skillman/skills_schema.json",
+  "skills": [
+    {
+      "source": "/home/ubuntu/code/bigconfig/once/green/green-once",
+      "skills": ["green-once"]
+    }
+  ]
+}
