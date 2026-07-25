@@ -1,9 +1,0 @@
-# General SMTP Settings
-set v15-compat=yes
-set mta=smtp://<{ no-infra-smtp-username }>:<{ no-infra-smtp-password }>@<{ no-infra-smtp-server }>:<{ no-infra-smtp-port }>
-set smtp-auth=login
-set smtp-use-starttls
-
-# Identity Settings
-set from="Fizzy <fizzy@<{ domain }>>"
-set hostname=<{ domain  }>

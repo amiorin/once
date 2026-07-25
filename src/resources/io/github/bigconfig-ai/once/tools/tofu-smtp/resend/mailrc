@@ -1,9 +1,0 @@
-# General SMTP Settings
-set v15-compat=yes
-set mta=smtp://<{ resend-username }>:<{ resend-password }>@<{ resend-server }>:<{ resend-port }>
-set smtp-auth=login
-set smtp-use-starttls
-
-# Identity Settings
-set from="Info <info@notifications.<{ domain }>>"
-set hostname=<{ domain  }>

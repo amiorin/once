@@ -101,13 +101,11 @@
            "no-infra" {:smtp_username (:no-infra-smtp-username opts)
                        :smtp_password (:no-infra-smtp-password opts)
                        :smtp_server (:no-infra-smtp-server opts)
-                       :smtp_port (:no-infra-smtp-port opts)
-                       :smtp_use_starttls true}
+                       :smtp_port (:no-infra-smtp-port opts)}
            "resend" {:smtp_username (:resend-username opts)
                      :smtp_password (:resend-password opts)
                      :smtp_server (:resend-server opts)
-                     :smtp_port (:resend-port opts)
-                     :smtp_use_starttls true}
+                     :smtp_port (:resend-port opts)}
            {})))
 
 (defn tofu-compute-step
@@ -125,9 +123,6 @@
         dir (tool-dir opts "tofu-smtp")
         specs [(template-spec (tool-template "tofu-smtp" provider "main.tf")
                               (str dir "/main.tf")
-                              opts)
-               (template-spec (tool-template "tofu-smtp" provider "mailrc")
-                              (str dir "/mailrc")
                               opts)]]
     (tofu-with-spec opts dir specs (fallback-smtp-params opts) :once/smtp-params)))
 

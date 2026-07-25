@@ -26,20 +26,6 @@
       retries: 10
       delay: 10
 
-    - name: Copy .mailrc
-      ansible.builtin.copy:
-        src: ../tofu-smtp/mailrc
-        dest: .mailrc
-        mode: "0600"
-
-    - name: Update cache and install s-nail
-      apt:
-        name: s-nail
-        state: present
-        update_cache: yes
-        cache_valid_time: 3600
-      become: yes
-
     - name: Install babashka
       ansible.builtin.shell: >-
         curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install

@@ -22,11 +22,6 @@ output "params" {
   value = {
     records = resend_domain.domain1.records
     id = resend_domain.domain1.id
-    smtp_username = "<{ resend-username }>"
-    smtp_password = "<{ resend-password }>"
-    smtp_server = "<{ resend-server }>"
-    smtp_port = "<{ resend-port }>"
-    smtp_use_starttls = true
   }
   sensitive = true
 }
