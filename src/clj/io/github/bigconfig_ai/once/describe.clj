@@ -1,9 +1,10 @@
 (ns io.github.bigconfig-ai.once.describe
   "Describe the active green desired state after provisioning.
 
-  The report shows configured providers, SSH reachability, and deployed ONCE
-  applications. Most live checks are soft failures; a missing remote `once`
-  command marks the step as failed."
+  The report shows configured providers, compute status, and deployed ONCE
+  applications. Compute is `absent` when OpenTofu holds no compute outputs,
+  `unreachable` when it does but SSH fails, and `running` otherwise; anything
+  but `running`, and a missing remote `once` command, marks the step failed."
   (:require
    [cheshire.core :as json]
    [clojure.string :as str]
@@ -74,11 +75,15 @@
    :smtp    (:provider-smtp params)
    :dns     (:provider-dns params)})
 
+(def ^:private placeholder-ip
+  "The address tools/fallback-compute-params renders with; never a real host."
+  "192.168.0.1")
+
 (defn- compute-target
   [{:keys [provider-compute ip user sudoer no-infra-compute-ip
            no-infra-compute-user no-infra-compute-sudoer]}]
   (let [ip (if (and (= provider-compute "no-infra")
-                    (or (str/blank? ip) (= "192.168.0.1" ip))
+                    (or (str/blank? ip) (= placeholder-ip ip))
                     (not (str/blank? no-infra-compute-ip)))
              no-infra-compute-ip
              ip)]
@@ -91,21 +96,28 @@
                "root")}))
 
 (defn- compute-status
-  [run-fn params]
-  (let [{:keys [ip] :as target} (compute-target params)]
+  "Classify compute as :running, :unreachable, or :absent.
+
+  An address can only reach the report through the tofu-compute outputs, so its
+  absence means the stage was never applied — except under `no-infra`, where
+  OpenTofu creates nothing and desired state supplies the host itself."
+  [run-fn params compute-detail]
+  (let [external? (= "no-infra" (:provider-compute params))
+        {:keys [ip] :as target} (compute-target params)]
     (cond
-      (str/blank? ip)
-      (assoc target :running? false :detail "missing IP address")
+      (or (str/blank? ip) (= placeholder-ip ip))
+      (if external?
+        (assoc target :status :unreachable :detail "no host configured")
+        (assoc target :status :absent
+               :detail (or compute-detail
+                           (str "no OpenTofu state in "
+                                (tools/tool-dir params "tofu-compute")))))
 
       :else
       (let [{:keys [ok?] :as result} (ssh-run run-fn target ["true"] ssh-probe-timeout-ms)]
         (assoc target
-               :running? (boolean ok?)
-               :detail (if ok?
-                         "ssh ok"
-                         (str (result-detail "ssh" result)
-                              (when (= "192.168.0.1" ip)
-                                "; no Tofu output found or host is down"))))))))
+               :status (if ok? :running :unreachable)
+               :detail (if ok? "ssh ok" (result-detail "ssh" result)))))))
 
 ;;; -------------------------------------------------------------- once list parsing
 
@@ -356,15 +368,21 @@
         smtp (tofu-output-params run-fn opts "tofu-smtp")
         details (remove str/blank? [(:detail compute) (:detail smtp)])]
     {:opts (merge opts (:params compute) (:params smtp))
-     :detail (when (seq details) (str/join "; " details))}))
+     :detail (when (seq details) (str/join "; " details))
+     :compute-detail (:detail compute)}))
 
 (defn- report
-  [opts run-fn resolve-detail]
+  [opts run-fn {:keys [detail compute-detail]}]
   (let [providers (provider-summary opts)
-        compute (cond-> (compute-status run-fn opts)
-                  resolve-detail (update :detail #(str % "; " resolve-detail)))
-        app-result (if (:running? compute)
-                     (remote-applications run-fn compute)
+        compute (compute-status run-fn opts compute-detail)
+        ;; an absent compute already carries its own explanation
+        compute (cond-> compute
+                  (and detail (not= :absent (:status compute)))
+                  (update :detail #(str % "; " detail)))
+        app-result (case (:status compute)
+                     :running (remote-applications run-fn compute)
+                     :absent {:ok? false
+                              :detail "not checked because compute has not been created"}
                      {:ok? false
                       :detail "not checked because compute is not reachable"})]
     {:profile (:profile opts)
@@ -381,16 +399,16 @@
   The two-argument arity accepts an injected command runner and treats `opts`
   as already resolved, keeping report construction process-free in tests."
   ([opts]
-   (let [{opts' :opts detail :detail} (resolve-tofu-opts opts run)]
-     (report opts' run detail)))
+   (let [{opts' :opts :as resolved} (resolve-tofu-opts opts run)]
+     (report opts' run (dissoc resolved :opts))))
   ([opts run-fn]
    (report opts run-fn nil))
   ([opts run-fn opts-fn]
    (try
      (report (opts-fn opts) run-fn nil)
      (catch Exception e
-       (report opts run-fn (str "could not resolve OpenTofu parameters: "
-                                (.getMessage e)))))))
+       (let [detail (str "could not resolve OpenTofu parameters: " (.getMessage e))]
+         (report opts run-fn {:detail detail :compute-detail detail}))))))
 
 ;;; -------------------------------------------------------------- reporting
 
@@ -419,7 +437,7 @@
   (println (format "  IP: %s" (present (:ip compute))))
   (println (format "  SSH user: %s" (present (:user compute))))
   (println (format "  Status: %s%s"
-                   (if (:running? compute) "running" "not reachable")
+                   (name (or (:status compute) :unknown))
                    (if-let [detail (not-empty (:detail compute))]
                      (format " (%s)" detail)
                      "")))
@@ -448,6 +466,14 @@
         (when registry-detail
           (println (format "    registry check: %s" registry-detail)))))))
 
+(defn- compute-error
+  "The failure message for compute that is anything but running."
+  [{:keys [status detail]}]
+  (when-not (= :running status)
+    (format "compute is %s%s"
+            (name (or status :unknown))
+            (if-let [detail (not-empty detail)] (str " — " detail) ""))))
+
 (defn describe
   "Print the report and return green's Unix-style outcome map."
   [opts]
@@ -455,7 +481,12 @@
     (print-report result)
     (merge opts
            {::result result}
-           (if (:fatal-error? result)
+           (cond
+             (:fatal-error? result)
              {:green/exit 1
               :green/err (or (:applications-error result) "describe failed")}
-             {:green/exit 0}))))
+
+             (compute-error (:compute result))
+             {:green/exit 1 :green/err (compute-error (:compute result))}
+
+             :else {:green/exit 0}))))

@@ -1025,7 +1025,20 @@ ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
     <section id="describe">
       <h2 class="anchor-heading"><a href="#describe" aria-label="Link to Describe">#</a>Describe</h2>
       <pre><code class="language-bash">./green describe</code></pre>
-      <p>Describe reads compute and SMTP outputs from their OpenTofu state, reports the selected providers, probes the server over SSH, and runs <code>sudo -n once list</code> when the host is reachable. For each application it compares the running image digest against the registry with <code>skopeo</code> and reports whether an update is available. Connectivity problems are reported without changing infrastructure; only a missing remote <code>once</code> command exits non-zero.</p>
+      <p>Describe reads compute and SMTP outputs from their OpenTofu state, reports the selected providers, probes the server over SSH, and runs <code>sudo -n once list</code> when the host is reachable. For each application it compares the running image digest against the registry with <code>skopeo</code> and reports whether an update is available. Nothing it does changes infrastructure.</p>
+      <p>Compute is reported as one of three states:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>running</code></td><td>OpenTofu holds compute outputs and SSH succeeded.</td></tr>
+            <tr><td><code>unreachable</code></td><td>The server exists in state, but SSH failed — it may be booting, firewalled, or down. The address is shown so you can investigate it.</td></tr>
+            <tr><td><code>absent</code></td><td>The <code>tofu-compute</code> stage has no outputs to read, so the server was never created — or its state is not reachable from here. Run <code>./green create</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Under <code>no-infra</code> the host is yours rather than OpenTofu's, so it is never reported as <code>absent</code>; without a configured address it reports <code>unreachable (no host configured)</code>.</p>
+      <p>Describe exits non-zero unless compute is <code>running</code>, and also when the remote <code>once</code> command is missing. Every other live check is a soft failure named in the report.</p>
       <p>For a remote backend, make sure its credentials are present so OpenTofu outputs can be read. The compute private key must be available to SSH.</p>
     </section>
 

@@ -3,7 +3,8 @@
    [cheshire.core :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [io.github.bigconfig-ai.once.describe :as d]))
+   [io.github.bigconfig-ai.once.describe :as d]
+   [io.github.bigconfig-ai.once.tools :as tools]))
 
 (def ^:private base-opts
   {:profile "test"
@@ -115,7 +116,7 @@
       (#'d/resolve-tofu-opts (assoc base-opts :provider-backend "local") run-fn)
       (is (every? (fn [[_ o]] (nil? (:extra-env o))) @calls)))))
 
-(deftest describe-ssh-failure-soft-fails-and-skips-remote-apps
+(deftest describe-ssh-failure-reports-unreachable-and-skips-remote-apps
   (let [calls  (atom [])
         run-fn (fn [args _opts]
                  (swap! calls conj args)
@@ -123,10 +124,53 @@
                    (throw (ex-info "remote apps should not be checked" {})))
                  (fail "Permission denied"))
         result (d/describe-report base-opts run-fn)]
-    (is (false? (get-in result [:compute :running?])))
+    (is (= :unreachable (get-in result [:compute :status])))
+    (is (str/includes? (get-in result [:compute :detail]) "ssh failed"))
     (is (= [] (:applications result)))
-    (is (str/includes? (:applications-error result) "not checked"))
+    (is (= "not checked because compute is not reachable" (:applications-error result)))
     (is (= 1 (count @calls)))))
+
+(deftest describe-without-compute-state-reports-absent-and-probes-nothing
+  (testing "no outputs at all names the work directory"
+    (let [calls  (atom [])
+          run-fn (fn [args _opts]
+                   (swap! calls conj args)
+                   (ok "{}"))
+          result (d/describe-report (dissoc base-opts :ip) run-fn)]
+      (is (= :absent (get-in result [:compute :status])))
+      (is (= (str "no OpenTofu state in " (tools/tool-dir base-opts "tofu-compute"))
+             (get-in result [:compute :detail])))
+      (is (= "not checked because compute has not been created"
+             (:applications-error result)))
+      (is (empty? @calls) "no ssh probe without an address")))
+  (testing "a failed state read explains itself instead"
+    (let [run-fn (fn [args _opts]
+                   (if (= ["tofu" "output" "-json"] args)
+                     (fail "Backend initialization required")
+                     (throw (ex-info "unexpected command" {:args args}))))
+          {:keys [compute-detail]} (#'d/resolve-tofu-opts (dissoc base-opts :ip) run-fn)
+          result (#'d/report (dissoc base-opts :ip) run-fn {:compute-detail compute-detail})]
+      (is (= :absent (get-in result [:compute :status])))
+      (is (str/includes? (get-in result [:compute :detail])
+                         "Backend initialization required")))))
+
+(deftest describe-no-infra-host-is-never-absent
+  (let [opts   (-> base-opts
+                   (dissoc :ip)
+                   (assoc :provider-compute "no-infra"))
+        run-fn (fn [args _opts] (throw (ex-info "unexpected command" {:args args})))
+        result (d/describe-report opts run-fn)]
+    (is (= :unreachable (get-in result [:compute :status])))
+    (is (= "no host configured" (get-in result [:compute :detail]))))
+  (testing "a configured host is probed as usual"
+    (let [opts   (-> base-opts
+                     (dissoc :ip)
+                     (assoc :provider-compute "no-infra"
+                            :no-infra-compute-ip "10.0.0.5"))
+          run-fn (fn [_args _opts] (fail "Connection refused"))
+          result (d/describe-report opts run-fn)]
+      (is (= :unreachable (get-in result [:compute :status])))
+      (is (str/includes? (get-in result [:compute :detail]) "ssh failed")))))
 
 (deftest describe-remote-command-failure-keeps-compute-running
   (let [run-fn (fn [args _opts]
@@ -137,7 +181,7 @@
                      (= ["sudo" "-n" "once" "list"] cmd) (fail "once missing")
                      :else (throw (ex-info "unexpected command" {:args args})))))
         result (d/describe-report base-opts run-fn)]
-    (is (true? (get-in result [:compute :running?])))
+    (is (= :running (get-in result [:compute :status])))
     (is (= [] (:applications result)))
     (is (false? (:fatal-error? result)))
     (is (str/includes? (:applications-error result) "once list failed"))))
@@ -153,34 +197,46 @@
                                                    :err "once: command not found"}
                      :else (throw (ex-info "unexpected command" {:args args})))))
         result (d/describe-report base-opts run-fn)]
-    (is (true? (get-in result [:compute :running?])))
+    (is (= :running (get-in result [:compute :status])))
     (is (= [] (:applications result)))
     (is (true? (:fatal-error? result)))
     (is (str/includes? (:applications-error result) "once command check failed"))))
 
+(defn- describe-with
+  [report]
+  (with-redefs [d/describe-report (constantly (merge {:profile "test"
+                                                      :providers {}
+                                                      :applications []
+                                                      :fatal-error? false}
+                                                     report))]
+    (let [result (atom nil)
+          out (with-out-str (reset! result (d/describe base-opts)))]
+      (assoc @result ::out out))))
+
 (deftest describe-workflow-step-sets-exit-status
-  (testing "soft report succeeds"
-    (with-redefs [d/describe-report (constantly {:profile "test"
-                                                 :providers {}
-                                                 :compute {}
-                                                 :applications []
-                                                 :fatal-error? false})]
-      (let [result (atom nil)]
-        (with-out-str
-          (reset! result (d/describe base-opts)))
-        (is (= 0 (:green/exit @result)))
-        (is (false? (get-in @result [::d/result :fatal-error?]))))))
+  (testing "a running host succeeds"
+    (let [result (describe-with {:compute {:status :running :detail "ssh ok"}})]
+      (is (= 0 (:green/exit result)))
+      (is (false? (get-in result [::d/result :fatal-error?])))
+      (is (str/includes? (::out result) "Status: running (ssh ok)"))))
   (testing "fatal report fails"
-    (with-redefs [d/describe-report (constantly {:profile "test"
-                                                 :providers {}
-                                                 :compute {}
-                                                 :applications []
-                                                 :fatal-error? true})]
-      (let [result (atom nil)]
-        (with-out-str
-          (reset! result (d/describe base-opts)))
-        (is (= 1 (:green/exit @result)))
-        (is (= "describe failed" (:green/err @result)))))))
+    (let [result (describe-with {:compute {:status :running} :fatal-error? true})]
+      (is (= 1 (:green/exit result)))
+      (is (= "describe failed" (:green/err result)))))
+  (testing "a provisioned but unreachable host fails"
+    (let [result (describe-with {:compute {:status :unreachable
+                                           :detail "ssh failed (exit 255) — Connection refused"}})]
+      (is (= 1 (:green/exit result)))
+      (is (= "compute is unreachable — ssh failed (exit 255) — Connection refused"
+             (:green/err result)))
+      (is (str/includes? (::out result) "Status: unreachable (ssh failed"))))
+  (testing "a host that was never created fails and says so"
+    (let [result (describe-with {:compute {:status :absent
+                                           :detail "no OpenTofu state in .green/test/tofu-compute"}})]
+      (is (= 1 (:green/exit result)))
+      (is (= "compute is absent — no OpenTofu state in .green/test/tofu-compute"
+             (:green/err result)))
+      (is (str/includes? (::out result) "Status: absent (no OpenTofu state in")))))
 
 (deftest describe-success-reports-image-digests-and-update-status
   (let [container {:Id "container-1"

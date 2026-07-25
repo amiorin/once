@@ -35,7 +35,7 @@ green/
 ├── src/
 │   ├── clj/io/github/bigconfig_ai/once/
 │   │   ├── tools.clj        # the six step functions, template specs, generated JSON
-│   │   ├── describe.clj     # post-provisioning report (providers, SSH, deployed apps)
+│   │   ├── describe.clj     # post-provisioning report (providers, compute status, apps)
 │   │   └── utils.clj        # contract number, GREEN_PAR_* overlay, zone derivation, process + YAML helpers
 │   └── resources/io/github/bigconfig-ai/once/
 │       ├── raw              # `<{ content|safe }>` — the template used for generated content
@@ -65,7 +65,7 @@ bb green build                 # render <workdir>/<profile>/ only, no tofu, no a
 bb green create                # provision and configure
 bb green create --dry-run      # print the DAG actions, touch nothing
 bb green delete                # destroy, in reverse
-bb green describe              # providers, SSH status, deployed apps, image updates
+bb green describe              # providers, compute status, deployed apps, image updates
 bb green pin                   # stamp the launcher with this repository's HEAD
 
 bb green build -f production.edn   # -f/--file selects a desired-state file (default: ./green.edn)

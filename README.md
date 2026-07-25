@@ -145,8 +145,11 @@ real `delete` validates provider credentials and refuses while
 `:compute-prevent-destroy` is true.
 
 `describe` reads compute and SMTP values from their OpenTofu state before
-probing the remote host. Infrastructure connectivity failures are reported as
-soft failures; a missing remote `once` command produces a non-zero exit.
+probing the remote host. Compute is reported as `running`, `unreachable` (state
+holds an address but SSH failed) or `absent` (the `tofu-compute` stage has no
+outputs, so nothing was created); a `no-infra` host is never `absent`. Anything
+but `running`, and a missing remote `once` command, produces a non-zero exit;
+the remaining live checks are soft failures named in the report.
 
 ## Providers and generated configuration
 
