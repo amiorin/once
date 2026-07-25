@@ -637,7 +637,7 @@
             <tr><td><code>Node.js</code> / <code>npx</code></td><td>Loading the skill</td><td>Only needed to run the Skills CLI.</td></tr>
             <tr><td><code>Babashka</code></td><td>All launcher commands</td><td>Runs the generated <code>green</code> script.</td></tr>
             <tr><td><code>OpenTofu</code></td><td>Real create, delete, and state-backed describe</td><td>Manages compute, SMTP, DNS, and verification state.</td></tr>
-            <tr><td><code>Ansible</code></td><td>Real create</td><td>Configures the remote host and ONCE applications.</td></tr>
+            <tr><td><code>Ansible</code></td><td>Real create and delete</td><td>Configures the remote host and ONCE applications; delete replays the local play to drop the managed SSH block.</td></tr>
             <tr><td><code>OpenSSH</code></td><td>Create and describe</td><td>Private compute key should already be available through <code>ssh-agent</code>.</td></tr>
             <tr><td><code>skopeo</code></td><td>Describe</td><td>Compares the running image digest against the registry. Without it, updates report as unknown.</td></tr>
           </tbody>
@@ -720,8 +720,7 @@ start + validation ─┤                ├─ tofu-dns ─ tofu-smtp-post ─�
       <pre><code class="language-clojure">{:profile "production"
  :workdir ".green"
 
- :compute-pubkey "ssh-ed25519 AAAA... operator"
- :deploy-pubkey  "ssh-ed25519 AAAA... ci-deploy"
+ :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
 
  :once {:applications
         [{:host "www.example.com"
@@ -785,7 +784,7 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
       <ul>
         <li>The work directory is generated output and should be ignored by Git.</li>
         <li>Local OpenTofu state remains in each tool directory. S3 and R2 use remote keys of the form <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</li>
-        <li>Generated Ansible files contain environment lookups, not application or SMTP secret values.</li>
+        <li>Generated Ansible files contain environment lookups, not application or SMTP secret values — provided each application's <code>:env</code> uses the map form, which is the one that defers to a <code>GREEN_PAR_*</code> lookup.</li>
         <li><code>apps.tf.json</code> and <code>smtp.tf.json</code> are generated only for the Cloudflare DNS provider; <code>no-infra</code> renders <code>main.tf</code> alone.</li>
         <li>The <code>ansible-local</code> play writes a managed <code>Host &lt;profile&gt;</code> block into <code>~/.ssh/config</code>, delimited by its own markers. Delete removes that block and leaves the rest of the file untouched.</li>
       </ul>
@@ -909,9 +908,8 @@ done</code></pre>
 :no-infra-compute-ip "203.0.113.10"
 :no-infra-compute-user "root"
 :no-infra-compute-sudoer "root"
-:no-infra-compute-uid 0
-:no-infra-compute-name "once"</code></pre>
-      <p>No compute resource or API credential is required. The server must be reachable using the configured user and an SSH identity already loaded into <code>ssh-agent</code>. <code>:compute-pubkey</code> may be omitted.</p>
+:no-infra-compute-uid 0</code></pre>
+      <p>No compute resource or API credential is required. The server must be reachable using the configured user and an SSH identity already loaded into <code>ssh-agent</code>. The host is reported under <code>:profile</code>, so it needs no name of its own.</p>
     </section>
 
     <section id="smtp-providers">
@@ -1104,8 +1102,12 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <p>Set the named variable through your private environment loader or secret manager. Check presence only; do not print the value. Application variable names come from each application's <code>:env</code> map.</p>
 
       <h3><code>:env must map container names...</code></h3>
-      <p>Use a map, not a vector of <code>KEY=value</code> strings:</p>
+      <p>The error fires when <code>:env</code> is neither a map nor a list — a bare string or number, say. Use the map form:</p>
       <pre><code class="language-clojure">:env {"DATABASE_URL" :site-database-url}</code></pre>
+      <div class="callout warning">
+        <span class="callout-title">A list <code>:env</code> is accepted, and written out literally</span>
+        <p>A vector of <code>"KEY=value"</code> strings passes validation and is copied verbatim into the rendered Ansible file. That is fine for a non-secret value such as <code>["TARGET_EMAIL=forms@example.com"]</code>, but it is the one form that puts its values on disk. Anything secret belongs in the map form, which renders an environment lookup instead.</p>
+      </div>
 
       <h3>Compute destruction is protected</h3>
       <p>This is expected. First run <code>./green delete --dry-run</code>. After explicit approval, set <code>GREEN_PAR_COMPUTE_PREVENT_DESTROY=false</code> only for the real delete command.</p>
@@ -1137,8 +1139,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <pre><code class="language-clojure">{:profile "production"
  :workdir ".green"
 
- :compute-pubkey "ssh-ed25519 AAAAC3... operator"
- :deploy-pubkey  "ssh-ed25519 AAAAC3... ci-deploy"
+ :deploy-pubkey "ssh-ed25519 AAAAC3... ci-deploy"
 
  :once
  {:applications
@@ -1197,7 +1198,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
             <tr><td>DigitalOcean</td><td><code>:digitalocean-name</code>, <code>:digitalocean-region</code>, <code>:digitalocean-size</code>, <code>:digitalocean-image</code>, <code>:digitalocean-ssh-keys</code>; optional <code>:digitalocean-vpc-uuid</code></td></tr>
             <tr><td>Hetzner</td><td><code>:hcloud-name</code>, <code>:hcloud-image</code>, <code>:hcloud-server-type</code>, <code>:hcloud-location</code>, <code>:hcloud-ssh-keys</code></td></tr>
             <tr><td>OCI</td><td><code>:oci-config-file-profile</code>, <code>:oci-subnet-id</code>, <code>:oci-compartment-id</code>, <code>:oci-availability-domain</code>, <code>:oci-display-name</code>, <code>:oci-shape</code>, <code>:oci-ocpus</code>, <code>:oci-memory-in-gbs</code>, <code>:oci-boot-volume-size-in-gbs</code>, <code>:oci-boot-volume-vpus-per-gb</code>, <code>:oci-ssh-authorized-keys</code></td></tr>
-            <tr><td>Existing compute</td><td><code>:no-infra-compute-ip</code>, <code>:no-infra-compute-user</code>, <code>:no-infra-compute-sudoer</code>, <code>:no-infra-compute-uid</code>; optional <code>:no-infra-compute-name</code></td></tr>
+            <tr><td>Existing compute</td><td><code>:no-infra-compute-ip</code>, <code>:no-infra-compute-user</code>, <code>:no-infra-compute-sudoer</code>, <code>:no-infra-compute-uid</code></td></tr>
             <tr><td>Resend</td><td>None — the relay is hard-coded</td></tr>
             <tr><td>Existing SMTP</td><td><code>:no-infra-smtp-server</code>, <code>:no-infra-smtp-port</code>, <code>:no-infra-smtp-username</code></td></tr>
             <tr><td>S3 backend</td><td><code>:s3-bucket</code>, <code>:s3-region</code></td></tr>

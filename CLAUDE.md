@@ -230,4 +230,4 @@ Stay on the `green` branch — each language has its own branch in this reposito
 - Do not put credentials, tokens, or private keys in source, in `green.edn`, or in a rendered file. `.envrc.private` is the local channel.
 - Do not give the launcher a dependency outside `green`, `once`, and Babashka's built-ins: it has to work as a lone file copied into a stranger's project.
 - Do not hand-edit `once-sha` / `green-sha`; run `bb green pin`.
-- When desired state changes, update all four surfaces that document it: `green.edn`, `green-once/references/configuration.md`, `green-once/SKILL.md`, and `index.html`.
+- When desired state changes, update all five surfaces that document it: `green.edn`, `green-once/references/configuration.md`, `green-once/SKILL.md`, `index.html`, and `README.md`.

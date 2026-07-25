@@ -19,7 +19,6 @@
 {:profile "default"
  :workdir ".green"
 
- :compute-pubkey "REPLACE_ME"
  :deploy-pubkey "REPLACE_ME"
 
  ;; Every application gets its own proxied A record; there is no implicit apex
@@ -77,5 +76,4 @@
  :no-infra-compute-ip "REPLACE_ME"
  :no-infra-compute-user "REPLACE_ME"
  :no-infra-compute-sudoer "REPLACE_ME"
- :no-infra-compute-uid "REPLACE_ME"
- :no-infra-compute-name "REPLACE_ME"}
+ :no-infra-compute-uid "REPLACE_ME"}

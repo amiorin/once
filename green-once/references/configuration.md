@@ -96,10 +96,9 @@ No credential variable is required: OCI authenticates through the named profile 
 :no-infra-compute-user "root"
 :no-infra-compute-sudoer "root"
 :no-infra-compute-uid 0
-:no-infra-compute-name "once"
 ```
 
-No compute API credential is required. SSH authentication must already work through `ssh-agent`.
+No compute API credential is required. SSH authentication must already work through `ssh-agent`. The host is reported under `:profile`, so it needs no name of its own.
 
 ## SMTP providers
 
