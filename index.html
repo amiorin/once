@@ -838,6 +838,7 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
             <tr><td>DigitalOcean</td><td><code>GREEN_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Hetzner Cloud</td><td><code>GREEN_PAR_HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Oracle Cloud</td><td>None — authenticates through the <code>:oci-config-file-profile</code> entry in <code>~/.oci/config</code></td><td>—</td></tr>
+            <tr><td>Yandex Cloud</td><td><code>GREEN_PAR_YC_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Resend</td><td><code>GREEN_PAR_RESEND_API_KEY</code>, <code>GREEN_PAR_RESEND_PASSWORD</code></td><td>Create and delete</td></tr>
             <tr><td>Existing SMTP</td><td><code>GREEN_PAR_NO_INFRA_SMTP_PASSWORD</code></td><td>Create and delete</td></tr>
             <tr><td>Cloudflare DNS</td><td><code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code></td><td>Create and delete</td></tr>
@@ -900,6 +901,22 @@ done</code></pre>
 :oci-boot-volume-vpus-per-gb 30
 :oci-ssh-authorized-keys "/home/user/.ssh/once.pub"</code></pre>
       <p>The current default shape is ARM-based. <code>:oci-ssh-authorized-keys</code> is a path to a public-key file on the machine running the launcher; its contents are written into instance metadata at plan time. OCI authenticates through the named profile in <code>~/.oci/config</code>, so no credential variable is required.</p>
+
+      <h3>Yandex Cloud</h3>
+      <pre><code class="language-clojure">:provider-compute "yandex"
+:compute-pubkey "ssh-ed25519 AAAA... admin"
+:yandex-cloud-id "b1g..."
+:yandex-folder-id "b1g..."
+:yandex-zone "ru-central1-a"
+:yandex-name "once"
+:yandex-platform-id "standard-v3"
+:yandex-cores 2
+:yandex-memory-gb 4
+:yandex-core-fraction 100
+:yandex-image-family "ubuntu-2404-lts"
+:yandex-disk-size-gb 30
+:yandex-subnet-cidr "10.10.0.0/24"</code></pre>
+      <p>Self-contained: creates a VPC network and subnet with the given CIDR, resolves the newest image of <code>:yandex-image-family</code>, and provisions the VM with a NAT'd public address. Yandex has no account-level SSH key registry, so <code>:compute-pubkey</code> is required here — it is written into instance metadata as the <code>ubuntu</code> user's authorized key. Credential: <code>GREEN_PAR_YC_TOKEN</code>. Yandex Object Storage can hold the OpenTofu state through the <code>r2</code> backend with <code>:r2-endpoint "https://storage.yandexcloud.net"</code>.</p>
 
       <h3>Existing server</h3>
       <pre><code class="language-clojure">:provider-compute "no-infra"

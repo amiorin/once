@@ -35,7 +35,7 @@ There is no domain key. The application hostnames are the source of truth: the D
 
 `:deploy-pubkey` is required. It authorizes only `sudo once update <configured-host>` through a remote ForceCommand. Private keys remain outside the project and should be loaded in `ssh-agent`.
 
-`:compute-pubkey` is accepted but currently unused: each compute provider references a key already registered with it (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file (`:oci-ssh-authorized-keys`). If present it must still look like a public key.
+`:compute-pubkey` is consumed only by the Yandex provider, which has no account-level key registry: the key is written into instance metadata for the `ubuntu` user, so it is required when `:provider-compute` is `"yandex"`. The other cloud providers reference a key already registered with them (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file (`:oci-ssh-authorized-keys`). If present it must still look like a public key.
 
 ## Compute providers
 
@@ -85,6 +85,26 @@ Required credential: `GREEN_PAR_HCLOUD_TOKEN`.
 ```
 
 No credential variable is required: OCI authenticates through the named profile in `~/.oci/config`. `:oci-ssh-authorized-keys` is a path to a public-key file on the machine running the launcher, read at plan time.
+
+### Yandex Cloud
+
+```clojure
+:provider-compute "yandex"
+:compute-pubkey "ssh-ed25519 AAAA... admin"
+:yandex-cloud-id "b1g..."
+:yandex-folder-id "b1g..."
+:yandex-zone "ru-central1-a"
+:yandex-name "once"
+:yandex-platform-id "standard-v3"
+:yandex-cores 2
+:yandex-memory-gb 4
+:yandex-core-fraction 100
+:yandex-image-family "ubuntu-2404-lts"
+:yandex-disk-size-gb 30
+:yandex-subnet-cidr "10.10.0.0/24"
+```
+
+Required credential: `GREEN_PAR_YC_TOKEN` (an OAuth or IAM token; `yc iam create-token` issues one). The template is self-contained: it creates a VPC network and subnet with the given CIDR, resolves the newest image of `:yandex-image-family`, and provisions the VM with a NAT'd public address. Yandex has no account-level SSH key registry, so `:compute-pubkey` is required and is written into instance metadata as the `ubuntu` user's authorized key. Yandex Object Storage can hold the OpenTofu state through the `r2` backend with `:r2-endpoint "https://storage.yandexcloud.net"` and a service-account static key.
 
 ### Existing server
 

@@ -56,6 +56,7 @@
   files, where they would sit in plaintext under the work directory."
   {:do-token "DIGITALOCEAN_TOKEN"
    :hcloud-token "HCLOUD_TOKEN"
+   :yc-token "YC_TOKEN"
    :resend-api-key "RESEND_API_KEY"
    :cloudflare-api-token "CLOUDFLARE_API_TOKEN"
    :r2-access-key-id "AWS_ACCESS_KEY_ID"
@@ -122,6 +123,11 @@
              :uid "1001"
              :name name
              :user "ubuntu"}
+      "yandex" {:ip "192.168.0.1"
+                :sudoer "ubuntu"
+                :uid "1000"
+                :name name
+                :user "ubuntu"}
       "no-infra" (cond-> {:ip (or (:no-infra-compute-ip opts) "192.168.0.1")
                             :sudoer (or (:no-infra-compute-sudoer opts) "root")
                             :name name
@@ -159,7 +165,7 @@
                               (str dir "/main.tf")
                               opts)]]
     (tofu-with-spec opts dir specs (fallback-compute-params opts) :once/compute-params
-                    (credential-env opts [:do-token :hcloud-token]))))
+                    (credential-env opts [:do-token :hcloud-token :yc-token]))))
 
 (defn- with-zone
   "Templates that name the DNS zone read `zone`, which no key in desired state

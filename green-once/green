@@ -31,7 +31,7 @@
   "Minimum io.github.bigconfig-ai/once contract this launcher requires.
   Guarded at run time so a stale pin fails loudly instead of rendering
   templates from an older commit."
-  3)
+  4)
 
 ;; Managed by `green pin` — do not edit by hand.
 (def ^:private once-sha "03ac70a9814d024573bd21ae37b33ebaaf0d054c")
@@ -96,7 +96,7 @@
   [k]
   (str "GREEN_PAR_" (-> (name k) str/upper-case (str/replace "-" "_"))))
 
-(def ^:private compute-providers #{"digitalocean" "hcloud" "oci" "no-infra"})
+(def ^:private compute-providers #{"digitalocean" "hcloud" "oci" "yandex" "no-infra"})
 (def ^:private smtp-providers #{"resend" "no-infra"})
 (def ^:private dns-providers #{"cloudflare" "no-infra"})
 (def ^:private backend-providers #{"local" "s3" "r2"})
@@ -111,6 +111,12 @@
           :oci-availability-domain :oci-display-name :oci-shape :oci-ocpus
           :oci-memory-in-gbs :oci-boot-volume-size-in-gbs
           :oci-boot-volume-vpus-per-gb :oci-ssh-authorized-keys]
+   ;; Yandex has no account-level SSH key registry, so :compute-pubkey is
+   ;; interpolated into instance metadata and becomes required here.
+   "yandex" [:compute-pubkey :yandex-cloud-id :yandex-folder-id :yandex-zone
+             :yandex-name :yandex-platform-id :yandex-cores :yandex-memory-gb
+             :yandex-core-fraction :yandex-image-family :yandex-disk-size-gb
+             :yandex-subnet-cidr]
    "no-infra" [:no-infra-compute-ip :no-infra-compute-user
                :no-infra-compute-sudoer :no-infra-compute-uid]})
 
@@ -128,7 +134,8 @@
 
 ;; Credential keys, expected from GREEN_PAR_* rather than green.edn.
 (def ^:private compute-secrets
-  {"digitalocean" [:do-token] "hcloud" [:hcloud-token] "oci" [] "no-infra" []})
+  {"digitalocean" [:do-token] "hcloud" [:hcloud-token] "oci" []
+   "yandex" [:yc-token] "no-infra" []})
 
 (def ^:private smtp-secrets
   {"resend" [:resend-api-key :resend-password]

@@ -9,6 +9,7 @@
 ;;   digitalocean   GREEN_PAR_DO_TOKEN
 ;;   hcloud         GREEN_PAR_HCLOUD_TOKEN
 ;;   oci            (none — uses :oci-config-file-profile from ~/.oci/config)
+;;   yandex         GREEN_PAR_YC_TOKEN
 ;;   resend         GREEN_PAR_RESEND_API_KEY GREEN_PAR_RESEND_PASSWORD
 ;;   no-infra smtp  GREEN_PAR_NO_INFRA_SMTP_PASSWORD
 ;;   cloudflare     GREEN_PAR_CLOUDFLARE_API_TOKEN
@@ -71,6 +72,21 @@
  :digitalocean-image "ubuntu-25-10-x64"
  :digitalocean-vpc-uuid "REPLACE_ME"
  :digitalocean-ssh-keys "REPLACE_ME"
+
+ ;; Yandex is the one compute provider that consumes :compute-pubkey — the
+ ;; account has no SSH key registry, so the key is written into instance
+ ;; metadata for the ubuntu user.
+ :yandex-cloud-id "REPLACE_ME"
+ :yandex-folder-id "REPLACE_ME"
+ :yandex-zone "ru-central1-a"
+ :yandex-name "once"
+ :yandex-platform-id "standard-v3"
+ :yandex-cores 2
+ :yandex-memory-gb 4
+ :yandex-core-fraction 100
+ :yandex-image-family "ubuntu-2404-lts"
+ :yandex-disk-size-gb 30
+ :yandex-subnet-cidr "10.10.0.0/24"
 
  :no-infra-compute-ip "REPLACE_ME"
  :no-infra-compute-user "REPLACE_ME"

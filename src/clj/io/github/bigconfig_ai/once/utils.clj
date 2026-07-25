@@ -13,8 +13,10 @@
   2: tools/backend-credential-env, which the launcher calls to read Tofu state.
   3: desired state drops :domain and :package. The DNS zone is derived from the
      application hosts through utils/apps-domain, and :profile alone names the
-     stack."
-  3)
+     stack.
+  4: the yandex compute provider — the tofu/yandex template, the :yandex-*
+     desired-state keys, and :yc-token passed to tofu as YC_TOKEN."
+  4)
 
 (defn strip-ansi [s]
   (-> s

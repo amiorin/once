@@ -40,7 +40,7 @@ green/
 │   └── resources/io/github/bigconfig-ai/once/
 │       ├── raw              # `<{ content|safe }>` — the template used for generated content
 │       └── tools/
-│           ├── tofu/{digitalocean,hcloud,oci,no-infra}/main.tf
+│           ├── tofu/{digitalocean,hcloud,oci,yandex,no-infra}/main.tf
 │           ├── tofu-smtp/{resend,no-infra}/main.tf
 │           ├── tofu-dns/{cloudflare,no-infra}/main.tf
 │           ├── tofu-smtp-post/{resend,no-infra}/main.tf
@@ -88,7 +88,7 @@ A single flat EDN map, except for the nested `:once {:applications [...]}` colle
  :once {:applications [{:host "www.example.com"
                         :image "ghcr.io/example/site:latest"
                         :env {"DATABASE_URL" :app-database-url}}]}
- :provider-compute "digitalocean"  ; digitalocean | hcloud | oci | no-infra
+ :provider-compute "digitalocean"  ; digitalocean | hcloud | oci | yandex | no-infra
  :provider-smtp "resend"           ; resend | no-infra
  :provider-dns "cloudflare"        ; cloudflare | no-infra
  :provider-backend "r2"            ; local | s3 | r2

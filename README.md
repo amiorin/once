@@ -72,7 +72,7 @@ nested `:once {:applications [...]}` collection:
  :once {:applications [{:host "www.example.com"
                         :image "ghcr.io/example/site:latest"
                         :env {"DATABASE_URL" :app-database-url}}]}
- :provider-compute "digitalocean" ; digitalocean, hcloud, oci, no-infra
+ :provider-compute "digitalocean" ; digitalocean, hcloud, oci, yandex, no-infra
  :provider-smtp "resend"          ; resend, no-infra
  :provider-dns "cloudflare"       ; cloudflare, no-infra
  :provider-backend "r2"           ; r2, s3, local
@@ -97,6 +97,7 @@ the value it replaces:
 
 ```bash
 export GREEN_PAR_DO_TOKEN="..."
+export GREEN_PAR_YC_TOKEN="..."
 export GREEN_PAR_CLOUDFLARE_API_TOKEN="..."
 export GREEN_PAR_RESEND_API_KEY="..."
 export GREEN_PAR_RESEND_PASSWORD="..."
@@ -148,8 +149,8 @@ soft failures; a missing remote `once` command produces a non-zero exit.
 
 ## Providers and generated configuration
 
-- Compute templates: DigitalOcean, Hetzner Cloud, OCI, and an existing
-  `no-infra` host.
+- Compute templates: DigitalOcean, Hetzner Cloud, OCI, Yandex Cloud, and an
+  existing `no-infra` host.
 - SMTP templates: Resend or `no-infra` SMTP settings.
 - DNS templates: Cloudflare or `no-infra`; the per-application and Resend DNS
   records are generated as `apps.tf.json` and `smtp.tf.json` at the
