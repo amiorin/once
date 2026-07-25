@@ -13,27 +13,12 @@ provider "cloudflare" {
 
 data "cloudflare_zone" "domain" {
   filter = {
-    name = "<{ domain }>"
+    name = "<{ zone }>"
   }
 }
 
-resource "cloudflare_dns_record" "star_record" {
-  zone_id = data.cloudflare_zone.domain.id
-  name    = "*"
-  content = "<{ ip }>"
-  type    = "A"
-  proxied = true
-  ttl     = 1
-}
-
-resource "cloudflare_dns_record" "at_record" {
-  zone_id = data.cloudflare_zone.domain.id
-  name    = "@"
-  content = "<{ ip }>"
-  type    = "A"
-  proxied = true
-  ttl     = 1
-}
+# The A records live in apps.tf.json: one per application host, generated from
+# the desired-state application list.
 
 resource "cloudflare_zone_setting" "common_settings" {
   for_each = {

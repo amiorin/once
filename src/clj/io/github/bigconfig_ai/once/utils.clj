@@ -10,8 +10,11 @@
   older commit could not survive; the launcher refuses to run against a lower
   number and tells the user to repin.
 
-  2: tools/backend-credential-env, which the launcher calls to read Tofu state."
-  2)
+  2: tools/backend-credential-env, which the launcher calls to read Tofu state.
+  3: desired state drops :domain and :package. The DNS zone is derived from the
+     application hosts through utils/apps-domain, and :profile alone names the
+     stack."
+  3)
 
 (defn strip-ansi [s]
   (-> s
@@ -82,6 +85,22 @@
                   (if (str/blank? captured) timeout (str captured "\n" timeout)))})))
     (catch Exception e
       {:ok? false :exit -1 :out "" :err (or (.getMessage e) (str (class e)))})))
+
+(defn registrable-domain
+  "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes
+  such as co.uk are not recognised — a host under one has to sit in a zone
+  Cloudflare would report by its last two labels anyway."
+  [host]
+  (let [labels (str/split (str host) #"\.")]
+    (when (<= 2 (count labels))
+      (str/join "." (take-last 2 labels)))))
+
+(defn apps-domain
+  "The zone the stack lives in. Desired state carries no :domain: the DNS
+  records, the Resend sending domain and the From address all derive from the
+  application hosts, which the launcher checks share a single zone."
+  [opts]
+  (some-> (get-in opts [:once :applications]) first :host registrable-domain))
 
 (defn- green-par-key
   [env-name]

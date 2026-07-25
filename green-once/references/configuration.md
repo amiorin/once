@@ -9,8 +9,6 @@ Every secret reaches the workflow through a `GREEN_PAR_*` environment variable, 
 ```clojure
 {:profile "production"
  :workdir ".green"
- :domain "example.com"
- :package "once-production"
 
  :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
 
@@ -29,7 +27,11 @@ Every secret reaches the workflow through a `GREEN_PAR_*` environment variable, 
  }
 ```
 
-Application hostnames must equal `:domain` or be subdomains of it. `:env` maps a container variable name to the flat key holding its value; the value itself never appears in the file, and is supplied by the `GREEN_PAR_*` variable named after that key (`:app-database-url` ← `GREEN_PAR_APP_DATABASE_URL`). Application options supported by the ONCE reconciler also include `:auto_update`, `:auto_backup`, `:backup_path`, `:disable_tls`, `:cpus`, and `:memory`.
+`:profile` names the stack: it is the working-directory and state-key prefix, the `name` the compute stage reports, and the `Host` alias written into `~/.ssh/config`.
+
+There is no domain key. The application hostnames are the source of truth: the DNS zone and the Resend sending domain are the last two labels they share, so every application must sit under one domain. Each application gets its own proxied `A` record — no apex or wildcard record is created, so a hostname that is not listed here does not resolve.
+
+`:env` maps a container variable name to the flat key holding its value; the value itself never appears in the file, and is supplied by the `GREEN_PAR_*` variable named after that key (`:app-database-url` ← `GREEN_PAR_APP_DATABASE_URL`). Application options supported by the ONCE reconciler also include `:auto_update`, `:auto_backup`, `:backup_path`, `:disable_tls`, `:cpus`, and `:memory`.
 
 `:deploy-pubkey` is required. It authorizes only `sudo once update <configured-host>` through a remote ForceCommand. Private keys remain outside the project and should be loaded in `ssh-agent`.
 
@@ -103,10 +105,9 @@ No compute API credential is required. SSH authentication must already work thro
 
 ```clojure
 :provider-smtp "resend"
-:resend-server "smtp.resend.com"
-:resend-port 587
-:resend-username "resend"
 ```
+
+Resend's relay (`smtp.resend.com:587`, user `resend`) is the same for every account, so it is hard-coded rather than configured. Mail is sent from `info@notifications.<domain>`, where the domain is the one shared by the application hosts.
 
 Required credentials: `GREEN_PAR_RESEND_API_KEY` for the Resend API, and `GREEN_PAR_RESEND_PASSWORD` for the SMTP password written into the server's mail configuration.
 
@@ -125,7 +126,7 @@ Required credential: `GREEN_PAR_NO_INFRA_SMTP_PASSWORD`.
 
 Use `:provider-dns "cloudflare"` or `:provider-dns "no-infra"`.
 
-Cloudflare requires `GREEN_PAR_CLOUDFLARE_API_TOKEN`. The token needs permission to discover the configured zone and manage its DNS records. `no-infra` renders an empty DNS module and requires no credential.
+Cloudflare requires `GREEN_PAR_CLOUDFLARE_API_TOKEN`. The token needs permission to discover the zone the application hosts share and manage its DNS records: one proxied `A` record per application host, plus the Resend verification records. `no-infra` renders an empty DNS module and requires no credential.
 
 ## State backends
 

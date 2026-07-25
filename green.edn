@@ -18,12 +18,14 @@
 
 {:profile "default"
  :workdir ".green"
- :domain "example.com"
- :package "default"
 
  :compute-pubkey "REPLACE_ME"
  :deploy-pubkey "REPLACE_ME"
 
+ ;; Every application gets its own proxied A record; there is no apex or
+ ;; wildcard record. The hosts also decide the DNS zone and the mail domain, so
+ ;; they must all sit under one domain — here example.com.
+ ;;
  ;; :env maps a container variable name to the flat key holding its value, so
  ;; the value arrives as GREEN_PAR_APP_EXAMPLE instead of living in this file.
  :once {:applications [{:host "www.example.com"
@@ -35,10 +37,6 @@
  :provider-dns "cloudflare"
  :provider-backend "r2"
  :compute-prevent-destroy true
-
- :resend-server "smtp.resend.com"
- :resend-port 587
- :resend-username "resend"
 
  :no-infra-smtp-server "smtp.resend.com"
  :no-infra-smtp-port 587

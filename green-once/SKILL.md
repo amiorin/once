@@ -27,9 +27,8 @@ Determine this skill's directory from the loaded `SKILL.md` path. Do not assume 
 
 Gather these non-secret inputs conversationally:
 
-- profile/package name and working directory (default `.green`)
-- apex domain
-- one or more applications: hostname, container image, and optional mapping of container variable names to the `green.edn` keys holding their values
+- profile name and working directory (default `.green`)
+- one or more applications: hostname, container image, and optional mapping of container variable names to the `green.edn` keys holding their values. The hostnames must share one domain; that shared domain is the DNS zone and the mail domain, and only the listed hostnames get DNS records
 - compute, SMTP, DNS, and backend providers
 - the selected providers' non-secret settings
 - compute and deploy SSH public keys where applicable

@@ -38,7 +38,7 @@ output "params" {
   value = {
     ip = digitalocean_droplet.node1.ipv4_address
     sudoer = "root"
-    name = "<{ package }>"
+    name = "<{ profile }>"
     user = "root"
   }
 }

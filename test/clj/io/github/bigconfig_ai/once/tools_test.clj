@@ -1,5 +1,6 @@
 (ns io.github.bigconfig-ai.once.tools-test
   (:require
+   [cheshire.core :as json]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
@@ -28,8 +29,7 @@
 
 (defn- once-opts
   [provider-smtp password]
-  {:domain "example.com"
-   :provider-smtp provider-smtp
+  {:provider-smtp provider-smtp
    :smtp_server "smtp.example.com"
    :smtp_port 587
    :smtp_username "user"
@@ -81,6 +81,31 @@
       (let [yaml (tools/ansible-once
                   (assoc-in opts [:once :applications 0 :env] ["TARGET_EMAIL=forms@example.com"]))]
         (is (str/includes? yaml "TARGET_EMAIL=forms@example.com"))))))
+
+(deftest dns-records-follow-the-applications
+  (let [json (tools/render-fn :apps {:ip "203.0.113.10"
+                                     :applications [{:host "www.example.com"}
+                                                    {:host "app.example.com"}]})
+        records (get-in (json/parse-string json true)
+                        [:resource :cloudflare_dns_record])]
+    (testing "one record per application host, and nothing else"
+      (is (= 2 (count records)))
+      (is (= #{"www.example.com" "app.example.com"}
+             (set (map :name (vals records)))))
+      (is (not (str/includes? json "\"*\"")) "no wildcard record")
+      (is (not (str/includes? json "\"@\"")) "no apex record"))
+
+    (testing "every host is a proxied A record pointing at the server"
+      (doseq [record (vals records)]
+        (is (= "A" (:type record)))
+        (is (true? (:proxied record)))
+        (is (= 1 (:ttl record)))
+        (is (= "203.0.113.10" (:content record)))
+        (is (= "${data.cloudflare_zone.domain.id}" (:zone_id record))))))
+
+  (testing "no applications, no records"
+    (is (empty? (json/parse-string (tools/render-fn :apps {:ip "203.0.113.10"
+                                                           :applications []}))))))
 
 (deftest ansible-local-renders-and-runs-the-playbook
   (let [workdir (temp-dir)]
@@ -138,14 +163,13 @@
                 "the marker must match what create wrote"))
           (is (not (.exists main)) "the rendered tree is removed afterwards")))
 
-      (testing "the alias falls back to package when Tofu state is unreadable"
+      (testing "the alias falls back to the profile when Tofu state is unreadable"
         (let [calls (atom [])]
           (with-redefs [ansible/ansible-step
                         (fn [opts args] (swap! calls conj args) opts)]
             (tools/ansible-local-step (-> (local-opts workdir :delete)
-                                          (dissoc :name)
-                                          (assoc :package "once-prod"))))
-          (is (= "once-prod" (:host_alias (:extra-vars (first @calls)))))))
+                                          (dissoc :name))))
+          (is (= "test" (:host_alias (:extra-vars (first @calls)))))))
 
       (finally
         (delete-tree! workdir)))))

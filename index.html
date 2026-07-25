@@ -719,8 +719,6 @@ start + validation ─────┤                 ├─ tofu-dns ─ tofu-s
 
       <pre><code class="language-clojure">{:profile "production"
  :workdir ".green"
- :domain "example.com"
- :package "once-production"
 
  :compute-pubkey "ssh-ed25519 AAAA... operator"
  :deploy-pubkey  "ssh-ed25519 AAAA... ci-deploy"
@@ -742,17 +740,13 @@ start + validation ─────┤                 ├─ tofu-dns ─ tofu-s
  :digitalocean-image "ubuntu-24-04-x64"
  :digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
 
- :resend-server "smtp.resend.com"
- :resend-port 587
- :resend-username "resend"
-
  :r2-bucket "once-tfstate"
  :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"}</code></pre>
 
       <h3>Non-secret overrides</h3>
       <p>A <code>GREEN_PAR_*</code> environment variable overrides a flat key. The launcher strips the prefix, lowercases the name, and changes underscores to hyphens. Existing boolean and integer values retain their types.</p>
       <pre><code class="language-bash">GREEN_PAR_DIGITALOCEAN_REGION=fra1 ./green build
-GREEN_PAR_RESEND_PORT=2525 ./green create --dry-run</code></pre>
+GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
       <p>Use this mechanism for temporary deployment settings and the destruction guard. Provider credentials should use the provider-native environment variables listed under <a href="#secrets">Secrets and environment</a>.</p>
     </section>
 
@@ -769,7 +763,9 @@ GREEN_PAR_RESEND_PORT=2525 ./green create --dry-run</code></pre>
     │   └── main.tf.json
     ├── tofu-dns/
     │   ├── backend.tf.json
-    │   └── main.tf.json
+    │   ├── main.tf.json
+    │   ├── apps.tf.json
+    │   └── smtp.tf.json
     ├── tofu-smtp-post/
     │   ├── backend.tf.json
     │   └── main.tf.json
@@ -793,7 +789,7 @@ GREEN_PAR_RESEND_PORT=2525 ./green create --dry-run</code></pre>
 
     <section id="applications">
       <h2 class="anchor-heading"><a href="#applications" aria-label="Link to Applications">#</a>Applications</h2>
-      <p>Applications live in <code>:once {:applications [...]}</code>. Every host must equal <code>:domain</code> or be a subdomain of it, and every application requires a container image.</p>
+      <p>Applications live in <code>:once {:applications [...]}</code>. Every application requires a hostname and a container image. The hostnames decide everything domain-related: they must share one domain, that shared domain is the DNS zone and the mail domain, and each hostname gets its own proxied A record. No apex or wildcard record is created, so a hostname that is not listed here does not resolve.</p>
       <pre><code class="language-clojure">:once
 {:applications
  [{:host "www.example.com"
@@ -917,11 +913,8 @@ done</code></pre>
       <h2 class="anchor-heading"><a href="#smtp-providers" aria-label="Link to SMTP providers">#</a>SMTP providers</h2>
 
       <h3>Resend</h3>
-      <pre><code class="language-clojure">:provider-smtp "resend"
-:resend-server "smtp.resend.com"
-:resend-port 587
-:resend-username "resend"</code></pre>
-      <p>The SMTP stage creates <code>notifications.&lt;domain&gt;</code>, returns its DNS records, and the post stage verifies it after DNS is configured. Use <code>GREEN_PAR_RESEND_API_KEY</code> for the Resend API and <code>GREEN_PAR_RESEND_PASSWORD</code> for server-side SMTP authentication.</p>
+      <pre><code class="language-clojure">:provider-smtp "resend"</code></pre>
+      <p>Resend needs no further keys: its relay is the same for every account, so <code>smtp.resend.com</code>, port <code>587</code>, and the user <code>resend</code> are hard-coded. The SMTP stage creates <code>notifications.&lt;domain&gt;</code> under the domain the application hostnames share, returns its DNS records, and the post stage verifies it after DNS is configured. Use <code>GREEN_PAR_RESEND_API_KEY</code> for the Resend API and <code>GREEN_PAR_RESEND_PASSWORD</code> for server-side SMTP authentication.</p>
 
       <h3>Existing SMTP</h3>
       <pre><code class="language-clojure">:provider-smtp "no-infra"
@@ -1109,7 +1102,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <p>Confirm Cloudflare received all unproxied Resend records and allow DNS propagation. Rerun create after the records are visible; OpenTofu will continue from existing state.</p>
 
       <h3>Cloudflare cannot find the zone</h3>
-      <p>The configured <code>:domain</code> must already belong to a zone accessible by <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code>. The token needs permission to read the zone and edit DNS records.</p>
+      <p>The domain shared by the application hostnames must already belong to a zone accessible by <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code>. The token needs permission to read the zone and edit DNS records.</p>
 
       <h3>An existing server fails during create</h3>
       <p>Verify direct SSH access with <code>:no-infra-compute-user</code>, passwordless privilege escalation for <code>:no-infra-compute-sudoer</code>, a supported Linux host, and outbound network access for installers.</p>
@@ -1120,8 +1113,6 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <p>This example contains only public or non-secret configuration. Replace illustrative identifiers with your own, but provide credentials and passwords exclusively through environment variables.</p>
       <pre><code class="language-clojure">{:profile "production"
  :workdir ".green"
- :domain "example.com"
- :package "once-production"
 
  :compute-pubkey "ssh-ed25519 AAAAC3... operator"
  :deploy-pubkey  "ssh-ed25519 AAAAC3... ci-deploy"
@@ -1147,10 +1138,6 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
  :digitalocean-image "ubuntu-24-04-x64"
  :digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
 
- :resend-server "smtp.resend.com"
- :resend-port 587
- :resend-username "resend"
-
  :r2-bucket "once-production-tfstate"
  :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"}</code></pre>
     </section>
@@ -1163,10 +1150,8 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
         <table>
           <thead><tr><th>Key</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td><code>:profile</code></td><td>Yes</td><td>Names generated output and remote state keys.</td></tr>
+            <tr><td><code>:profile</code></td><td>Yes</td><td>Names generated output, remote state keys, the compute resource, and the SSH host alias.</td></tr>
             <tr><td><code>:workdir</code></td><td>Yes</td><td>Generated root directory; recommended value is <code>.green</code>.</td></tr>
-            <tr><td><code>:domain</code></td><td>Yes</td><td>Lowercase fully-qualified apex domain.</td></tr>
-            <tr><td><code>:package</code></td><td>Yes</td><td>Deployment and compute resource identifier.</td></tr>
             <tr><td><code>:compute-pubkey</code></td><td>Optional</td><td>Administrative SSH public key. Currently unused — providers reference an already-registered key.</td></tr>
             <tr><td><code>:deploy-pubkey</code></td><td>Yes</td><td>Restricted application-update SSH public key.</td></tr>
             <tr><td><code>:once</code></td><td>Yes</td><td>Map containing a non-empty <code>:applications</code> vector.</td></tr>
@@ -1188,7 +1173,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
             <tr><td>Hetzner</td><td><code>:hcloud-name</code>, <code>:hcloud-image</code>, <code>:hcloud-server-type</code>, <code>:hcloud-location</code>, <code>:hcloud-ssh-keys</code></td></tr>
             <tr><td>OCI</td><td><code>:oci-config-file-profile</code>, <code>:oci-subnet-id</code>, <code>:oci-compartment-id</code>, <code>:oci-availability-domain</code>, <code>:oci-display-name</code>, <code>:oci-shape</code>, <code>:oci-ocpus</code>, <code>:oci-memory-in-gbs</code>, <code>:oci-boot-volume-size-in-gbs</code>, <code>:oci-boot-volume-vpus-per-gb</code>, <code>:oci-ssh-authorized-keys</code></td></tr>
             <tr><td>Existing compute</td><td><code>:no-infra-compute-ip</code>, <code>:no-infra-compute-user</code>, <code>:no-infra-compute-sudoer</code>, <code>:no-infra-compute-uid</code>; optional <code>:no-infra-compute-name</code></td></tr>
-            <tr><td>Resend</td><td><code>:resend-server</code>, <code>:resend-port</code>, <code>:resend-username</code></td></tr>
+            <tr><td>Resend</td><td>None — the relay is hard-coded</td></tr>
             <tr><td>Existing SMTP</td><td><code>:no-infra-smtp-server</code>, <code>:no-infra-smtp-port</code>, <code>:no-infra-smtp-username</code></td></tr>
             <tr><td>S3 backend</td><td><code>:s3-bucket</code>, <code>:s3-region</code></td></tr>
             <tr><td>R2 backend</td><td><code>:r2-bucket</code>, <code>:r2-endpoint</code></td></tr>

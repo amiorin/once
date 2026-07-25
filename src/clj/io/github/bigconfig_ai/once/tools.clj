@@ -114,8 +114,8 @@
         (assoc result result-key (merge fallback (or (output-params result) {})))))))
 
 (defn- fallback-compute-params
-  [{:keys [package provider-compute] :as opts}]
-  (let [name (or package "once")]
+  [{:keys [profile provider-compute] :as opts}]
+  (let [name (or profile "once")]
     (case provider-compute
       "oci" {:ip "192.168.0.1"
              :sudoer "ubuntu"
@@ -132,6 +132,13 @@
        :name name
        :user "root"})))
 
+(def ^:private resend-smtp
+  "Resend's relay is the same for every account, so it is not desired state.
+  Only the password is, and it arrives as GREEN_PAR_RESEND_PASSWORD."
+  {:smtp_server "smtp.resend.com"
+   :smtp_port 587
+   :smtp_username "resend"})
+
 (defn- fallback-smtp-params
   [{:keys [provider-smtp] :as opts}]
   (merge {:id "domain-id-not-defined"
@@ -141,10 +148,7 @@
                        :smtp_password (:no-infra-smtp-password opts)
                        :smtp_server (:no-infra-smtp-server opts)
                        :smtp_port (:no-infra-smtp-port opts)}
-           "resend" {:smtp_username (:resend-username opts)
-                     :smtp_password (:resend-password opts)
-                     :smtp_server (:resend-server opts)
-                     :smtp_port (:resend-port opts)}
+           "resend" (assoc resend-smtp :smtp_password (:resend-password opts))
            {})))
 
 (defn tofu-compute-step
@@ -157,9 +161,16 @@
     (tofu-with-spec opts dir specs (fallback-compute-params opts) :once/compute-params
                     (credential-env opts [:do-token :hcloud-token]))))
 
+(defn- with-zone
+  "Templates that name the DNS zone read `zone`, which no key in desired state
+  supplies: it is derived from the application hosts."
+  [opts]
+  (assoc opts :zone (utils/apps-domain opts)))
+
 (defn tofu-smtp-step
   [opts]
-  (let [provider (or (:provider-smtp opts) "resend")
+  (let [opts (with-zone opts)
+        provider (or (:provider-smtp opts) "resend")
         dir (tool-dir opts "tofu-smtp")
         specs [(template-spec (tool-template "tofu-smtp" provider "main.tf")
                               (str dir "/main.tf")
@@ -202,8 +213,25 @@
     :else x))
 
 (defn render-fn
-  [src {:keys [records]}]
+  [src {:keys [records applications ip]}]
   (case src
+    ;; One proxied A record per application host. There is no apex or wildcard
+    ;; record: only the hosts desired state names resolve to the server.
+    :apps (let [app-records
+                (for [{:keys [host]} applications]
+                  (tofu-construct :resource
+                                  :cloudflare_dns_record
+                                  (add-fqn-suffix ::app-dns (str "-" host))
+                                  {:zone_id "${data.cloudflare_zone.domain.id}"
+                                   :name host
+                                   :content ip
+                                   :type "A"
+                                   :proxied true
+                                   :ttl 1}))
+                m (if (seq app-records)
+                    (sort-nested-map (apply deep-merge app-records))
+                    {})]
+            (json/generate-string m {:pretty true}))
     :smtp (let [cloudflare-records
                 (for [{:keys [name priority record type value]} records]
                   (tofu-construct :resource
@@ -238,14 +266,17 @@
 
 (defn tofu-dns-step
   [opts]
-  (let [opts (if (= :delete (:green/event opts)) opts (joined-params opts))
+  (let [opts (with-zone (if (= :delete (:green/event opts)) opts (joined-params opts)))
         provider (or (:provider-dns opts) "cloudflare")
         dir (tool-dir opts "tofu-dns")
         specs (cond-> [(template-spec (tool-template "tofu-dns" provider "main.tf")
                                       (str dir "/main.tf")
                                       opts)]
                 (= provider "cloudflare")
-                (conj (raw-spec (str dir "/smtp.tf.json")
+                (conj (raw-spec (str dir "/apps.tf.json")
+                                (render-fn :apps {:applications (get-in opts [:once :applications])
+                                                  :ip (:ip opts)}))
+                      (raw-spec (str dir "/smtp.tf.json")
                                 (render-fn :smtp {:records (:records opts)}))))]
     (tofu-with-spec opts dir specs {} nil
                     (credential-env opts [:cloudflare-api-token]))))
@@ -326,10 +357,11 @@
    "no-infra" :no-infra-smtp-password})
 
 (defn ansible-once
-  [{:keys [once domain provider-smtp] :as opts}]
+  [{:keys [once provider-smtp] :as opts}]
   (let [pw-key (smtp-password-keys (or provider-smtp "resend"))
         smtp (-> (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
-                 (assoc :smtp_from (format "Info <info@notifications.%s>" domain)))
+                 (assoc :smtp_from (format "Info <info@notifications.%s>"
+                                           (utils/apps-domain opts))))
         smtp (cond-> smtp
                (and pw-key (:smtp_password smtp))
                (assoc :smtp_password (par-lookup pw-key)))
@@ -380,10 +412,10 @@
 
 (defn- local-host-alias
   "The SSH alias the local playbook manages. Tofu reports it as `name`, itself
-  rendered from `package`, so `package` answers when state cannot be read."
+  rendered from `profile`, so `profile` answers when state cannot be read."
   [data]
   (or (not-empty (str (:name data)))
-      (not-empty (str (:package data)))
+      (not-empty (str (:profile data)))
       "once"))
 
 (defn ansible-local-step

@@ -40,7 +40,7 @@ output "params" {
   value = {
     ip = hcloud_server.node1.ipv4_address
     sudoer = "root"
-    name = "<{ package }>"
+    name = "<{ profile }>"
     user = "root"
   }
 }

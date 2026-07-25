@@ -31,7 +31,7 @@
   "Minimum io.github.bigconfig-ai/once contract this launcher requires.
   Guarded at run time so a stale pin fails loudly instead of rendering
   templates from an older commit."
-  2)
+  3)
 
 ;; Managed by `green pin` — do not edit by hand.
 (def ^:private once-sha "e3e6859fa716e7608a7adc1a298ef20748f88db6")
@@ -115,7 +115,8 @@
                :no-infra-compute-sudoer :no-infra-compute-uid]})
 
 (def ^:private smtp-required
-  {"resend" [:resend-server :resend-port :resend-username]
+  ;; Resend needs nothing here: its relay is hard-coded in the once library.
+  {"resend" []
    "no-infra" [:no-infra-smtp-server :no-infra-smtp-port
                :no-infra-smtp-username]})
 
@@ -149,7 +150,7 @@
 
 (defn- required-keys
   [opts]
-  (concat [:profile :workdir :domain :package :deploy-pubkey]
+  (concat [:profile :workdir :deploy-pubkey]
           (provider-keys compute-required opts :provider-compute)
           (provider-keys smtp-required opts :provider-smtp)
           (provider-keys dns-required opts :provider-dns)
@@ -167,16 +168,12 @@
   (keep (fn [k] (when (placeholder? (get opts k)) k)) keys))
 
 (defn- app-errors
-  [domain applications]
+  [applications]
   (mapcat
    (fn [[idx {:keys [host image env]}]]
      (concat
       (when (or (placeholder? host) (not (re-matches domain-re (str host))))
         [(format ":once :applications[%d] has an invalid :host" idx)])
-      (when (and (string? host) (string? domain)
-                 (not (or (= host domain)
-                          (str/ends-with? host (str "." domain)))))
-        [(format ":once :applications[%d] :host must belong to %s" idx domain)])
       (when (placeholder? image)
         [(format ":once :applications[%d] requires :image" idx)])
       (when-not (or (nil? env) (map? env) (sequential? env))
@@ -215,13 +212,18 @@
             :let [provider (get opts provider-key)]
             :when (not (contains? table provider))]
         (str "unsupported " provider-key " " (pr-str provider)))
-      (when-not (and (string? (:domain opts))
-                     (re-matches domain-re (:domain opts)))
-        [":domain must be a fully-qualified lowercase domain"])
       (when-not (and (sequential? applications) (seq applications))
         [":once :applications must be a non-empty sequence"])
       (when (sequential? applications)
-        (app-errors (:domain opts) applications))
+        (app-errors applications))
+      ;; The DNS zone and the mail domain are derived rather than configured, so
+      ;; the hosts have to agree on one.
+      (when (sequential? applications)
+        (let [zones (distinct (keep #(utils/registrable-domain (:host %))
+                                    applications))]
+          (when (< 1 (count zones))
+            [(str ":once :applications must share one domain, found "
+                  (str/join ", " (sort zones)))])))
       (when-not (boolean? (:compute-prevent-destroy opts))
         [":compute-prevent-destroy must be true or false"])
       (when-not (str/starts-with? (str (:deploy-pubkey opts)) "ssh-")

@@ -11,7 +11,7 @@ provider "resend" {
 }
 
 resource "resend_domain" "domain1" {
-  name           = "notifications.<{ domain }>"
+  name           = "notifications.<{ zone }>"
   region         = "eu-west-1"
   open_tracking  = false
   click_tracking = false
