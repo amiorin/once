@@ -374,5 +374,17 @@
                               data)
                (template-spec (static-template "ansible-local" "main.yml")
                               (str dir "/main.yml")
-                              data)]]
-    (sc/scaffold opts specs)))
+                              data)]
+        rendered (sc/scaffold opts specs)]
+    (if (or (= :build (:green/event opts))
+            (= :delete (:green/event opts)))
+      rendered
+      ;; The playbook's variables are Ansible's, not Selmer's, so they arrive as
+      ;; extra-vars: the local inventory targets localhost only and carries no
+      ;; host vars of its own. `name` is reserved in Ansible, hence host_alias.
+      (ansible/ansible-step rendered {:dir dir
+                                      :inventory "inventory.ini"
+                                      :playbooks {:create "main.yml"}
+                                      :extra-vars {:host_alias (:name data)
+                                                   :ip (:ip data)
+                                                   :user (:user data)}}))))
