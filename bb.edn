@@ -1,2 +1,4 @@
-{:deps {io.github.amiorin/green      {:local/root "/home/ubuntu/code/green"}
+{:deps {io.github.amiorin/green      {:git/url "https://github.com/amiorin/green.git"
+                                      :git/sha "1bcee232c98a9562d12a795c03978094ccc7a7cc"}
+        #_#_io.github.amiorin/green  {:local/root "/home/ubuntu/code/green"}
         io.github.bigconfig-ai/once {:local/root "."}}}
