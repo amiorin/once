@@ -322,8 +322,10 @@
      {:bucket (:r2-bucket opts)
       :key (str (or (:profile opts) "default") "/" tool ".tfstate")
       :region "auto"
-      :access_key (:r2-access-key-id opts)
-      :secret_key (:r2-secret-access-key opts)
+      ;; access_key/secret_key come from AWS_ACCESS_KEY_ID and
+      ;; AWS_SECRET_ACCESS_KEY in the environment. Naming them here would
+      ;; write them to backend.tf.json and to OpenTofu's resolved-config
+      ;; cache in .terraform/terraform.tfstate.
       :endpoints {:s3 (:r2-endpoint opts)}
       :skip_credentials_validation true
       :skip_metadata_api_check true

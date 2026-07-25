@@ -57,18 +57,30 @@
   {:do-token "DIGITALOCEAN_TOKEN"
    :hcloud-token "HCLOUD_TOKEN"
    :resend-api-key "RESEND_API_KEY"
-   :cloudflare-api-token "CLOUDFLARE_API_TOKEN"})
+   :cloudflare-api-token "CLOUDFLARE_API_TOKEN"
+   :r2-access-key-id "AWS_ACCESS_KEY_ID"
+   :r2-secret-access-key "AWS_SECRET_ACCESS_KEY"})
+
+(defn- backend-credential-keys
+  "State-backend credentials. Unlike provider credentials these belong to every
+  stage, since each one reads and writes state. R2 is an S3-compatible backend,
+  so it authenticates through the AWS chain; s3 uses the ambient chain already
+  and local needs nothing."
+  [opts]
+  (if (= "r2" (:provider-backend opts))
+    [:r2-access-key-id :r2-secret-access-key]
+    []))
 
 (defn- credential-env
-  "Environment additions for `ks`. Unset credentials are omitted, so build and
-  dry-run stay credential-free."
+  "Environment additions for `ks`, plus whatever the state backend needs. Unset
+  credentials are omitted, so build and dry-run stay credential-free."
   [opts ks]
   (not-empty
    (into {}
          (keep (fn [k]
                  (when-let [v (not-empty (str (get opts k)))]
                    [(credential-env-vars k) v])))
-         ks)))
+         (concat ks (backend-credential-keys opts)))))
 
 (defn- tofu-with-spec
   [opts dir specs fallback result-key env]
