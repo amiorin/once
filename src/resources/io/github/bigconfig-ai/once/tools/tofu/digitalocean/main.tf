@@ -16,8 +16,8 @@ resource "digitalocean_droplet" "node1" {
   region   = "<{ digitalocean-region }>"
   size     = "<{ digitalocean-size }>"
   image    = "<{ digitalocean-image }>"
-  vpc_uuid = "<{ digitalocean-vpc-uuid }>"
-
+<% if digitalocean-vpc-uuid|not-empty %>  vpc_uuid = "<{ digitalocean-vpc-uuid }>"
+<% endif %>
   # SSH Keys are passed as a list of IDs or Fingerprints
   ssh_keys = ["<{ digitalocean-ssh-keys }>"]
   # Wait for ssh before starting Ansible
