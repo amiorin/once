@@ -4,6 +4,13 @@
   (:import
    [java.util.concurrent TimeUnit]))
 
+(def contract
+  "Compatibility number for the launcher that consumes these namespaces and the
+  templates under src/resources. Bump it on any change a launcher pinned to an
+  older commit could not survive; the launcher refuses to run against a lower
+  number and tells the user to repin."
+  1)
+
 (defn strip-ansi [s]
   (-> s
       (str/replace #"\x1b\]8;[^\x07]*\x07" "")
@@ -82,10 +89,26 @@
       (str/replace "_" "-")
       keyword))
 
+(defn- coerce-override
+  "Environment variables are strings; match the type of the value already in
+  `opts` so a boolean key stays a boolean. Without this,
+  `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false` would overlay the truthy string
+  \"false\"."
+  [old value]
+  (cond
+    (boolean? old) (case (str/lower-case value)
+                     "true" true
+                     "false" false
+                     value)
+    (integer? old) (or (parse-long value) value)
+    :else value))
+
 (defn read-green-pars
   "Overlay `GREEN_PAR_*` environment variables onto flat keys in `opts`.
 
-  For example, `GREEN_PAR_DO_TOKEN=xxx` becomes `{:do-token \"xxx\"}`."
+  For example, `GREEN_PAR_DO_TOKEN=xxx` becomes `{:do-token \"xxx\"}`. This is
+  how secrets and tokens reach the workflow — they are never read from
+  green.edn. Overrides are coerced to the type of the value they replace."
   ([opts]
    (read-green-pars opts (System/getenv)))
   ([opts env]
@@ -93,7 +116,8 @@
                 (let [k (str k)]
                   (if (and (str/starts-with? k "GREEN_PAR_")
                            (< (count "GREEN_PAR_") (count k)))
-                    (assoc result (green-par-key k) v)
+                    (let [key (green-par-key k)]
+                      (assoc result key (coerce-override (get result key) v)))
                     result)))
               opts
               env)))

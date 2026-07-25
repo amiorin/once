@@ -12,7 +12,7 @@ Use this skill to initialize or operate an ONCE deployment in the user's current
 ## Non-negotiable safety rules
 
 - Never ask the user to paste a secret into chat.
-- Never put API tokens, passwords, private keys, access keys, or application secret values in `green.edn`, `green`, shell history, logs, or generated examples.
+- Never put API tokens, passwords, private keys, access keys, or application secret values in `green.edn`, `green`, shell history, logs, or generated examples. Every secret is supplied by a `GREEN_PAR_*` environment variable named after the key it fills.
 - Ask only for the **names** of application-secret environment variables and whether required variables are set.
 - Public SSH keys are not secrets. Read only a user-approved `.pub` file; never read a private SSH key.
 - Do not overwrite an existing `green` or `green.edn` without explicit approval. If an existing project is valid, operate it instead of regenerating it.
@@ -29,7 +29,7 @@ Gather these non-secret inputs conversationally:
 
 - profile/package name and working directory (default `.green`)
 - apex domain
-- one or more applications: hostname, container image, and optional mapping of container variable names to host environment-variable names
+- one or more applications: hostname, container image, and optional mapping of container variable names to the `green.edn` keys holding their values
 - compute, SMTP, DNS, and backend providers
 - the selected providers' non-secret settings
 - compute and deploy SSH public keys where applicable
@@ -67,11 +67,11 @@ Before real create/delete, check required environment variables by presence only
 
 ## Generated application environment
 
-Represent application environment as a map from container variable name to host environment-variable name:
+Represent application environment as a map from container variable name to the flat `green.edn` key that holds its value:
 
 ```clojure
-:env {"DATABASE_URL" "ONCE_APP_DATABASE_URL"
-      "SECRET_KEY_BASE" "ONCE_APP_SECRET_KEY_BASE"}
+:env {"DATABASE_URL" :app-database-url
+      "SECRET_KEY_BASE" :app-secret-key-base}
 ```
 
-Never emit `"KEY=secret"` values in EDN. The generated Ansible configuration uses environment lookups at execution time, so secret values are not written into generated configuration.
+Never emit `"KEY=secret"` values in EDN, and never add the referenced keys to `green.edn`. The user exports `GREEN_PAR_APP_DATABASE_URL` and `GREEN_PAR_APP_SECRET_KEY_BASE`; the launcher resolves them when it renders, so secret values are not written into desired state. Tell the user which `GREEN_PAR_*` names their configuration requires.

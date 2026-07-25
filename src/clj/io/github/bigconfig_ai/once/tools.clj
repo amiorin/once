@@ -19,7 +19,7 @@
 (defn tool-dir
   "Return the isolated working directory for `tool` in the active profile."
   [opts tool]
-  (str (io/file (or (:workdir opts) ".dist")
+  (str (io/file (or (:workdir opts) ".green")
                 (or (:profile opts) "default")
                 tool)))
 
@@ -256,13 +256,32 @@
                                  :users {:hosts users-hosts}}}}]
     (json/generate-string result {:pretty true})))
 
+(defn- resolve-env
+  "Resolve an application `:env` map of container variable name -> flat opts key
+  into the [\"KEY=VALUE\"] list the once module expects. Values come from
+  green.edn or a `GREEN_PAR_*` override, so application secrets stay out of the
+  desired-state file. A list is passed through untouched."
+  [opts env]
+  (if (map? env)
+    (mapv (fn [[var-name k]]
+            ;; str, not format: an unresolved key renders an empty value rather
+            ;; than the string "null".
+            (str (name var-name) "=" (get opts (keyword k))))
+          env)
+    env))
+
+(defn- application-data
+  [opts smtp app]
+  (cond-> (merge app smtp)
+    (map? (:env app)) (assoc :env (resolve-env opts (:env app)))))
+
 (defn ansible-once
   [{:keys [once domain] :as opts}]
   (let [smtp (-> (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
                  (assoc :smtp_from (format "Info <info@notifications.%s>" domain)))
         once (update once :applications
                      (fn [applications]
-                       (mapv #(merge % smtp) applications)))
+                       (mapv #(application-data opts smtp %) applications)))
         data [{:name "Reconcile ONCE applications"
                :become true
                :once once}]]

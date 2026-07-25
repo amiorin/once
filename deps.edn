@@ -1,6 +1,11 @@
 {:paths   ["src/clj" "src/resources"]
+ ;; Pinned by sha so this project resolves as a git dependency elsewhere — the
+ ;; launcher fetches it that way. Swap in the local root to develop against
+ ;; green source.
  :deps    {org.clojure/clojure          {:mvn/version "1.12.5"}
-           io.github.amiorin/green      {:local/root "/home/ubuntu/code/green"}}
+           io.github.amiorin/green      {:git/url "https://github.com/amiorin/green.git"
+                                         :git/sha "0301621045bc513d603e05ec4f6bd453dddae317"}
+           #_#_io.github.amiorin/green  {:local/root "/home/ubuntu/code/green"}}
  :aliases {:dev  {:extra-paths ["env/dev/clj" "test/clj"]}
            :test {:extra-paths ["test/clj"]
                   :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}

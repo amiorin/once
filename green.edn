@@ -1,13 +1,34 @@
+;; Desired state for the ONCE stack. Non-secret values only.
+;;
+;; Secrets and tokens are never written here: export them as GREEN_PAR_* and
+;; they are overlaid onto the matching flat key at run time. The variable name
+;; is the key uppercased with hyphens as underscores, so :do-token comes from
+;; GREEN_PAR_DO_TOKEN. Any key below can be overridden the same way.
+;;
+;; Required per provider:
+;;   digitalocean   GREEN_PAR_DO_TOKEN
+;;   hcloud         GREEN_PAR_HCLOUD_TOKEN
+;;   oci            (none — uses :oci-config-file-profile from ~/.oci/config)
+;;   resend         GREEN_PAR_RESEND_API_KEY GREEN_PAR_RESEND_PASSWORD
+;;   no-infra smtp  GREEN_PAR_NO_INFRA_SMTP_PASSWORD
+;;   cloudflare     GREEN_PAR_CLOUDFLARE_API_TOKEN
+;;   r2 backend     GREEN_PAR_R2_ACCESS_KEY_ID GREEN_PAR_R2_SECRET_ACCESS_KEY
+;;   s3 backend     (none — OpenTofu uses the ambient AWS credential chain)
+;; Plus one variable per application :env entry, named after the key it maps to.
+
 {:profile "default"
- :workdir ".dist"
+ :workdir ".green"
  :domain "example.com"
  :package "default"
 
  :compute-pubkey "REPLACE_ME"
  :deploy-pubkey "REPLACE_ME"
+
+ ;; :env maps a container variable name to the flat key holding its value, so
+ ;; the value arrives as GREEN_PAR_APP_EXAMPLE instead of living in this file.
  :once {:applications [{:host "www.example.com"
                         :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"
-                        :env ["EXAMPLE=REPLACE_ME"]}]}
+                        :env {"EXAMPLE" :app-example}}]}
 
  :provider-compute "digitalocean"
  :provider-smtp "resend"
@@ -18,22 +39,15 @@
  :resend-server "smtp.resend.com"
  :resend-port 587
  :resend-username "resend"
- :resend-api-key "REPLACE_ME"
- :resend-password "REPLACE_ME"
 
  :no-infra-smtp-server "smtp.resend.com"
  :no-infra-smtp-port 587
  :no-infra-smtp-username "resend"
- :no-infra-smtp-password "REPLACE_ME"
-
- :cloudflare-api-token "REPLACE_ME"
 
  :s3-bucket "REPLACE_ME"
  :s3-region "REPLACE_ME"
  :r2-bucket "REPLACE_ME"
  :r2-endpoint "REPLACE_ME"
- :r2-access-key-id "REPLACE_ME"
- :r2-secret-access-key "REPLACE_ME"
 
  :oci-config-file-profile "REPLACE_ME"
  :oci-subnet-id "REPLACE_ME"
@@ -52,7 +66,6 @@
  :hcloud-server-type "cx23"
  :hcloud-location "hel1"
  :hcloud-ssh-keys "REPLACE_ME"
- :hcloud-token "REPLACE_ME"
 
  :digitalocean-name "once"
  :digitalocean-region "ams3"
@@ -60,7 +73,6 @@
  :digitalocean-image "ubuntu-25-10-x64"
  :digitalocean-vpc-uuid "REPLACE_ME"
  :digitalocean-ssh-keys "REPLACE_ME"
- :do-token "REPLACE_ME"
 
  :no-infra-compute-ip "REPLACE_ME"
  :no-infra-compute-user "REPLACE_ME"

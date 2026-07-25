@@ -662,7 +662,7 @@
           <pre><code class="language-text">Create a Green Once project for example.com.
 Deploy ghcr.io/example/site:latest at www.example.com.
 Use DigitalOcean, Resend, Cloudflare, and R2.
-Map DATABASE_URL to the host variable ONCE_SITE_DATABASE_URL.</code></pre>
+Map DATABASE_URL to the key :site-database-url.</code></pre>
         </li>
         <li>
           <h3>Review generated project files</h3>
@@ -728,7 +728,7 @@ start + validation ─────┤                 ├─ tofu-dns ─ tofu-s
  :once {:applications
         [{:host "www.example.com"
           :image "ghcr.io/example/site:latest"
-          :env {"DATABASE_URL" "ONCE_SITE_DATABASE_URL"}}]}
+          :env {"DATABASE_URL" :site-database-url}}]}
 
  :provider-compute "digitalocean"
  :provider-smtp "resend"
@@ -740,6 +740,7 @@ start + validation ─────┤                 ├─ tofu-dns ─ tofu-s
  :digitalocean-region "ams3"
  :digitalocean-size "s-1vcpu-1gb-35gb-intel"
  :digitalocean-image "ubuntu-24-04-x64"
+ :digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
 
  :resend-server "smtp.resend.com"
  :resend-port 587
@@ -797,8 +798,8 @@ GREEN_PAR_RESEND_PORT=2525 ./green create --dry-run</code></pre>
 {:applications
  [{:host "www.example.com"
    :image "ghcr.io/example/site:latest"
-   :env {"DATABASE_URL" "ONCE_SITE_DATABASE_URL"
-         "SECRET_KEY_BASE" "ONCE_SITE_SECRET_KEY_BASE"}
+   :env {"DATABASE_URL" :site-database-url
+         "SECRET_KEY_BASE" :site-secret-key-base}
    :auto_update true
    :auto_backup true
    :backup_path "/var/backups/site"
@@ -806,7 +807,7 @@ GREEN_PAR_RESEND_PORT=2525 ./green create --dry-run</code></pre>
    :memory "2g"}]}</code></pre>
 
       <h3>Environment indirection</h3>
-      <p><code>:env</code> maps a container variable name to the name of a host environment variable. It never maps to a secret value. On real create, the launcher verifies that every referenced host variable is set; Ansible resolves it only while configuring the server.</p>
+      <p><code>:env</code> maps a container variable name to the flat <code>green.edn</code> key that holds its value. It never maps to a secret value. The value is supplied by the <code>GREEN_PAR_*</code> variable named after that key — <code>:site-database-url</code> comes from <code>GREEN_PAR_SITE_DATABASE_URL</code> — and the launcher verifies every reference resolves before a real create.</p>
 
       <div class="table-wrap">
         <table>
@@ -814,7 +815,7 @@ GREEN_PAR_RESEND_PORT=2525 ./green create --dry-run</code></pre>
           <tbody>
             <tr><td><code>:host</code></td><td>Required FQDN served by the application.</td></tr>
             <tr><td><code>:image</code></td><td>Required container image reference.</td></tr>
-            <tr><td><code>:env</code></td><td>Map of container variable names to host environment-variable names.</td></tr>
+            <tr><td><code>:env</code></td><td>Map of container variable names to the <code>green.edn</code> keys holding their values.</td></tr>
             <tr><td><code>:auto_update</code></td><td>Enable ONCE automatic image updates.</td></tr>
             <tr><td><code>:auto_backup</code></td><td>Enable ONCE automatic backups.</td></tr>
             <tr><td><code>:backup_path</code></td><td>Set the application backup path.</td></tr>
@@ -837,23 +838,24 @@ GREEN_PAR_RESEND_PORT=2525 ./green create --dry-run</code></pre>
         <table>
           <thead><tr><th>Selection</th><th>Required environment variables</th><th>When</th></tr></thead>
           <tbody>
-            <tr><td>DigitalOcean</td><td><code>DIGITALOCEAN_TOKEN</code></td><td>Create and delete</td></tr>
-            <tr><td>Hetzner Cloud</td><td><code>HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
-            <tr><td>Oracle Cloud</td><td><code>TF_VAR_oci_tenancy_ocid</code>, <code>TF_VAR_oci_user_ocid</code>, <code>TF_VAR_oci_fingerprint</code>, <code>TF_VAR_oci_private_key</code></td><td>Create and delete</td></tr>
-            <tr><td>Resend</td><td><code>TF_VAR_resend_api_key</code></td><td>Create and delete</td></tr>
-            <tr><td>Any SMTP provider</td><td><code>ONCE_SMTP_PASSWORD</code></td><td>Create</td></tr>
-            <tr><td>Cloudflare DNS</td><td><code>CLOUDFLARE_API_TOKEN</code></td><td>Create and delete</td></tr>
-            <tr><td>S3 or R2 backend</td><td><code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code></td><td>Create and delete</td></tr>
-            <tr><td>Application <code>:env</code></td><td>Every host variable named by the application map</td><td>Create</td></tr>
+            <tr><td>DigitalOcean</td><td><code>GREEN_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Hetzner Cloud</td><td><code>GREEN_PAR_HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Oracle Cloud</td><td>None — authenticates through the <code>:oci-config-file-profile</code> entry in <code>~/.oci/config</code></td><td>—</td></tr>
+            <tr><td>Resend</td><td><code>GREEN_PAR_RESEND_API_KEY</code>, <code>GREEN_PAR_RESEND_PASSWORD</code></td><td>Create and delete</td></tr>
+            <tr><td>Existing SMTP</td><td><code>GREEN_PAR_NO_INFRA_SMTP_PASSWORD</code></td><td>Create and delete</td></tr>
+            <tr><td>Cloudflare DNS</td><td><code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>R2 backend</td><td><code>GREEN_PAR_R2_ACCESS_KEY_ID</code>, <code>GREEN_PAR_R2_SECRET_ACCESS_KEY</code></td><td>Create and delete</td></tr>
+            <tr><td>S3 backend</td><td>None — OpenTofu resolves its own AWS credential chain</td><td>Create and delete</td></tr>
+            <tr><td>Application <code>:env</code></td><td>One <code>GREEN_PAR_*</code> per key named by the application map</td><td>Create</td></tr>
           </tbody>
         </table>
       </div>
-      <p><code>AWS_SESSION_TOKEN</code> is honored when present for S3-compatible authentication. Build and dry-run do not require these secret variables.</p>
+      <p>Every credential travels the same path: a <code>GREEN_PAR_*</code> variable overlaid onto the matching flat key. There is no <code>TF_VAR_*</code> or provider-native variable, and no Ansible environment lookup. Build and dry-run do not require these variables — unset values render empty, so a build never writes a secret to disk.</p>
 
       <h3>Check presence without printing values</h3>
-      <pre><code class="language-bash">for name in DIGITALOCEAN_TOKEN TF_VAR_resend_api_key \
-  ONCE_SMTP_PASSWORD CLOUDFLARE_API_TOKEN \
-  AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+      <pre><code class="language-bash">for name in GREEN_PAR_DO_TOKEN GREEN_PAR_RESEND_API_KEY \
+  GREEN_PAR_RESEND_PASSWORD GREEN_PAR_CLOUDFLARE_API_TOKEN \
+  GREEN_PAR_R2_ACCESS_KEY_ID GREEN_PAR_R2_SECRET_ACCESS_KEY; do
   if [ -n "${!name:-}" ]; then
     printf '%s: set\n' "$name"
   else
@@ -872,21 +874,23 @@ done</code></pre>
 :digitalocean-region "ams3"
 :digitalocean-size "s-1vcpu-1gb-35gb-intel"
 :digitalocean-image "ubuntu-24-04-x64"
+:digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
 ;; Optional:
 :digitalocean-vpc-uuid "non-secret-vpc-uuid"</code></pre>
-      <p>The workflow registers <code>:compute-pubkey</code> as a DigitalOcean SSH key and attaches it to the droplet. Credential: <code>DIGITALOCEAN_TOKEN</code>.</p>
+      <p>The droplet attaches the key named by <code>:digitalocean-ssh-keys</code>, which must already exist in the account — give it a fingerprint or key id. Credential: <code>GREEN_PAR_DO_TOKEN</code>.</p>
 
       <h3>Hetzner Cloud</h3>
       <pre><code class="language-clojure">:provider-compute "hcloud"
 :hcloud-name "once"
 :hcloud-image "ubuntu-24.04"
 :hcloud-server-type "cx23"
-:hcloud-location "hel1"</code></pre>
-      <p>The workflow registers <code>:compute-pubkey</code> and creates an IPv4 server. Credential: <code>HCLOUD_TOKEN</code>.</p>
+:hcloud-location "hel1"
+:hcloud-ssh-keys "key-name-or-id-already-in-the-project"</code></pre>
+      <p>Creates an IPv4 server attached to the key named by <code>:hcloud-ssh-keys</code>, which must already exist in the project. Credential: <code>GREEN_PAR_HCLOUD_TOKEN</code>.</p>
 
       <h3>Oracle Cloud Infrastructure</h3>
       <pre><code class="language-clojure">:provider-compute "oci"
-:oci-region "eu-frankfurt-1"
+:oci-config-file-profile "DEFAULT"
 :oci-subnet-id "ocid1.subnet..."
 :oci-compartment-id "ocid1.compartment..."
 :oci-availability-domain "..."
@@ -895,8 +899,9 @@ done</code></pre>
 :oci-ocpus 1
 :oci-memory-in-gbs 4
 :oci-boot-volume-size-in-gbs 50
-:oci-boot-volume-vpus-per-gb 30</code></pre>
-      <p>The current default shape is ARM-based. The compute public key is written into instance metadata. OCI authentication uses the four <code>TF_VAR_oci_*</code> variables listed above.</p>
+:oci-boot-volume-vpus-per-gb 30
+:oci-ssh-authorized-keys "/home/user/.ssh/once.pub"</code></pre>
+      <p>The current default shape is ARM-based. <code>:oci-ssh-authorized-keys</code> is a path to a public-key file on the machine running the launcher; its contents are written into instance metadata at plan time. OCI authenticates through the named profile in <code>~/.oci/config</code>, so no credential variable is required.</p>
 
       <h3>Existing server</h3>
       <pre><code class="language-clojure">:provider-compute "no-infra"
@@ -905,7 +910,7 @@ done</code></pre>
 :no-infra-compute-sudoer "root"
 :no-infra-compute-uid 0
 :no-infra-compute-name "once"</code></pre>
-      <p>No compute resource or API credential is required. The server must be reachable using the configured user and an SSH identity already loaded into <code>ssh-agent</code>. <code>:compute-pubkey</code> may be omitted for this provider.</p>
+      <p>No compute resource or API credential is required. The server must be reachable using the configured user and an SSH identity already loaded into <code>ssh-agent</code>. <code>:compute-pubkey</code> may be omitted.</p>
     </section>
 
     <section id="smtp-providers">
@@ -916,14 +921,14 @@ done</code></pre>
 :resend-server "smtp.resend.com"
 :resend-port 587
 :resend-username "resend"</code></pre>
-      <p>The SMTP stage creates <code>notifications.&lt;domain&gt;</code>, returns its DNS records, and the post stage verifies it after DNS is configured. Use <code>TF_VAR_resend_api_key</code> for the Resend API and <code>ONCE_SMTP_PASSWORD</code> for server-side SMTP authentication.</p>
+      <p>The SMTP stage creates <code>notifications.&lt;domain&gt;</code>, returns its DNS records, and the post stage verifies it after DNS is configured. Use <code>GREEN_PAR_RESEND_API_KEY</code> for the Resend API and <code>GREEN_PAR_RESEND_PASSWORD</code> for server-side SMTP authentication.</p>
 
       <h3>Existing SMTP</h3>
       <pre><code class="language-clojure">:provider-smtp "no-infra"
 :no-infra-smtp-server "smtp.example.net"
 :no-infra-smtp-port 587
 :no-infra-smtp-username "smtp-user"</code></pre>
-      <p>No SMTP infrastructure is created. A real create still requires <code>ONCE_SMTP_PASSWORD</code> so the remote ONCE server can send mail.</p>
+      <p>No SMTP infrastructure is created. A real create still requires <code>GREEN_PAR_NO_INFRA_SMTP_PASSWORD</code> so the remote ONCE server can send mail.</p>
     </section>
 
     <section id="dns-providers">
@@ -932,7 +937,7 @@ done</code></pre>
         <article class="card">
           <p class="label">Managed</p>
           <h3><code>cloudflare</code></h3>
-          <p>Finds the configured zone, creates a proxied A record for each application hostname, and adds the unproxied records returned by Resend. Requires <code>CLOUDFLARE_API_TOKEN</code> with zone-read and DNS-edit access.</p>
+          <p>Finds the configured zone, creates a proxied A record for each application hostname, and adds the unproxied records returned by Resend. Requires <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code> with zone-read and DNS-edit access.</p>
         </article>
         <article class="card">
           <p class="label">External</p>
@@ -955,13 +960,13 @@ done</code></pre>
       <pre><code class="language-clojure">:provider-backend "s3"
 :s3-bucket "once-tfstate"
 :s3-region "eu-west-1"</code></pre>
-      <p>Uses <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code>. State keys are <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</p>
+      <p>The generated backend names only the bucket, key, and region, so OpenTofu resolves credentials through its own AWS chain — environment variables, a shared profile, or an instance role. State keys are <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</p>
 
       <h3>Cloudflare R2</h3>
       <pre><code class="language-clojure">:provider-backend "r2"
 :r2-bucket "once-tfstate"
 :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"</code></pre>
-      <p>Uses the S3-compatible backend with R2 credentials in <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code>.</p>
+      <p>Uses the S3-compatible backend with <code>region = "auto"</code>, taking the R2 access key from <code>GREEN_PAR_R2_ACCESS_KEY_ID</code> and <code>GREEN_PAR_R2_SECRET_ACCESS_KEY</code>. State keys are <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</p>
     </section>
 
     <section id="ssh-configuration">
@@ -970,7 +975,7 @@ done</code></pre>
         <article class="card">
           <p class="label">Operations</p>
           <h3><code>:compute-pubkey</code></h3>
-          <p>Authorizes administrative SSH access to a new cloud server. Its private half remains outside the project and should be loaded into <code>ssh-agent</code> before create.</p>
+          <p>Accepted but currently unused: each compute provider references a key already registered with it (<code>:digitalocean-ssh-keys</code>, <code>:hcloud-ssh-keys</code>) or a local public-key file (<code>:oci-ssh-authorized-keys</code>). The matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
         </article>
         <article class="card">
           <p class="label">Deployment</p>
@@ -1084,7 +1089,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
 
       <h3><code>:env must map container names...</code></h3>
       <p>Use a map, not a vector of <code>KEY=value</code> strings:</p>
-      <pre><code class="language-clojure">:env {"DATABASE_URL" "ONCE_SITE_DATABASE_URL"}</code></pre>
+      <pre><code class="language-clojure">:env {"DATABASE_URL" :site-database-url}</code></pre>
 
       <h3>Compute destruction is protected</h3>
       <p>This is expected. First run <code>./green delete --dry-run</code>. After explicit approval, set <code>GREEN_PAR_COMPUTE_PREVENT_DESTROY=false</code> only for the real delete command.</p>
@@ -1104,7 +1109,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <p>Confirm Cloudflare received all unproxied Resend records and allow DNS propagation. Rerun create after the records are visible; OpenTofu will continue from existing state.</p>
 
       <h3>Cloudflare cannot find the zone</h3>
-      <p>The configured <code>:domain</code> must already belong to a zone accessible by <code>CLOUDFLARE_API_TOKEN</code>. The token needs permission to read the zone and edit DNS records.</p>
+      <p>The configured <code>:domain</code> must already belong to a zone accessible by <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code>. The token needs permission to read the zone and edit DNS records.</p>
 
       <h3>An existing server fails during create</h3>
       <p>Verify direct SSH access with <code>:no-infra-compute-user</code>, passwordless privilege escalation for <code>:no-infra-compute-sudoer</code>, a supported Linux host, and outbound network access for installers.</p>
@@ -1125,8 +1130,8 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
  {:applications
   [{:host "www.example.com"
     :image "ghcr.io/example/site:latest"
-    :env {"DATABASE_URL" "ONCE_SITE_DATABASE_URL"
-          "SECRET_KEY_BASE" "ONCE_SITE_SECRET_KEY_BASE"}
+    :env {"DATABASE_URL" :site-database-url
+          "SECRET_KEY_BASE" :site-secret-key-base}
     :auto_update true
     :auto_backup true}]}
 
@@ -1140,6 +1145,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
  :digitalocean-region "ams3"
  :digitalocean-size "s-1vcpu-1gb-35gb-intel"
  :digitalocean-image "ubuntu-24-04-x64"
+ :digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
 
  :resend-server "smtp.resend.com"
  :resend-port 587
@@ -1161,7 +1167,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
             <tr><td><code>:workdir</code></td><td>Yes</td><td>Generated root directory; recommended value is <code>.green</code>.</td></tr>
             <tr><td><code>:domain</code></td><td>Yes</td><td>Lowercase fully-qualified apex domain.</td></tr>
             <tr><td><code>:package</code></td><td>Yes</td><td>Deployment and compute resource identifier.</td></tr>
-            <tr><td><code>:compute-pubkey</code></td><td>Cloud only</td><td>Administrative SSH public key.</td></tr>
+            <tr><td><code>:compute-pubkey</code></td><td>Optional</td><td>Administrative SSH public key. Currently unused — providers reference an already-registered key.</td></tr>
             <tr><td><code>:deploy-pubkey</code></td><td>Yes</td><td>Restricted application-update SSH public key.</td></tr>
             <tr><td><code>:once</code></td><td>Yes</td><td>Map containing a non-empty <code>:applications</code> vector.</td></tr>
             <tr><td><code>:provider-compute</code></td><td>Yes</td><td><code>digitalocean</code>, <code>hcloud</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
@@ -1178,9 +1184,9 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
         <table>
           <thead><tr><th>Provider</th><th>Keys</th></tr></thead>
           <tbody>
-            <tr><td>DigitalOcean</td><td><code>:digitalocean-name</code>, <code>:digitalocean-region</code>, <code>:digitalocean-size</code>, <code>:digitalocean-image</code>; optional <code>:digitalocean-vpc-uuid</code></td></tr>
-            <tr><td>Hetzner</td><td><code>:hcloud-name</code>, <code>:hcloud-image</code>, <code>:hcloud-server-type</code>, <code>:hcloud-location</code></td></tr>
-            <tr><td>OCI</td><td><code>:oci-region</code>, <code>:oci-subnet-id</code>, <code>:oci-compartment-id</code>, <code>:oci-availability-domain</code>, <code>:oci-display-name</code>, <code>:oci-shape</code>, <code>:oci-ocpus</code>, <code>:oci-memory-in-gbs</code>, <code>:oci-boot-volume-size-in-gbs</code>, <code>:oci-boot-volume-vpus-per-gb</code></td></tr>
+            <tr><td>DigitalOcean</td><td><code>:digitalocean-name</code>, <code>:digitalocean-region</code>, <code>:digitalocean-size</code>, <code>:digitalocean-image</code>, <code>:digitalocean-ssh-keys</code>; optional <code>:digitalocean-vpc-uuid</code></td></tr>
+            <tr><td>Hetzner</td><td><code>:hcloud-name</code>, <code>:hcloud-image</code>, <code>:hcloud-server-type</code>, <code>:hcloud-location</code>, <code>:hcloud-ssh-keys</code></td></tr>
+            <tr><td>OCI</td><td><code>:oci-config-file-profile</code>, <code>:oci-subnet-id</code>, <code>:oci-compartment-id</code>, <code>:oci-availability-domain</code>, <code>:oci-display-name</code>, <code>:oci-shape</code>, <code>:oci-ocpus</code>, <code>:oci-memory-in-gbs</code>, <code>:oci-boot-volume-size-in-gbs</code>, <code>:oci-boot-volume-vpus-per-gb</code>, <code>:oci-ssh-authorized-keys</code></td></tr>
             <tr><td>Existing compute</td><td><code>:no-infra-compute-ip</code>, <code>:no-infra-compute-user</code>, <code>:no-infra-compute-sudoer</code>, <code>:no-infra-compute-uid</code>; optional <code>:no-infra-compute-name</code></td></tr>
             <tr><td>Resend</td><td><code>:resend-server</code>, <code>:resend-port</code>, <code>:resend-username</code></td></tr>
             <tr><td>Existing SMTP</td><td><code>:no-infra-smtp-server</code>, <code>:no-infra-smtp-port</code>, <code>:no-infra-smtp-username</code></td></tr>

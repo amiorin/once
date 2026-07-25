@@ -16,11 +16,22 @@ tofu-smtp ────┘                                      └─ ansible-re
 
 Compute and SMTP run concurrently. DNS joins their outputs, SMTP verification
 runs after DNS, and the two Ansible stages then run concurrently. Build renders
-the same files without invoking OpenTofu or Ansible. Delete destroys DNS first,
-then destroys SMTP and compute concurrently.
+the same files without invoking OpenTofu or Ansible.
+
+Delete reverses the graph:
+
+```text
+ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
+                                              └─ tofu-compute
+```
+
+Cleanup removes the rendered Ansible trees, SMTP verification and DNS are
+destroyed in order, then SMTP and compute are destroyed concurrently. Delete
+reads the compute and SMTP outputs already in state so the destroy renders with
+real values.
 
 Generated files and isolated OpenTofu state directories live under
-`.dist/<profile>/`.
+`.green/<profile>/`.
 
 ## Requirements
 
@@ -44,9 +55,11 @@ SMTP, DNS, and backend providers with:
  :provider-backend "r2"}          ; r2, s3, local
 ```
 
-Secrets can remain as `REPLACE_ME` in the committed file. Any flat key can be
-overridden with `GREEN_PAR_*`; names are lowercased and underscores become
-hyphens:
+Credential keys are absent from the committed file: they arrive as `GREEN_PAR_*`
+environment variables, which are overlaid onto the matching flat key before the
+workflow starts. Any flat key can be overridden the same way; names are
+lowercased and underscores become hyphens, and the override takes the type of
+the value it replaces:
 
 ```bash
 export GREEN_PAR_DO_TOKEN="..."
@@ -69,7 +82,7 @@ export GREEN_PAR_COMPUTE_PREVENT_DESTROY=false
 Run from the repository root:
 
 ```bash
-bb green build                 # render .dist/<profile>/ only
+bb green build                 # render .green/<profile>/ only
 bb green create                # provision and configure
 bb green create --dry-run      # print the DAG actions, touch nothing
 bb green delete                # destroy infrastructure
@@ -109,8 +122,26 @@ clojure-lsp format
 ```
 
 Source namespaces are under `src/clj/io/github/bigconfig_ai/once/`; templates
-are under `src/resources/io/github/bigconfig-ai/once/tools/`. `.dist/` is
+are under `src/resources/io/github/bigconfig-ai/once/tools/`. `.green/` is
 generated and must not be edited.
+
+The launcher is a single file, `green-once/green`; `./green` in the repository
+root is a symlink to it. The same file is the skill payload: copied into a
+project on its own it resolves `once` and `green` as pinned git dependencies,
+while inside this repository `bb.edn` supplies them from local roots and the
+bootstrap is skipped.
+
+After committing and pushing a change to the launcher, `src/clj`, or the
+templates, repin so standalone copies resolve the new sources:
+
+```bash
+bb green pin        # stamps the launcher with the current HEAD
+```
+
+`pin` refuses to run on a dirty tree or an unpushed HEAD. A launcher whose pin
+predates the sources it needs fails with a message naming `green pin` rather
+than rendering silently from an older commit; the check is the `contract`
+number in `utils.clj`.
 
 ## License
 

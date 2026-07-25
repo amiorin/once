@@ -2,6 +2,8 @@
 
 The generated `green.edn` is a flat EDN map. Include only selected providers' non-secret settings. Never add credentials or passwords.
 
+Every secret reaches the workflow through a `GREEN_PAR_*` environment variable, which is overlaid onto the matching flat key before anything runs. The variable name is the key uppercased with hyphens as underscores, so `:do-token` is supplied by `GREEN_PAR_DO_TOKEN`. There is no second mechanism: no `TF_VAR_*`, no provider-native variable names, no Ansible environment lookups. Overrides are coerced to the type of the value they replace, so booleans and integers stay booleans and integers.
+
 ## Base shape
 
 ```clojure
@@ -10,13 +12,12 @@ The generated `green.edn` is a flat EDN map. Include only selected providers' no
  :domain "example.com"
  :package "once-production"
 
- :compute-pubkey "ssh-ed25519 AAAA... operator-compute"
- :deploy-pubkey  "ssh-ed25519 AAAA... ci-deploy"
+ :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
 
  :once {:applications
         [{:host "www.example.com"
           :image "ghcr.io/example/site:latest"
-          :env {"DATABASE_URL" "ONCE_APP_DATABASE_URL"}}]}
+          :env {"DATABASE_URL" :app-database-url}}]}
 
  :provider-compute "digitalocean"
  :provider-smtp "resend"
@@ -28,9 +29,11 @@ The generated `green.edn` is a flat EDN map. Include only selected providers' no
  }
 ```
 
-Application hostnames must equal `:domain` or be subdomains of it. `:env` maps container variable names to environment-variable names; it never contains values. Application options supported by the ONCE reconciler also include `:auto_update`, `:auto_backup`, `:backup_path`, `:disable_tls`, `:cpus`, and `:memory`.
+Application hostnames must equal `:domain` or be subdomains of it. `:env` maps a container variable name to the flat key holding its value; the value itself never appears in the file, and is supplied by the `GREEN_PAR_*` variable named after that key (`:app-database-url` ← `GREEN_PAR_APP_DATABASE_URL`). Application options supported by the ONCE reconciler also include `:auto_update`, `:auto_backup`, `:backup_path`, `:disable_tls`, `:cpus`, and `:memory`.
 
-`:compute-pubkey` is required for cloud compute and is registered with the new server. `:deploy-pubkey` authorizes only `sudo once update <configured-host>` through a remote ForceCommand. Private keys remain outside the project and should be loaded in `ssh-agent`.
+`:deploy-pubkey` is required. It authorizes only `sudo once update <configured-host>` through a remote ForceCommand. Private keys remain outside the project and should be loaded in `ssh-agent`.
+
+`:compute-pubkey` is accepted but currently unused: each compute provider references a key already registered with it (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file (`:oci-ssh-authorized-keys`). If present it must still look like a public key.
 
 ## Compute providers
 
@@ -42,11 +45,12 @@ Application hostnames must equal `:domain` or be subdomains of it. `:env` maps c
 :digitalocean-region "ams3"
 :digitalocean-size "s-1vcpu-1gb-35gb-intel"
 :digitalocean-image "ubuntu-24-04-x64"
+:digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
 ;; Optional:
 :digitalocean-vpc-uuid "non-secret-vpc-uuid"
 ```
 
-Required secret environment variable: `DIGITALOCEAN_TOKEN`.
+Required credential: `GREEN_PAR_DO_TOKEN`.
 
 ### Hetzner Cloud
 
@@ -56,15 +60,16 @@ Required secret environment variable: `DIGITALOCEAN_TOKEN`.
 :hcloud-image "ubuntu-24.04"
 :hcloud-server-type "cx23"
 :hcloud-location "hel1"
+:hcloud-ssh-keys "key-name-or-id-already-in-the-project"
 ```
 
-Required secret environment variable: `HCLOUD_TOKEN`.
+Required credential: `GREEN_PAR_HCLOUD_TOKEN`.
 
 ### Oracle Cloud Infrastructure
 
 ```clojure
 :provider-compute "oci"
-:oci-region "eu-frankfurt-1"
+:oci-config-file-profile "DEFAULT"
 :oci-subnet-id "ocid1.subnet..."
 :oci-compartment-id "ocid1.compartment..."
 :oci-availability-domain "..."
@@ -74,9 +79,10 @@ Required secret environment variable: `HCLOUD_TOKEN`.
 :oci-memory-in-gbs 4
 :oci-boot-volume-size-in-gbs 50
 :oci-boot-volume-vpus-per-gb 30
+:oci-ssh-authorized-keys "/home/user/.ssh/once.pub"
 ```
 
-Required environment variables: `TF_VAR_oci_tenancy_ocid`, `TF_VAR_oci_user_ocid`, `TF_VAR_oci_fingerprint`, and secret `TF_VAR_oci_private_key`.
+No credential variable is required: OCI authenticates through the named profile in `~/.oci/config`. `:oci-ssh-authorized-keys` is a path to a public-key file on the machine running the launcher, read at plan time.
 
 ### Existing server
 
@@ -89,7 +95,7 @@ Required environment variables: `TF_VAR_oci_tenancy_ocid`, `TF_VAR_oci_user_ocid
 :no-infra-compute-name "once"
 ```
 
-No compute API credential is required. SSH authentication must already work through `ssh-agent`. `:compute-pubkey` may be omitted.
+No compute API credential is required. SSH authentication must already work through `ssh-agent`.
 
 ## SMTP providers
 
@@ -102,7 +108,7 @@ No compute API credential is required. SSH authentication must already work thro
 :resend-username "resend"
 ```
 
-Required secrets: `TF_VAR_resend_api_key` and, for create/provisioning, `ONCE_SMTP_PASSWORD`.
+Required credentials: `GREEN_PAR_RESEND_API_KEY` for the Resend API, and `GREEN_PAR_RESEND_PASSWORD` for the SMTP password written into the server's mail configuration.
 
 ### Existing SMTP
 
@@ -113,13 +119,13 @@ Required secrets: `TF_VAR_resend_api_key` and, for create/provisioning, `ONCE_SM
 :no-infra-smtp-username "smtp-user"
 ```
 
-Required secret for create/provisioning: `ONCE_SMTP_PASSWORD`.
+Required credential: `GREEN_PAR_NO_INFRA_SMTP_PASSWORD`.
 
 ## DNS providers
 
 Use `:provider-dns "cloudflare"` or `:provider-dns "no-infra"`.
 
-Cloudflare requires `CLOUDFLARE_API_TOKEN`. The token needs permission to discover the configured zone and manage its DNS records. `no-infra` renders an empty DNS module and requires no credential.
+Cloudflare requires `GREEN_PAR_CLOUDFLARE_API_TOKEN`. The token needs permission to discover the configured zone and manage its DNS records. `no-infra` renders an empty DNS module and requires no credential.
 
 ## State backends
 
@@ -139,7 +145,7 @@ Each tool keeps isolated state under `<workdir>/<profile>/<tool>/`.
 :s3-region "eu-west-1"
 ```
 
-Required secrets: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. `AWS_SESSION_TOKEN` is honored when present. State keys are derived as `<profile>/<tool>.tfstate`.
+No `GREEN_PAR_*` credential: the generated backend names only the bucket, key, and region, so OpenTofu resolves credentials through its own AWS chain (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, a shared profile, or an instance role). State keys are derived as `<profile>/<tool>.tfstate`.
 
 ### Cloudflare R2
 
@@ -149,11 +155,11 @@ Required secrets: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. `AWS_SESSION_
 :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"
 ```
 
-Required secrets: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, set to the R2 access-key credentials. State keys are derived as `<profile>/<tool>.tfstate`.
+Required credentials: `GREEN_PAR_R2_ACCESS_KEY_ID` and `GREEN_PAR_R2_SECRET_ACCESS_KEY`. R2 is configured as an S3-compatible backend with `region = "auto"`. State keys are derived as `<profile>/<tool>.tfstate`.
 
 ## Safe lifecycle
 
-`build` and dry-run do not require provider credentials. Real create validates all selected provider credentials and every application environment-variable reference before running. Real delete validates provider credentials and refuses while `:compute-prevent-destroy` is true.
+`build` and dry-run do not require credentials; unset values simply render empty, so a build never writes a secret to disk. Real create validates all selected provider credentials and every application `:env` reference before running. Real delete validates provider credentials and refuses while `:compute-prevent-destroy` is true.
 
 To authorize an intentional delete without editing committed desired state:
 
@@ -163,4 +169,4 @@ export GREEN_PAR_COMPUTE_PREVENT_DESTROY=false
 ./green delete
 ```
 
-`GREEN_PAR_*` may override flat non-secret values as well: strip the prefix, lowercase the name, and replace underscores with hyphens. For example, `GREEN_PAR_DIGITALOCEAN_REGION=fra1` overrides `:digitalocean-region`.
+`GREEN_PAR_*` overrides any flat key, not just secrets: strip the prefix, lowercase the name, and replace underscores with hyphens. For example, `GREEN_PAR_DIGITALOCEAN_REGION=fra1` overrides `:digitalocean-region`.
