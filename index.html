@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The manual for using the green-once agent skill and operating a single-server Basecamp ONCE deployment with Green, OpenTofu, and Ansible.">
+  <title>Green Once — Manual</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css">
+
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --surface: #f6f8fa;
+      --surface-strong: #eef1f4;
+      --text: #1f2328;
+      --muted: #59636e;
+      --border: #d1d9e0;
+      --border-soft: #e7ebef;
+      --accent: #1f6feb;
+      --accent-strong: #0a55c2;
+      --accent-soft: #ddf4ff;
+      --green: #116329;
+      --green-soft: #dafbe1;
+      --amber: #7d4e00;
+      --amber-soft: #fff8c5;
+      --red: #a40e26;
+      --red-soft: #ffebe9;
+      --purple: #6639ba;
+      --code-bg: #f6f8fa;
+      --sidebar-width: 286px;
+      --content-width: 880px;
+      --radius: 8px;
+      --shadow: 0 1px 2px rgb(31 35 40 / 4%);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 24px;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+    a:focus-visible, button:focus-visible {
+      outline: 3px solid rgb(31 111 235 / 28%);
+      outline-offset: 2px;
+    }
+
+    code, pre, kbd, samp, .mono {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    :not(pre) > code {
+      padding: 0.13em 0.36em;
+      border: 1px solid var(--border-soft);
+      border-radius: 5px;
+      background: var(--code-bg);
+      font-size: 0.88em;
+      overflow-wrap: anywhere;
+    }
+
+    kbd {
+      padding: 1px 5px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--surface);
+      font-size: 0.83em;
+    }
+
+    pre {
+      position: relative;
+      margin: 16px 0 22px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--code-bg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    pre code.hljs,
+    pre code {
+      display: block;
+      padding: 16px 18px;
+      background: var(--code-bg);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.58;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    pre.diagram code {
+      color: #30363d;
+      font-size: 12.5px;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 100;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: var(--text);
+      color: #fff;
+      transform: translateY(-160%);
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100vh;
+      padding: 22px 18px 28px;
+      border-right: 1px solid var(--border-soft);
+      background: var(--surface);
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .back {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      margin: 0 5px 18px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .back:hover { color: var(--accent); }
+
+    .brand {
+      margin: 0 5px 18px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark:hover { text-decoration: none; }
+
+    .leaf {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--green-soft);
+      color: var(--green);
+      font-size: 16px;
+    }
+
+    .brand p {
+      margin: 5px 0 0 38px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    nav .group {
+      margin: 18px 7px 5px;
+      color: var(--muted);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    nav ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    nav li { margin: 1px 0; }
+
+    nav a {
+      display: block;
+      padding: 4px 8px;
+      border-radius: 5px;
+      color: #30363d;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    nav a:hover {
+      background: #e9edf1;
+      color: var(--accent-strong);
+      text-decoration: none;
+    }
+
+    nav a.active {
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 600;
+    }
+
+    main {
+      width: min(100%, calc(var(--content-width) + 112px));
+      padding: 54px 56px 100px;
+    }
+
+    .hero {
+      margin-bottom: 46px;
+      padding-bottom: 34px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, h4 {
+      color: var(--text);
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(36px, 6vw, 52px);
+      letter-spacing: -0.045em;
+    }
+
+    h2 {
+      margin: 64px 0 18px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: 26px;
+    }
+
+    h3 {
+      margin: 34px 0 10px;
+      font-size: 19px;
+    }
+
+    h4 {
+      margin: 24px 0 8px;
+      font-size: 15px;
+    }
+
+    .hero .lead {
+      max-width: 760px;
+      margin: 16px 0 20px;
+      color: #3f4851;
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    p { margin: 0 0 14px; }
+    ul, ol { margin: 8px 0 18px; padding-left: 24px; }
+    li { margin: 4px 0; }
+    strong { font-weight: 680; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 18px 0 24px;
+    }
+
+    .card {
+      padding: 18px 19px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .card h3, .card h4 { margin-top: 0; }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card .label {
+      margin-bottom: 8px;
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .callout {
+      margin: 20px 0;
+      padding: 15px 17px;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      background: var(--accent-soft);
+    }
+
+    .callout.warning {
+      border-left-color: #bf8700;
+      background: var(--amber-soft);
+    }
+
+    .callout.danger {
+      border-left-color: #cf222e;
+      background: var(--red-soft);
+    }
+
+    .callout.success {
+      border-left-color: #1a7f37;
+      background: var(--green-soft);
+    }
+
+    .callout-title {
+      display: block;
+      margin-bottom: 3px;
+      font-weight: 700;
+    }
+
+    .callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+
+    .steps {
+      margin: 20px 0 28px;
+      padding: 0;
+      list-style: none;
+      counter-reset: steps;
+    }
+
+    .steps > li {
+      position: relative;
+      margin: 0 0 0 17px;
+      padding: 0 0 26px 34px;
+      border-left: 1px solid var(--border);
+      counter-increment: steps;
+    }
+
+    .steps > li:last-child { border-left-color: transparent; padding-bottom: 2px; }
+
+    .steps > li::before {
+      position: absolute;
+      top: -2px;
+      left: -17px;
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border: 1px solid #9ec5ff;
+      border-radius: 50%;
+      background: #fff;
+      color: var(--accent-strong);
+      content: counter(steps);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .steps h3 { margin: 0 0 5px; font-size: 17px; }
+
+    .table-wrap {
+      margin: 16px 0 26px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 13.5px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-soft);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--surface);
+      color: #3f4851;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+    td:first-child { white-space: nowrap; }
+
+    .flow-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .flow-item {
+      padding: 13px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface);
+    }
+
+    .flow-item b { display: block; margin-bottom: 3px; }
+    .flow-item span { color: var(--muted); font-size: 13px; }
+
+    .anchor-heading { position: relative; }
+    .anchor-heading > a {
+      position: absolute;
+      left: -24px;
+      width: 20px;
+      color: var(--muted);
+      font-weight: 400;
+      opacity: 0;
+    }
+    .anchor-heading:hover > a, .anchor-heading > a:focus { opacity: 1; text-decoration: none; }
+
+    .muted { color: var(--muted); }
+    .small { font-size: 13px; }
+    .nowrap { white-space: nowrap; }
+
+    footer {
+      margin-top: 72px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-soft);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      .layout { display: block; }
+      aside {
+        position: static;
+        width: 100%;
+        height: auto;
+        padding: 16px 20px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .brand { display: inline-block; margin-bottom: 0; padding-bottom: 0; border: 0; }
+      .brand p { display: none; }
+      .back { float: right; margin: 7px 0 0; }
+      aside nav { display: none; }
+      main { width: 100%; padding: 38px 24px 72px; }
+      .hero { margin-bottom: 30px; }
+      h2 { margin-top: 52px; }
+      .anchor-heading > a { display: none; }
+    }
+
+    @media (max-width: 640px) {
+      body { font-size: 14.5px; }
+      main { padding: 30px 18px 64px; }
+      .cards, .flow-list { grid-template-columns: 1fr; }
+      h1 { font-size: 38px; }
+      h2 { font-size: 23px; }
+      td:first-child { white-space: normal; }
+      .back span { display: none; }
+    }
+
+    @media print {
+      aside { display: none; }
+      .layout { display: block; }
+      main { width: 100%; max-width: none; padding: 0; }
+      a { color: inherit; text-decoration: underline; }
+      pre, .card, .table-wrap { break-inside: avoid; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+
+<div class="layout">
+  <aside aria-label="Manual navigation">
+    <a class="back" href="https://github.com/bigconfig-ai/once" rel="noopener">
+      <span aria-hidden="true">←</span><span>Back to bigconfig-ai/once</span>
+    </a>
+
+    <div class="brand">
+      <a class="brand-mark" href="#top">
+        <span class="leaf" aria-hidden="true">◆</span>
+        <span>Green Once</span>
+      </a>
+      <p>Manual</p>
+    </div>
+
+    <nav aria-label="Table of contents">
+      <div class="group">Get started</div>
+      <ul>
+        <li><a href="#introduction">Introduction</a></li>
+        <li><a href="#green-once-and-once">green-once and once</a></li>
+        <li><a href="#requirements">Requirements</a></li>
+        <li><a href="#quick-start">Quick start</a></li>
+      </ul>
+
+      <div class="group">Concepts</div>
+      <ul>
+        <li><a href="#workflow-architecture">Workflow architecture</a></li>
+        <li><a href="#desired-state">Desired state</a></li>
+        <li><a href="#generated-files">Generated files</a></li>
+      </ul>
+
+      <div class="group">Configuration</div>
+      <ul>
+        <li><a href="#applications">Applications</a></li>
+        <li><a href="#secrets">Secrets and environment</a></li>
+        <li><a href="#compute-providers">Compute providers</a></li>
+        <li><a href="#smtp-providers">SMTP providers</a></li>
+        <li><a href="#dns-providers">DNS providers</a></li>
+        <li><a href="#state-backends">State backends</a></li>
+        <li><a href="#ssh-configuration">SSH configuration</a></li>
+      </ul>
+
+      <div class="group">Command reference</div>
+      <ul>
+        <li><a href="#commands">Command overview</a></li>
+        <li><a href="#build">Build</a></li>
+        <li><a href="#create">Create and dry-run</a></li>
+        <li><a href="#describe">Describe</a></li>
+        <li><a href="#delete">Delete and dry-run</a></li>
+        <li><a href="#another-file">Another state file</a></li>
+      </ul>
+
+      <div class="group">Operations</div>
+      <ul>
+        <li><a href="#safe-lifecycle">Safe lifecycle</a></li>
+        <li><a href="#deploy-updates">Application updates</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+      </ul>
+
+      <div class="group">Reference</div>
+      <ul>
+        <li><a href="#complete-example">Complete example</a></li>
+        <li><a href="#parameter-reference">Parameter reference</a></li>
+        <li><a href="#repository-layout">Repository layout</a></li>
+        <li><a href="#development">Development</a></li>
+        <li><a href="#license">License</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main id="content">
+    <header class="hero" id="top">
+      <p class="eyebrow">Green · OpenTofu · Ansible</p>
+      <h1>Green Once</h1>
+      <p class="lead">Use an AI-agent skill to create and operate a production, single-server Basecamp ONCE deployment from a small, reviewable desired-state file.</p>
+      <ul class="badges" aria-label="Project attributes">
+        <li class="badge">Single server</li>
+        <li class="badge">Agent guided</li>
+        <li class="badge">Dry-run first</li>
+        <li class="badge">MIT licensed</li>
+      </ul>
+    </header>
+
+    <section id="introduction">
+      <h2 class="anchor-heading"><a href="#introduction" aria-label="Link to Introduction">#</a>Introduction</h2>
+      <p>Green Once provisions a server, configures DNS and outgoing email, installs Docker and <a href="https://github.com/basecamp/once" rel="noopener">Basecamp ONCE</a>, and reconciles the applications declared in <code>green.edn</code>. It combines a guided agent skill with an executable infrastructure workflow.</p>
+      <p>You provide a domain, application images, provider choices, non-secret settings, and public SSH keys. Credentials and application secrets stay in your environment. The result is an isolated set of OpenTofu and Ansible files plus a repeatable lifecycle command.</p>
+
+      <div class="callout success">
+        <span class="callout-title">The safe default</span>
+        Start with <code>build</code> and <code>create --dry-run</code>. Neither command contacts a cloud provider or changes infrastructure. Run a real <code>create</code> only after reviewing the desired state and dry-run.
+      </div>
+    </section>
+
+    <section id="green-once-and-once">
+      <h2 class="anchor-heading"><a href="#green-once-and-once" aria-label="Link to green-once and once">#</a>green-once and once</h2>
+      <div class="cards">
+        <article class="card">
+          <p class="label">Agent interface</p>
+          <h3><code>green-once</code></h3>
+          <p>An agent skill that gathers non-secret inputs, creates <code>green</code> and <code>green.edn</code>, protects the work directory with <code>.gitignore</code>, and performs safe build and dry-run checks.</p>
+        </article>
+        <article class="card">
+          <p class="label">Executable workflow</p>
+          <h3><code>once</code></h3>
+          <p>The underlying Green DAG that renders and runs OpenTofu and Ansible stages. It owns provider configuration, state, server setup, application reconciliation, description, and teardown.</p>
+        </article>
+      </div>
+      <p>The skill is the guided setup and safety layer; the generated <code>green</code> launcher is the durable operational interface. After initialization, the project can be operated directly without Node or the skill.</p>
+    </section>
+
+    <section id="requirements">
+      <h2 class="anchor-heading"><a href="#requirements" aria-label="Link to Requirements">#</a>Requirements</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tool</th><th>Needed for</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>Node.js</code> / <code>npx</code></td><td>Loading the skill</td><td>Only needed to run the Skills CLI.</td></tr>
+            <tr><td><code>Babashka</code></td><td>All launcher commands</td><td>Runs the generated <code>green</code> script.</td></tr>
+            <tr><td><code>OpenTofu</code></td><td>Real create, delete, and state-backed describe</td><td>Manages compute, SMTP, DNS, and verification state.</td></tr>
+            <tr><td><code>Ansible</code></td><td>Real create</td><td>Configures the remote host and ONCE applications.</td></tr>
+            <tr><td><code>OpenSSH</code></td><td>Create and describe</td><td>Private compute key should already be available through <code>ssh-agent</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Provider credentials are required only for a real create or delete and only for the providers selected in <code>green.edn</code>. Build and dry-run still validate the non-secret desired-state structure.</p>
+    </section>
+
+    <section id="quick-start">
+      <h2 class="anchor-heading"><a href="#quick-start" aria-label="Link to Quick start">#</a>Quick start</h2>
+
+      <ol class="steps">
+        <li>
+          <h3>Use the skill</h3>
+          <p>Load <code>green-once</code> for a one-off agent session without installing it:</p>
+          <pre><code class="language-bash">npx skills use bigconfig-ai/once@green-once</code></pre>
+          <p>To install it into an agent permanently instead:</p>
+          <pre><code class="language-bash">npx skills add bigconfig-ai/once --skill green-once</code></pre>
+        </li>
+        <li>
+          <h3>Describe the deployment</h3>
+          <p>Tell the agent the profile name, domain, application hostnames and images, provider choices, and public-key file paths. Give it only the <em>names</em> of environment variables that hold application secrets—never secret values.</p>
+          <pre><code class="language-text">Create a Green Once project for example.com.
+Deploy ghcr.io/example/site:latest at www.example.com.
+Use DigitalOcean, Resend, Cloudflare, and R2.
+Map DATABASE_URL to the host variable ONCE_SITE_DATABASE_URL.</code></pre>
+        </li>
+        <li>
+          <h3>Review generated project files</h3>
+          <p>The skill writes an executable <code>green</code> launcher and a flat <code>green.edn</code> desired-state file. It does not put credentials or application secret values in either file.</p>
+        </li>
+        <li>
+          <h3>Run safe checks</h3>
+          <p>The skill builds generated configuration and prints the execution graph without provisioning anything:</p>
+          <pre><code class="language-bash">./green build -f ./green.edn
+./green create -f ./green.edn --dry-run</code></pre>
+        </li>
+        <li>
+          <h3>Provision explicitly</h3>
+          <p>Set the required environment variables through your private shell or secret manager, review the dry-run, and explicitly approve the real operation:</p>
+          <pre><code class="language-bash">./green create -f ./green.edn
+./green describe -f ./green.edn</code></pre>
+        </li>
+      </ol>
+
+      <div class="callout warning">
+        <span class="callout-title">Approval boundary</span>
+        The skill must not start a real <code>create</code> or <code>delete</code> merely because initialization succeeded. Those operations require explicit user confirmation.
+      </div>
+    </section>
+
+    <section id="workflow-architecture">
+      <h2 class="anchor-heading"><a href="#workflow-architecture" aria-label="Link to Workflow architecture">#</a>Workflow architecture</h2>
+      <p>Green executes the lifecycle as a directed acyclic graph. Independent work runs concurrently; downstream steps receive outputs from their upstream branches.</p>
+
+      <h3>Create and build</h3>
+      <pre class="diagram"><code>                        ┌─ tofu-compute ─┐
+start + validation ─────┤                 ├─ tofu-dns ─ tofu-smtp-post ─┬─ ansible-local
+                        └─ tofu-smtp ─────┘                              └─ ansible-remote</code></pre>
+      <div class="flow-list">
+        <div class="flow-item"><b>1 · Compute + SMTP</b><span>Provisioned concurrently.</span></div>
+        <div class="flow-item"><b>2 · DNS</b><span>Joins the server IP and SMTP records.</span></div>
+        <div class="flow-item"><b>3 · SMTP post</b><span>Verifies the sending domain after DNS.</span></div>
+        <div class="flow-item"><b>4 · Local output</b><span>Writes an optional SSH config fragment.</span></div>
+        <div class="flow-item"><b>5 · Remote setup</b><span>Installs ONCE and reconciles applications.</span></div>
+      </div>
+      <p>For <code>build</code>, the same graph renders deterministic configuration with safe placeholder outputs but does not invoke OpenTofu or Ansible.</p>
+
+      <h3>Delete</h3>
+      <pre class="diagram"><code>start + validation
+        │
+        └─ ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
+                                                        └─ tofu-compute</code></pre>
+      <p>A real delete first removes generated Ansible files, then destroys SMTP verification and DNS, and finally destroys SMTP and compute concurrently. Existing OpenTofu outputs are loaded before teardown so dependent state can be addressed in reverse order.</p>
+    </section>
+
+    <section id="desired-state">
+      <h2 class="anchor-heading"><a href="#desired-state" aria-label="Link to Desired state">#</a>Desired state</h2>
+      <p><code>green.edn</code> is a single flat EDN map, except for the nested <code>:once</code> application collection. Keep provider selection and non-secret settings in this file; keep all credentials, passwords, private keys, and application secret values out.</p>
+
+      <pre><code class="language-clojure">{:profile "production"
+ :workdir ".green"
+ :domain "example.com"
+ :package "once-production"
+
+ :compute-pubkey "ssh-ed25519 AAAA... operator"
+ :deploy-pubkey  "ssh-ed25519 AAAA... ci-deploy"
+
+ :once {:applications
+        [{:host "www.example.com"
+          :image "ghcr.io/example/site:latest"
+          :env {"DATABASE_URL" "ONCE_SITE_DATABASE_URL"}}]}
+
+ :provider-compute "digitalocean"
+ :provider-smtp "resend"
+ :provider-dns "cloudflare"
+ :provider-backend "r2"
+ :compute-prevent-destroy true
+
+ :digitalocean-name "once"
+ :digitalocean-region "ams3"
+ :digitalocean-size "s-1vcpu-1gb-35gb-intel"
+ :digitalocean-image "ubuntu-24-04-x64"
+
+ :resend-server "smtp.resend.com"
+ :resend-port 587
+ :resend-username "resend"
+
+ :r2-bucket "once-tfstate"
+ :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"}</code></pre>
+
+      <h3>Non-secret overrides</h3>
+      <p>A <code>GREEN_PAR_*</code> environment variable overrides a flat key. The launcher strips the prefix, lowercases the name, and changes underscores to hyphens. Existing boolean and integer values retain their types.</p>
+      <pre><code class="language-bash">GREEN_PAR_DIGITALOCEAN_REGION=fra1 ./green build
+GREEN_PAR_RESEND_PORT=2525 ./green create --dry-run</code></pre>
+      <p>Use this mechanism for temporary deployment settings and the destruction guard. Provider credentials should use the provider-native environment variables listed under <a href="#secrets">Secrets and environment</a>.</p>
+    </section>
+
+    <section id="generated-files">
+      <h2 class="anchor-heading"><a href="#generated-files" aria-label="Link to Generated files">#</a>Generated files</h2>
+      <p>Every tool gets an isolated directory under <code>&lt;workdir&gt;/&lt;profile&gt;/</code>. With the recommended defaults, a build resembles:</p>
+      <pre><code class="language-text">.green/
+└── production/
+    ├── tofu-compute/
+    │   ├── backend.tf.json
+    │   └── main.tf.json
+    ├── tofu-smtp/
+    │   ├── backend.tf.json
+    │   └── main.tf.json
+    ├── tofu-dns/
+    │   ├── backend.tf.json
+    │   └── main.tf.json
+    ├── tofu-smtp-post/
+    │   ├── backend.tf.json
+    │   └── main.tf.json
+    ├── ansible-local/
+    │   └── config
+    └── ansible-remote/
+        ├── ansible.cfg
+        ├── inventory.json
+        ├── main.json
+        ├── once.json
+        ├── mailrc.j2
+        ├── files/deploy
+        └── library/once</code></pre>
+      <ul>
+        <li>The work directory is generated output and should be ignored by Git.</li>
+        <li>Local OpenTofu state remains in each tool directory. S3 and R2 use remote keys of the form <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</li>
+        <li>Generated Ansible templates contain environment lookups, not application or SMTP secret values.</li>
+        <li>The <code>ansible-local/config</code> file is an SSH fragment you may include from <code>~/.ssh/config</code>; Green does not overwrite your personal SSH configuration.</li>
+      </ul>
+    </section>
+
+    <section id="applications">
+      <h2 class="anchor-heading"><a href="#applications" aria-label="Link to Applications">#</a>Applications</h2>
+      <p>Applications live in <code>:once {:applications [...]}</code>. Every host must equal <code>:domain</code> or be a subdomain of it, and every application requires a container image.</p>
+      <pre><code class="language-clojure">:once
+{:applications
+ [{:host "www.example.com"
+   :image "ghcr.io/example/site:latest"
+   :env {"DATABASE_URL" "ONCE_SITE_DATABASE_URL"
+         "SECRET_KEY_BASE" "ONCE_SITE_SECRET_KEY_BASE"}
+   :auto_update true
+   :auto_backup true
+   :backup_path "/var/backups/site"
+   :cpus 2
+   :memory "2g"}]}</code></pre>
+
+      <h3>Environment indirection</h3>
+      <p><code>:env</code> maps a container variable name to the name of a host environment variable. It never maps to a secret value. On real create, the launcher verifies that every referenced host variable is set; Ansible resolves it only while configuring the server.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Application key</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>:host</code></td><td>Required FQDN served by the application.</td></tr>
+            <tr><td><code>:image</code></td><td>Required container image reference.</td></tr>
+            <tr><td><code>:env</code></td><td>Map of container variable names to host environment-variable names.</td></tr>
+            <tr><td><code>:auto_update</code></td><td>Enable ONCE automatic image updates.</td></tr>
+            <tr><td><code>:auto_backup</code></td><td>Enable ONCE automatic backups.</td></tr>
+            <tr><td><code>:backup_path</code></td><td>Set the application backup path.</td></tr>
+            <tr><td><code>:disable_tls</code></td><td>Disable ONCE-managed TLS for the application.</td></tr>
+            <tr><td><code>:cpus</code></td><td>Set the container CPU allocation.</td></tr>
+            <tr><td><code>:memory</code></td><td>Set the container memory allocation.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="secrets">
+      <h2 class="anchor-heading"><a href="#secrets" aria-label="Link to Secrets and environment">#</a>Secrets and environment</h2>
+      <div class="callout danger">
+        <span class="callout-title">Never put secret values in project files or chat</span>
+        Do not place API tokens, passwords, private keys, access keys, or application secrets in <code>green.edn</code>, the <code>green</code> launcher, prompts, generated examples, logs, or shell history. Use a private environment loader or secret manager.
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Selection</th><th>Required environment variables</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>DigitalOcean</td><td><code>DIGITALOCEAN_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Hetzner Cloud</td><td><code>HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Oracle Cloud</td><td><code>TF_VAR_oci_tenancy_ocid</code>, <code>TF_VAR_oci_user_ocid</code>, <code>TF_VAR_oci_fingerprint</code>, <code>TF_VAR_oci_private_key</code></td><td>Create and delete</td></tr>
+            <tr><td>Resend</td><td><code>TF_VAR_resend_api_key</code></td><td>Create and delete</td></tr>
+            <tr><td>Any SMTP provider</td><td><code>ONCE_SMTP_PASSWORD</code></td><td>Create</td></tr>
+            <tr><td>Cloudflare DNS</td><td><code>CLOUDFLARE_API_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>S3 or R2 backend</td><td><code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code></td><td>Create and delete</td></tr>
+            <tr><td>Application <code>:env</code></td><td>Every host variable named by the application map</td><td>Create</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>AWS_SESSION_TOKEN</code> is honored when present for S3-compatible authentication. Build and dry-run do not require these secret variables.</p>
+
+      <h3>Check presence without printing values</h3>
+      <pre><code class="language-bash">for name in DIGITALOCEAN_TOKEN TF_VAR_resend_api_key \
+  ONCE_SMTP_PASSWORD CLOUDFLARE_API_TOKEN \
+  AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+  if [ -n "${!name:-}" ]; then
+    printf '%s: set\n' "$name"
+  else
+    printf '%s: missing\n' "$name"
+  fi
+done</code></pre>
+      <p class="small muted">Adjust the list to your selected providers. This check reports only presence and never prints values.</p>
+    </section>
+
+    <section id="compute-providers">
+      <h2 class="anchor-heading"><a href="#compute-providers" aria-label="Link to Compute providers">#</a>Compute providers</h2>
+
+      <h3>DigitalOcean</h3>
+      <pre><code class="language-clojure">:provider-compute "digitalocean"
+:digitalocean-name "once"
+:digitalocean-region "ams3"
+:digitalocean-size "s-1vcpu-1gb-35gb-intel"
+:digitalocean-image "ubuntu-24-04-x64"
+;; Optional:
+:digitalocean-vpc-uuid "non-secret-vpc-uuid"</code></pre>
+      <p>The workflow registers <code>:compute-pubkey</code> as a DigitalOcean SSH key and attaches it to the droplet. Credential: <code>DIGITALOCEAN_TOKEN</code>.</p>
+
+      <h3>Hetzner Cloud</h3>
+      <pre><code class="language-clojure">:provider-compute "hcloud"
+:hcloud-name "once"
+:hcloud-image "ubuntu-24.04"
+:hcloud-server-type "cx23"
+:hcloud-location "hel1"</code></pre>
+      <p>The workflow registers <code>:compute-pubkey</code> and creates an IPv4 server. Credential: <code>HCLOUD_TOKEN</code>.</p>
+
+      <h3>Oracle Cloud Infrastructure</h3>
+      <pre><code class="language-clojure">:provider-compute "oci"
+:oci-region "eu-frankfurt-1"
+:oci-subnet-id "ocid1.subnet..."
+:oci-compartment-id "ocid1.compartment..."
+:oci-availability-domain "..."
+:oci-display-name "once"
+:oci-shape "VM.Standard.A1.Flex"
+:oci-ocpus 1
+:oci-memory-in-gbs 4
+:oci-boot-volume-size-in-gbs 50
+:oci-boot-volume-vpus-per-gb 30</code></pre>
+      <p>The current default shape is ARM-based. The compute public key is written into instance metadata. OCI authentication uses the four <code>TF_VAR_oci_*</code> variables listed above.</p>
+
+      <h3>Existing server</h3>
+      <pre><code class="language-clojure">:provider-compute "no-infra"
+:no-infra-compute-ip "203.0.113.10"
+:no-infra-compute-user "root"
+:no-infra-compute-sudoer "root"
+:no-infra-compute-uid 0
+:no-infra-compute-name "once"</code></pre>
+      <p>No compute resource or API credential is required. The server must be reachable using the configured user and an SSH identity already loaded into <code>ssh-agent</code>. <code>:compute-pubkey</code> may be omitted for this provider.</p>
+    </section>
+
+    <section id="smtp-providers">
+      <h2 class="anchor-heading"><a href="#smtp-providers" aria-label="Link to SMTP providers">#</a>SMTP providers</h2>
+
+      <h3>Resend</h3>
+      <pre><code class="language-clojure">:provider-smtp "resend"
+:resend-server "smtp.resend.com"
+:resend-port 587
+:resend-username "resend"</code></pre>
+      <p>The SMTP stage creates <code>notifications.&lt;domain&gt;</code>, returns its DNS records, and the post stage verifies it after DNS is configured. Use <code>TF_VAR_resend_api_key</code> for the Resend API and <code>ONCE_SMTP_PASSWORD</code> for server-side SMTP authentication.</p>
+
+      <h3>Existing SMTP</h3>
+      <pre><code class="language-clojure">:provider-smtp "no-infra"
+:no-infra-smtp-server "smtp.example.net"
+:no-infra-smtp-port 587
+:no-infra-smtp-username "smtp-user"</code></pre>
+      <p>No SMTP infrastructure is created. A real create still requires <code>ONCE_SMTP_PASSWORD</code> so the remote ONCE server can send mail.</p>
+    </section>
+
+    <section id="dns-providers">
+      <h2 class="anchor-heading"><a href="#dns-providers" aria-label="Link to DNS providers">#</a>DNS providers</h2>
+      <div class="cards">
+        <article class="card">
+          <p class="label">Managed</p>
+          <h3><code>cloudflare</code></h3>
+          <p>Finds the configured zone, creates a proxied A record for each application hostname, and adds the unproxied records returned by Resend. Requires <code>CLOUDFLARE_API_TOKEN</code> with zone-read and DNS-edit access.</p>
+        </article>
+        <article class="card">
+          <p class="label">External</p>
+          <h3><code>no-infra</code></h3>
+          <p>Creates no DNS resources and requires no DNS credential. You are responsible for application and SMTP records outside Green Once.</p>
+        </article>
+      </div>
+      <pre><code class="language-clojure">:provider-dns "cloudflare"  ; or "no-infra"</code></pre>
+    </section>
+
+    <section id="state-backends">
+      <h2 class="anchor-heading"><a href="#state-backends" aria-label="Link to State backends">#</a>State backends</h2>
+      <p>Backend advice writes a backend configuration before every OpenTofu stage. State is isolated by both profile and tool.</p>
+
+      <h3>Local</h3>
+      <pre><code class="language-clojure">:provider-backend "local"</code></pre>
+      <p>Best for experiments. Protect and back up the work directory; losing local state makes safe lifecycle management difficult.</p>
+
+      <h3>Amazon S3</h3>
+      <pre><code class="language-clojure">:provider-backend "s3"
+:s3-bucket "once-tfstate"
+:s3-region "eu-west-1"</code></pre>
+      <p>Uses <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code>. State keys are <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</p>
+
+      <h3>Cloudflare R2</h3>
+      <pre><code class="language-clojure">:provider-backend "r2"
+:r2-bucket "once-tfstate"
+:r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"</code></pre>
+      <p>Uses the S3-compatible backend with R2 credentials in <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code>.</p>
+    </section>
+
+    <section id="ssh-configuration">
+      <h2 class="anchor-heading"><a href="#ssh-configuration" aria-label="Link to SSH configuration">#</a>SSH configuration</h2>
+      <div class="cards">
+        <article class="card">
+          <p class="label">Operations</p>
+          <h3><code>:compute-pubkey</code></h3>
+          <p>Authorizes administrative SSH access to a new cloud server. Its private half remains outside the project and should be loaded into <code>ssh-agent</code> before create.</p>
+        </article>
+        <article class="card">
+          <p class="label">Deployment</p>
+          <h3><code>:deploy-pubkey</code></h3>
+          <p>Authorizes the remote <code>deploy</code> user through a forced command. Interactive sessions are denied; only <code>sudo once update &lt;configured-host&gt;</code> is accepted.</p>
+        </article>
+      </div>
+      <p>Public keys are not secrets, but private key files are. The skill may read only a public <code>.pub</code> file that you approve; it must never inspect a private SSH key.</p>
+      <pre><code class="language-bash">ssh-add -l
+ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
+    </section>
+
+    <section id="commands">
+      <h2 class="anchor-heading"><a href="#commands" aria-label="Link to Command overview">#</a>Command overview</h2>
+      <pre><code class="language-text">Usage: ./green &lt;build|create|delete|describe&gt; [-f|--file green.edn] [--dry-run]</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Command</th><th>Effect</th><th>External changes</th></tr></thead>
+          <tbody>
+            <tr><td><code>./green build</code></td><td>Validate and render all stage files.</td><td>Writes only the local work directory.</td></tr>
+            <tr><td><code>./green create --dry-run</code></td><td>Validate and print the create DAG.</td><td>None.</td></tr>
+            <tr><td><code>./green create</code></td><td>Provision infrastructure and reconcile the server.</td><td>Yes.</td></tr>
+            <tr><td><code>./green describe</code></td><td>Read state, probe SSH, and list ONCE applications.</td><td>Read-only.</td></tr>
+            <tr><td><code>./green delete --dry-run</code></td><td>Validate and print the delete DAG.</td><td>None.</td></tr>
+            <tr><td><code>./green delete</code></td><td>Destroy managed infrastructure in reverse order.</td><td>Destructive.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="build">
+      <h2 class="anchor-heading"><a href="#build" aria-label="Link to Build">#</a>Build</h2>
+      <pre><code class="language-bash">./green build</code></pre>
+      <p>Build validates the selected providers and required non-secret values, then renders all OpenTofu and Ansible files. It does not invoke OpenTofu, Ansible, SSH, or provider APIs. Use it to review exactly what Green Once would generate.</p>
+    </section>
+
+    <section id="create">
+      <h2 class="anchor-heading"><a href="#create" aria-label="Link to Create and dry-run">#</a>Create and dry-run</h2>
+      <pre><code class="language-bash">./green create --dry-run
+./green create</code></pre>
+      <p>Dry-run validates desired-state structure and prints planned DAG actions without requiring provider credentials. Real create additionally checks provider and application environment variables, applies the four OpenTofu stages, and configures the host with Ansible.</p>
+      <div class="callout warning">
+        <span class="callout-title">Real infrastructure operation</span>
+        A real create can incur cloud costs, create public DNS records, and deploy internet-facing applications. Review <code>green.edn</code>, <code>build</code>, and dry-run first.
+      </div>
+    </section>
+
+    <section id="describe">
+      <h2 class="anchor-heading"><a href="#describe" aria-label="Link to Describe">#</a>Describe</h2>
+      <pre><code class="language-bash">./green describe</code></pre>
+      <p>Describe reads compute and SMTP outputs from their OpenTofu state, reports the selected providers, probes the server over SSH, and runs <code>sudo -n once list</code> when the host is reachable. Connectivity problems are reported without changing infrastructure.</p>
+      <p>For a remote backend, make sure its credentials are present so OpenTofu outputs can be read. The compute private key must be available to SSH.</p>
+    </section>
+
+    <section id="delete">
+      <h2 class="anchor-heading"><a href="#delete" aria-label="Link to Delete and dry-run">#</a>Delete and dry-run</h2>
+      <pre><code class="language-bash">./green delete --dry-run
+GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
+      <p>Dry-run prints teardown order and changes nothing. A real delete is refused while <code>:compute-prevent-destroy</code> is <code>true</code>, which is the required default. Deliberately override it only for the exact delete you have approved.</p>
+      <div class="callout danger">
+        <span class="callout-title">Destructive operation</span>
+        Delete removes managed DNS, SMTP, and compute resources. Verify backups and state access first. The protection override should be temporary rather than committed to <code>green.edn</code>.
+      </div>
+    </section>
+
+    <section id="another-file">
+      <h2 class="anchor-heading"><a href="#another-file" aria-label="Link to Another state file">#</a>Using another desired-state file</h2>
+      <p>Use <code>-f</code> or <code>--file</code> with every command:</p>
+      <pre><code class="language-bash">./green build -f ./production.edn
+./green create --file ./production.edn --dry-run
+./green describe -f ./production.edn</code></pre>
+      <p>Keep profiles and work directories distinct to prevent state or generated files from overlapping.</p>
+    </section>
+
+    <section id="safe-lifecycle">
+      <h2 class="anchor-heading"><a href="#safe-lifecycle" aria-label="Link to Safe lifecycle">#</a>Safe lifecycle</h2>
+      <ol>
+        <li>Keep <code>green.edn</code> free of secrets and commit it for review.</li>
+        <li>Keep <code>&lt;workdir&gt;/</code> and private environment files ignored by Git.</li>
+        <li>Load the compute private key into <code>ssh-agent</code>; never copy it into the project.</li>
+        <li>Load required credentials through a private environment or secret manager.</li>
+        <li>Run <code>./green build</code>.</li>
+        <li>Run <code>./green create --dry-run</code>.</li>
+        <li>Explicitly approve and run <code>./green create</code>.</li>
+        <li>Run <code>./green describe</code> after provisioning.</li>
+        <li>Back up application data and OpenTofu state before teardown.</li>
+        <li>Dry-run and explicitly approve any real delete.</li>
+      </ol>
+      <p>For production, prefer S3 or R2 state over local state and protect the bucket with appropriate access controls and retention.</p>
+    </section>
+
+    <section id="deploy-updates">
+      <h2 class="anchor-heading"><a href="#deploy-updates" aria-label="Link to Application updates">#</a>Application updates</h2>
+      <p>The remote server gets a restricted <code>deploy</code> account intended for CI or controlled update jobs. Its forced command rejects interactive sessions, malformed commands, and hosts not already known to ONCE.</p>
+      <pre><code class="language-bash">ssh deploy@SERVER_IP sudo once update www.example.com</code></pre>
+      <p>The key supplied as <code>:deploy-pubkey</code> is the only credential authorized for that account. You can also set <code>:auto_update true</code> on an application when ONCE should handle updates automatically.</p>
+      <p>Running <code>./green create</code> again is appropriate when infrastructure or declared application membership changes: the remote Ansible module adds missing hosts and removes hosts no longer present in desired state.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2 class="anchor-heading"><a href="#troubleshooting" aria-label="Link to Troubleshooting">#</a>Troubleshooting</h2>
+
+      <h3><code>npx skills</code> cannot find <code>green-once</code></h3>
+      <p>Confirm internet access and use the full package and skill name: <code>npx skills use bigconfig-ai/once@green-once</code>.</p>
+
+      <h3>A desired-state key is required</h3>
+      <p>Add the missing non-secret field for the selected provider. Remove unused providers' fields rather than filling them with credentials or passwords.</p>
+
+      <h3>A required environment variable is not set</h3>
+      <p>Set the named variable through your private environment loader or secret manager. Check presence only; do not print the value. Application variable names come from each application's <code>:env</code> map.</p>
+
+      <h3><code>:env must map container names...</code></h3>
+      <p>Use a map, not a vector of <code>KEY=value</code> strings:</p>
+      <pre><code class="language-clojure">:env {"DATABASE_URL" "ONCE_SITE_DATABASE_URL"}</code></pre>
+
+      <h3>Compute destruction is protected</h3>
+      <p>This is expected. First run <code>./green delete --dry-run</code>. After explicit approval, set <code>GREEN_PAR_COMPUTE_PREVENT_DESTROY=false</code> only for the real delete command.</p>
+
+      <h3>SSH is not reachable</h3>
+      <ul>
+        <li>Check the address reported by <code>./green describe</code>.</li>
+        <li>Run <code>ssh-add -l</code> and confirm the compute private key is loaded.</li>
+        <li>Check provider firewalls and the configured existing-server user.</li>
+        <li>For a fresh cloud server, allow startup and SSH initialization to finish.</li>
+      </ul>
+
+      <h3>OpenTofu output or state is missing</h3>
+      <p>Use the same <code>:profile</code>, <code>:workdir</code>, backend selection, and backend credentials used during create. Do not delete the local work directory when using local state.</p>
+
+      <h3>Resend verification is delayed</h3>
+      <p>Confirm Cloudflare received all unproxied Resend records and allow DNS propagation. Rerun create after the records are visible; OpenTofu will continue from existing state.</p>
+
+      <h3>Cloudflare cannot find the zone</h3>
+      <p>The configured <code>:domain</code> must already belong to a zone accessible by <code>CLOUDFLARE_API_TOKEN</code>. The token needs permission to read the zone and edit DNS records.</p>
+
+      <h3>An existing server fails during create</h3>
+      <p>Verify direct SSH access with <code>:no-infra-compute-user</code>, passwordless privilege escalation for <code>:no-infra-compute-sudoer</code>, a supported Linux host, and outbound network access for installers.</p>
+    </section>
+
+    <section id="complete-example">
+      <h2 class="anchor-heading"><a href="#complete-example" aria-label="Link to Complete example">#</a>Complete <code>green.edn</code> example</h2>
+      <p>This example contains only public or non-secret configuration. Replace illustrative identifiers with your own, but provide credentials and passwords exclusively through environment variables.</p>
+      <pre><code class="language-clojure">{:profile "production"
+ :workdir ".green"
+ :domain "example.com"
+ :package "once-production"
+
+ :compute-pubkey "ssh-ed25519 AAAAC3... operator"
+ :deploy-pubkey  "ssh-ed25519 AAAAC3... ci-deploy"
+
+ :once
+ {:applications
+  [{:host "www.example.com"
+    :image "ghcr.io/example/site:latest"
+    :env {"DATABASE_URL" "ONCE_SITE_DATABASE_URL"
+          "SECRET_KEY_BASE" "ONCE_SITE_SECRET_KEY_BASE"}
+    :auto_update true
+    :auto_backup true}]}
+
+ :provider-compute "digitalocean"
+ :provider-smtp "resend"
+ :provider-dns "cloudflare"
+ :provider-backend "r2"
+ :compute-prevent-destroy true
+
+ :digitalocean-name "once-production"
+ :digitalocean-region "ams3"
+ :digitalocean-size "s-1vcpu-1gb-35gb-intel"
+ :digitalocean-image "ubuntu-24-04-x64"
+
+ :resend-server "smtp.resend.com"
+ :resend-port 587
+ :resend-username "resend"
+
+ :r2-bucket "once-production-tfstate"
+ :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"}</code></pre>
+    </section>
+
+    <section id="parameter-reference">
+      <h2 class="anchor-heading"><a href="#parameter-reference" aria-label="Link to Parameter reference">#</a>Parameter reference</h2>
+
+      <h3>Base</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Key</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>:profile</code></td><td>Yes</td><td>Names generated output and remote state keys.</td></tr>
+            <tr><td><code>:workdir</code></td><td>Yes</td><td>Generated root directory; recommended value is <code>.green</code>.</td></tr>
+            <tr><td><code>:domain</code></td><td>Yes</td><td>Lowercase fully-qualified apex domain.</td></tr>
+            <tr><td><code>:package</code></td><td>Yes</td><td>Deployment and compute resource identifier.</td></tr>
+            <tr><td><code>:compute-pubkey</code></td><td>Cloud only</td><td>Administrative SSH public key.</td></tr>
+            <tr><td><code>:deploy-pubkey</code></td><td>Yes</td><td>Restricted application-update SSH public key.</td></tr>
+            <tr><td><code>:once</code></td><td>Yes</td><td>Map containing a non-empty <code>:applications</code> vector.</td></tr>
+            <tr><td><code>:provider-compute</code></td><td>Yes</td><td><code>digitalocean</code>, <code>hcloud</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
+            <tr><td><code>:provider-smtp</code></td><td>Yes</td><td><code>resend</code> or <code>no-infra</code>.</td></tr>
+            <tr><td><code>:provider-dns</code></td><td>Yes</td><td><code>cloudflare</code> or <code>no-infra</code>.</td></tr>
+            <tr><td><code>:provider-backend</code></td><td>Yes</td><td><code>local</code>, <code>s3</code>, or <code>r2</code>.</td></tr>
+            <tr><td><code>:compute-prevent-destroy</code></td><td>Yes</td><td>Boolean destruction guard; keep <code>true</code> in committed state.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Provider-specific non-secret keys</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Provider</th><th>Keys</th></tr></thead>
+          <tbody>
+            <tr><td>DigitalOcean</td><td><code>:digitalocean-name</code>, <code>:digitalocean-region</code>, <code>:digitalocean-size</code>, <code>:digitalocean-image</code>; optional <code>:digitalocean-vpc-uuid</code></td></tr>
+            <tr><td>Hetzner</td><td><code>:hcloud-name</code>, <code>:hcloud-image</code>, <code>:hcloud-server-type</code>, <code>:hcloud-location</code></td></tr>
+            <tr><td>OCI</td><td><code>:oci-region</code>, <code>:oci-subnet-id</code>, <code>:oci-compartment-id</code>, <code>:oci-availability-domain</code>, <code>:oci-display-name</code>, <code>:oci-shape</code>, <code>:oci-ocpus</code>, <code>:oci-memory-in-gbs</code>, <code>:oci-boot-volume-size-in-gbs</code>, <code>:oci-boot-volume-vpus-per-gb</code></td></tr>
+            <tr><td>Existing compute</td><td><code>:no-infra-compute-ip</code>, <code>:no-infra-compute-user</code>, <code>:no-infra-compute-sudoer</code>, <code>:no-infra-compute-uid</code>; optional <code>:no-infra-compute-name</code></td></tr>
+            <tr><td>Resend</td><td><code>:resend-server</code>, <code>:resend-port</code>, <code>:resend-username</code></td></tr>
+            <tr><td>Existing SMTP</td><td><code>:no-infra-smtp-server</code>, <code>:no-infra-smtp-port</code>, <code>:no-infra-smtp-username</code></td></tr>
+            <tr><td>S3 backend</td><td><code>:s3-bucket</code>, <code>:s3-region</code></td></tr>
+            <tr><td>R2 backend</td><td><code>:r2-bucket</code>, <code>:r2-endpoint</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="repository-layout">
+      <h2 class="anchor-heading"><a href="#repository-layout" aria-label="Link to Repository layout">#</a>Repository layout</h2>
+      <pre><code class="language-text">once/
+├── green-once/
+│   ├── SKILL.md                    # agent instructions and safety policy
+│   ├── green                       # bundled self-contained launcher
+│   └── references/
+│       └── configuration.md        # skill configuration reference
+├── green                           # repository development launcher
+├── green.edn                       # repository example desired state
+├── src/                            # Clojure implementation and resources
+├── test/                           # Clojure tests
+├── README.md
+└── index.html                      # this manual</code></pre>
+      <p>An initialized user project normally needs only the copied <code>green</code> launcher, <code>green.edn</code>, and a precise ignore rule for its configured work directory.</p>
+    </section>
+
+    <section id="development">
+      <h2 class="anchor-heading"><a href="#development" aria-label="Link to Development">#</a>Development and testing</h2>
+      <p>Run repository checks from the Green Once project root:</p>
+      <pre><code class="language-bash">clojure -M:test
+clojure-lsp clean-ns
+clojure-lsp format</code></pre>
+      <p>The production skill copies <code>green-once/green</code> into initialized projects. Test changes with build and dry-run before attempting live provider operations. Generated work directories are artifacts and must not be edited as source.</p>
+    </section>
+
+    <section id="license">
+      <h2 class="anchor-heading"><a href="#license" aria-label="Link to License">#</a>License</h2>
+      <p>Copyright © 2026 Alberto Miorin. Distributed under the MIT License.</p>
+    </section>
+
+    <footer>
+      <p>Green Once manual · <a href="https://github.com/bigconfig-ai/once" rel="noopener">github.com/bigconfig-ai/once</a></p>
+    </footer>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/languages/clojure.min.js"></script>
+<script>
+  if (window.hljs) {
+    window.hljs.highlightAll();
+  }
+
+  const links = [...document.querySelectorAll('nav a[href^="#"]')];
+  const sections = links
+    .map((link) => document.querySelector(link.getAttribute('href')))
+    .filter(Boolean);
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (!visible) return;
+      links.forEach((link) => {
+        link.classList.toggle('active', link.getAttribute('href') === `#${visible.target.id}`);
+      });
+    }, { rootMargin: '-10% 0px -78% 0px', threshold: 0 });
+
+    sections.forEach((section) => observer.observe(section));
+  }
+</script>
+</body>
+</html>
