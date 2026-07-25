@@ -33,11 +33,41 @@
   ([msg] (fail-json msg {}))
   ([msg extra] (exit-json (merge {:failed true :changed false :msg msg} extra))))
 
-(defn run! [cmd]
-  (let [result @(p/process cmd {:out :string :err :string})]
-    (when-not (zero? (:exit result))
-      (fail-json (str/trim (:err result)) {:rc (:exit result) :cmd cmd}))
-    result))
+(def redacted "***")
+
+(defn redact-cmd
+  "Scrub secret values out of an argv before it is reported. `--smtp-password`
+  carries a bare secret; `--env` carries KEY=VALUE, whose key is worth keeping."
+  [cmd]
+  (mapv (fn [prev arg]
+          (case prev
+            "--smtp-password" redacted
+            "--env" (str (first (str/split arg #"=" 2)) "=" redacted)
+            arg))
+        (cons nil cmd)
+        cmd))
+
+(defn scrub
+  "Replace `secrets` wherever they appear in `s`, for output we do not control."
+  [s secrets]
+  (reduce #(str/replace %1 %2 redacted) s secrets))
+
+(defn app-secrets
+  "The values in `app` that must never reach module output."
+  [app]
+  (->> (cons (:smtp_password app)
+             (map #(second (str/split % #"=" 2)) (:env app)))
+       (remove str/blank?)
+       set))
+
+(defn run!
+  ([cmd] (run! cmd #{}))
+  ([cmd secrets]
+   (let [result @(p/process cmd {:out :string :err :string})]
+     (when-not (zero? (:exit result))
+       (fail-json (scrub (str/trim (:err result)) secrets)
+                  {:rc (:exit result) :cmd (redact-cmd cmd)}))
+     result)))
 
 (defn strip-ansi [s]
   (-> s
@@ -85,7 +115,8 @@
     (doseq [host to-remove]
       (run! (build-remove-cmd namespace host remove-data?)))
     (doseq [host to-deploy]
-      (run! (build-deploy-cmd namespace (apps-by-host host))))
+      (let [app (apps-by-host host)]
+        (run! (build-deploy-cmd namespace app) (app-secrets app))))
     (exit-json {:changed (boolean (or (seq to-deploy) (seq to-remove)))
                 :deployed (vec to-deploy)
                 :removed  (vec to-remove)})))
