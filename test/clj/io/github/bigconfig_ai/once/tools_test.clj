@@ -52,16 +52,44 @@
           (is (= 1 (count @calls)))
           (let [{:keys [inventory playbooks extra-vars]} (first @calls)]
             (is (= "inventory.ini" inventory))
-            (is (= {:create "main.yml"} playbooks))
+            (is (= {:create "main.yml" :delete "main.yml"} playbooks))
             (testing "name is reserved in Ansible, so it is passed as host_alias"
-              (is (= {:host_alias "once-test" :ip "203.0.113.10" :user "root"}
+              (is (= {:host_alias "once-test"
+                      :ip "203.0.113.10"
+                      :user "root"
+                      :block_state "present"}
                      extra-vars))))))
 
-      (testing "delete removes the rendered files without invoking ansible"
-        (with-redefs [ansible/ansible-step
-                      (fn [& _] (throw (ex-info "ansible must not run for delete" {})))]
-          (let [result (tools/ansible-local-step (local-opts workdir :delete))]
-            (is (zero? (:green/exit result))))))
+      (testing "delete drops the managed block, then removes the rendered files"
+        (let [main (io/file (tools/tool-dir {:workdir workdir :profile "test"}
+                                            "ansible-local")
+                            "main.yml")
+              calls (atom [])]
+          (with-redefs [ansible/ansible-step
+                        (fn [opts args]
+                          ;; the playbook must still exist when ansible runs
+                          (swap! calls conj (assoc args :playbook-present?
+                                                   (.exists main)))
+                          opts)]
+            (let [result (tools/ansible-local-step (local-opts workdir :delete))]
+              (is (zero? (:green/exit result)))))
+          (is (= 1 (count @calls)) "ansible runs on delete")
+          (let [{:keys [extra-vars playbook-present?]} (first @calls)]
+            (is (true? playbook-present?))
+            (is (= "absent" (:block_state extra-vars))
+                "blockinfile removes the block rather than writing it")
+            (is (= "once-test" (:host_alias extra-vars))
+                "the marker must match what create wrote"))
+          (is (not (.exists main)) "the rendered tree is removed afterwards")))
+
+      (testing "the alias falls back to package when Tofu state is unreadable"
+        (let [calls (atom [])]
+          (with-redefs [ansible/ansible-step
+                        (fn [opts args] (swap! calls conj args) opts)]
+            (tools/ansible-local-step (-> (local-opts workdir :delete)
+                                          (dissoc :name)
+                                          (assoc :package "once-prod"))))
+          (is (= "once-prod" (:host_alias (:extra-vars (first @calls)))))))
 
       (finally
         (delete-tree! workdir)))))

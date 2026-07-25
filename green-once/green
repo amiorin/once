@@ -285,8 +285,10 @@
       :else (assoc opts :green/exit 0))))
 
 (defn ansible-cleanup-step
-  "Remove the rendered Ansible trees. Both steps scaffold against
-  :green/event :delete, which deletes their targets."
+  "Undo what the Ansible stages applied, then remove their rendered trees.
+  ansible-local runs its playbook once more to drop the managed ~/.ssh/config
+  block; both steps then scaffold against :green/event :delete, which deletes
+  their targets."
   [opts]
   (-> opts tools/ansible-local-step tools/ansible-remote-step))
 

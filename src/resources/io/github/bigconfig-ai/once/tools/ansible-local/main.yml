@@ -2,10 +2,11 @@
 - name: Managed Local Configuration
   hosts: local
   tasks:
-    - name: Configure SSH access for {{ host_alias }}
+    - name: Manage SSH access for {{ host_alias }}
       ansible.builtin.blockinfile:
         path: ~/.ssh/config
         marker: "# {mark} {{ host_alias }} ANSIBLE MANAGED BLOCK"
+        state: "{{ block_state | default('present') }}"
         create: yes
         mode: "0600"
         block: |

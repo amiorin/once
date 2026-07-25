@@ -362,6 +362,14 @@
                                       :playbooks {:create "main.yml"}
                                       :host-key-checking false}))))
 
+(defn- local-host-alias
+  "The SSH alias the local playbook manages. Tofu reports it as `name`, itself
+  rendered from `package`, so `package` answers when state cannot be read."
+  [data]
+  (or (not-empty (str (:name data)))
+      (not-empty (str (:package data)))
+      "once"))
+
 (defn ansible-local-step
   [opts]
   (let [dir (tool-dir opts "ansible-local")
@@ -375,16 +383,34 @@
                (template-spec (static-template "ansible-local" "main.yml")
                               (str dir "/main.yml")
                               data)]
-        rendered (sc/scaffold opts specs)]
-    (if (or (= :build (:green/event opts))
-            (= :delete (:green/event opts)))
-      rendered
-      ;; The playbook's variables are Ansible's, not Selmer's, so they arrive as
-      ;; extra-vars: the local inventory targets localhost only and carries no
-      ;; host vars of its own. `name` is reserved in Ansible, hence host_alias.
-      (ansible/ansible-step rendered {:dir dir
-                                      :inventory "inventory.ini"
-                                      :playbooks {:create "main.yml"}
-                                      :extra-vars {:host_alias (:name data)
-                                                   :ip (:ip data)
-                                                   :user (:user data)}}))))
+        delete? (= :delete (:green/event opts))
+        ;; The playbook's variables are Ansible's, not Selmer's, so they arrive
+        ;; as extra-vars: the local inventory targets localhost only and carries
+        ;; no host vars of its own. `name` is reserved in Ansible, hence
+        ;; host_alias. block_state drives blockinfile in both directions.
+        config {:dir dir
+                :inventory "inventory.ini"
+                :playbooks {:create "main.yml" :delete "main.yml"}
+                :extra-vars {:host_alias (local-host-alias data)
+                             :ip (:ip data)
+                             :user (:user data)
+                             :block_state (if delete? "absent" "present")}}]
+    (cond
+      (= :build (:green/event opts))
+      (sc/scaffold opts specs)
+
+      ;; Delete renders the playbook so it can run, removes the managed block
+      ;; from ~/.ssh/config, then deletes the rendered tree. Mirrors
+      ;; tofu-with-spec: the tool runs while its inputs still exist.
+      delete?
+      (let [rendered (-> opts
+                         (assoc :green/event :create)
+                         (sc/scaffold specs)
+                         (assoc :green/event :delete))
+            result (ansible/ansible-step rendered config)]
+        (if (failed? result)
+          result
+          (sc/scaffold result specs)))
+
+      :else
+      (ansible/ansible-step (sc/scaffold opts specs) config))))
