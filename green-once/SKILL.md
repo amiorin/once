@@ -73,4 +73,4 @@ Represent application environment as a map from container variable name to the f
       "SECRET_KEY_BASE" :app-secret-key-base}
 ```
 
-Never emit `"KEY=secret"` values in EDN, and never add the referenced keys to `green.edn`. The user exports `GREEN_PAR_APP_DATABASE_URL` and `GREEN_PAR_APP_SECRET_KEY_BASE`; the launcher resolves them when it renders, so secret values are not written into desired state. Tell the user which `GREEN_PAR_*` names their configuration requires.
+Never emit `"KEY=secret"` values in EDN, and never add the referenced keys to `green.edn`. The user exports `GREEN_PAR_APP_DATABASE_URL` and `GREEN_PAR_APP_SECRET_KEY_BASE`; the rendered Ansible file carries a lookup of those variables rather than their values, so secrets are resolved when the play runs and never land in desired state or in generated output. Tell the user which `GREEN_PAR_*` names their configuration requires.

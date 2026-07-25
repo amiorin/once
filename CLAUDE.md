@@ -4,207 +4,230 @@ This file describes the `once` codebase for AI assistants. Read it before making
 
 ## Project Overview
 
-`once` is a Clojure library and CLI tool that automates provisioning and configuration of cloud infrastructure using [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment via [Basecamp's ONCE](https://github.com/basecamp/once).
+`once` provisions and operates a single-server [ONCE](https://github.com/basecamp/once) installation with [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment.
 
-Built on top of BigConfig SDK (the [`big-config`](https://github.com/bigconfig-ai/big-config) package), which provides workflow orchestration, template rendering, and step execution primitives.
+It is built on [`green`](https://github.com/amiorin/green), a DAG workflow engine: a graph of steps threaded by an `opts` map, with advice (before/after/around) attached per step. This branch is a rewrite — the BigConfig SDK, `bb run package …`, `options.clj` profiles, and `BC_PAR_*` variables are gone. Do not reintroduce those concepts.
+
+The repository ships two things from one file:
+
+- **The launcher** `green-once/green`, a single Babashka script. `./green` in the repository root is a symlink to it.
+- **The `green-once` skill** (`green-once/SKILL.md` + `references/configuration.md`), whose payload is that same launcher, copied into a user's own project. Standing alone it resolves `once` and `green` as pinned git dependencies; inside this repository `bb.edn` supplies local roots and the bootstrap is skipped.
 
 ## Tech Stack
 
-- **Language**: Clojure 1.12.4 (JVM)
-- **CLI runner**: Babashka (`run` script; `bb.edn` only supplies deps)
-- **Infrastructure**: OpenTofu (Terraform fork)
-- **Config management**: Ansible
-- **Key libraries**: BigConfig SDK (`big-config`), `big-tofu`, `cheshire` (JSON), `babashka/process`, `com.rpl/specter`
+- **Language**: Clojure 1.12.5 (JVM), plus Babashka for the launcher and for the two scripts that run on the remote host
+- **Workflow engine**: `io.github.amiorin/green` (`green.workflow`, `green.scaffold`, `green.tofu`, `green.ansible`, `green.cli`, `green.progress`, `green.dry-run`)
+- **Infrastructure**: OpenTofu; **Config management**: Ansible
+- **Key libraries**: `cheshire` (JSON), `selmer` (templates, via `green.scaffold`)
 - **Dev environment**: Nix via `devenv` + `direnv`
 
 ## Repository Structure
 
 ```
-once/
+green/
+├── green-once/
+│   ├── green                # THE launcher: bootstrap, validation, workflow, CLI, pin
+│   ├── SKILL.md             # green-once skill definition
+│   └── references/
+│       └── configuration.md # desired-state reference the skill reads before generating green.edn
+├── green                    # symlink -> green-once/green
+├── green.edn                # desired state for this repository's own stack
 ├── src/
 │   ├── clj/io/github/bigconfig_ai/once/
-│   │   ├── options.clj      # Cloud profiles & active profile (def bb ...)
-│   │   ├── package.clj      # High-level create/delete workflows + validate/describe step wiring
-│   │   ├── params.clj       # Parameter extraction from OpenTofu outputs
-│   │   ├── tools.clj        # Tofu/Ansible tool implementations
-│   │   ├── validation.clj   # Profile schema (malli), tool/credential/image/ssh-agent checks
-│   │   └── describe.clj     # Post-provisioning report (providers, SSH, deployed apps)
-│   └── resources/io/github/bigconfig-ai/once/tools/
-│       ├── tofu/            # Multi-cloud .tf templates (DigitalOcean, hcloud, OCI, no-infra)
-│       ├── tofu-smtp/       # SMTP (Resend) setup templates
-│       ├── tofu-dns/        # DNS (Cloudflare) templates
-│       ├── tofu-smtp-post/  # SMTP post-verification templates
-│       ├── ansible/         # Remote host playbooks (incl. files/deploy bb script)
-│       └── ansible-local/   # Local machine playbooks
+│   │   ├── tools.clj        # the six step functions, template specs, generated JSON
+│   │   ├── describe.clj     # post-provisioning report (providers, SSH, deployed apps)
+│   │   └── utils.clj        # contract number, GREEN_PAR_* overlay, zone derivation, process + YAML helpers
+│   └── resources/io/github/bigconfig-ai/once/
+│       ├── raw              # `<{ content|safe }>` — the template used for generated content
+│       └── tools/
+│           ├── tofu/{digitalocean,hcloud,oci,no-infra}/main.tf
+│           ├── tofu-smtp/{resend,no-infra}/main.tf
+│           ├── tofu-dns/{cloudflare,no-infra}/main.tf
+│           ├── tofu-smtp-post/{resend,no-infra}/main.tf
+│           ├── ansible/            # remote host: playbook, ansible.cfg, files/deploy, library/once
+│           └── ansible-local/      # local machine: playbook, ansible.cfg, inventory.ini
 ├── test/clj/io/github/bigconfig_ai/once/
-│   ├── deploy_test.clj      # Tests for the deploy ForceCommand script
-│   ├── describe_test.clj    # Tests for the describe report (parsing + assembly)
-│   ├── utils_test.clj       # Utility tests
-│   └── validation_test.clj  # Tests for the malli profile schema and tool selection
-├── env/dev/clj/user.clj     # REPL dev namespace
-├── deps.edn                 # Clojure CLI deps and aliases
-├── bb.edn                   # Babashka dependency config
-├── run                      # Babashka command entrypoint (`bb run ...`)
-├── devenv.nix               # Nix dev environment
-└── .envrc                   # direnv config (loads devenv, sources .envrc.private)
+│   ├── tools_test.clj       # rendering, generated DNS records, ansible-local lifecycle
+│   ├── describe_test.clj    # report parsing and assembly
+│   ├── deploy_test.clj      # the deploy ForceCommand script
+│   ├── once_module_test.clj # the `once` Ansible module
+│   └── utils_test.clj       # zone derivation, ANSI stripping
+├── index.html               # the user-facing manual for the green-once skill
+├── deps.edn / bb.edn        # git-pinned green; bb.edn overrides with local roots
+├── plans/                   # historical task briefs, several predating the rewrite — not authoritative
+└── devenv.nix / .envrc      # Nix dev shell; .envrc sources .envrc.private (gitignored)
 ```
 
 ## Development Commands
 
-### Code Maintenance
 ```bash
-clojure-lsp clean-ns
-clojure-lsp format
+bb green build                 # render <workdir>/<profile>/ only, no tofu, no ansible
+bb green create                # provision and configure
+bb green create --dry-run      # print the DAG actions, touch nothing
+bb green delete                # destroy, in reverse
+bb green describe              # providers, SSH status, deployed apps, image updates
+bb green pin                   # stamp the launcher with this repository's HEAD
+
+bb green build -f production.edn   # -f/--file selects a desired-state file (default: ./green.edn)
+
+clojure -M:test                # cognitect test-runner over test/clj
+clojure-lsp clean-ns && clojure-lsp format
+clj-kondo --lint src/clj test/clj green-once/green
 ```
 
-### Running Tests
-```bash
-clojure -M:test   # runs cognitect test-runner against test/clj
+`.github/workflows/cicd.yml` runs `clojure -X:test` on pushes to `main` and tags `1.0.<commit-count>`.
+
+## Desired state (`green.edn`)
+
+A single flat EDN map, except for the nested `:once {:applications [...]}` collection. Provider selection and non-secret settings live here; credentials never do.
+
+```clojure
+{:profile "production"          ; names the workdir, the state keys, the compute
+ :workdir ".green"              ; resource, and the ~/.ssh/config Host alias
+ :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
+ :once {:applications [{:host "www.example.com"
+                        :image "ghcr.io/example/site:latest"
+                        :env {"DATABASE_URL" :app-database-url}}]}
+ :provider-compute "digitalocean"  ; digitalocean | hcloud | oci | no-infra
+ :provider-smtp "resend"           ; resend | no-infra
+ :provider-dns "cloudflare"        ; cloudflare | no-infra
+ :provider-backend "r2"            ; local | s3 | r2
+ :compute-prevent-destroy true}
 ```
 
-### Pre-flight Validation
-```bash
-bb run package validate   # checks active profile schema, required CLIs, credentials, image refs,
-                          # and that :compute-pubkey is loaded in ssh-agent (cloud providers only)
+Load-bearing rules:
+
+- **No domain key.** The application hosts are the source of truth. `utils/apps-domain` takes the last two labels they share; that zone is the Cloudflare zone, the parent of the Resend sending domain `notifications.<zone>`, and the `info@notifications.<zone>` From address. The launcher rejects applications spread over more than one domain. Templates read it as `<{ zone }>`, injected by `tools/with-zone` — nothing in desired state supplies it.
+- **No apex or wildcard DNS record.** Each application host gets its own proxied `A` record, so an unlisted host does not resolve.
+- **Resend's relay is hard-coded** (`smtp.resend.com`, 587, user `resend`) in `tools/resend-smtp`, because it is identical for every account. Only `GREEN_PAR_RESEND_API_KEY` and `GREEN_PAR_RESEND_PASSWORD` are configurable. The `no-infra` SMTP keys stay in desired state.
+- **`GREEN_PAR_*` is the only secret channel.** `utils/read-green-pars` overlays any such variable onto the matching flat key — uppercased, hyphens as underscores, so `:do-token` ← `GREEN_PAR_DO_TOKEN`. Overrides are coerced to the type of the value they replace, so `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false` stays a boolean. Any flat key can be overridden the same way. There is no `TF_VAR_*` and no second mechanism.
+- Application `:env` maps a container variable **name** to the flat key holding its value, never to the value itself.
+
+## Architecture
+
+### The DAG
+
+`wire-fn` in the launcher returns `[step-fn & next-steps]` per step and switches on `:green/event`. Create and build:
+
+```text
+start ─┬─ tofu-compute ─┐                          ┌─ ansible-local
+       └─ tofu-smtp ────┴─ tofu-dns ─ smtp-post ───┴─ ansible-remote
 ```
 
-### Post-provisioning Report
-```bash
-bb run package describe  # configured providers + SSH reachability + deployed ONCE applications
-                  # (image, tag, running digest, registry digest, update-available?)
+Delete:
+
+```text
+start ─ ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
+                                                     └─ tofu-compute
 ```
 
-### Full Lifecycle
-```bash
-bb run package validate            # opt-in pre-flight checks; can be chained
-bb run package describe            # opt-in post-provisioning report
-bb run package build               # render everything without applying/provisioning
-bb run package create              # provision everything (all 6 stages)
-bb run package delete              # tear down (reverse 4 Tofu stages)
-bb run package validate create     # validate, then create only if validation passes
-bb run package git-check lock build unlock-any  # advanced Git/lock workflow helpers
-bb run package delete create       # clean slate redeploy
+Compute and SMTP run concurrently; `tofu-dns` is a join, and the engine hands it the fork-point opts plus `:green/branches` (a vector of branch results) — `tools/joined-params` reads the branch results out of it. The two Ansible stages then run concurrently.
+
+`workflow` also attaches: backend advice `:before` each Tofu step, `progress/advise` (the `>>> / <<<` lines), and `dry-run/advise` over `side-effecting-steps` (so `--dry-run` skips them).
+
+### The opts map
+
+One map is threaded through every step. Reserved keys are namespaced; desired-state keys are plain kebab-case keywords.
+
+| Key | Meaning |
+|---|---|
+| `:green/exit` | 0 success, >0 failure — how steps report, instead of throwing |
+| `:green/err`, `:green/trace` | failure message and stack trace |
+| `:green/event` | `:build`, `:create`, or `:delete`, stamped by `green.cli` |
+| `:green/dry-run` | set by `--dry-run` |
+| `:green/branches` | branch results at a join |
+| `:once/compute-params`, `:once/smtp-params` | outputs adopted from earlier stages |
+| `:zone` | derived DNS zone (see above) |
+| `:green.scaffold/written`, `:green.scaffold/deleted` | paths a scaffold touched |
+
+### Stages
+
+Each stage owns an isolated directory, `tools/tool-dir` = `<workdir>/<profile>/<tool>`:
+
+| Step | Work dir | Templates | Does |
+|---|---|---|---|
+| `:once/tofu-compute` | `tofu-compute` | `tools/tofu/<provider>/` | provisions the VM (or passes through `no-infra`), outputs ip/user/sudoer/name |
+| `:once/tofu-smtp` | `tofu-smtp` | `tools/tofu-smtp/<provider>/` | registers `notifications.<zone>` at Resend, outputs its id and DNS records |
+| `:once/tofu-dns` | `tofu-dns` | `tools/tofu-dns/<provider>/` | zone settings, plus generated `apps.tf.json` and `smtp.tf.json` |
+| `:once/tofu-smtp-post` | `tofu-smtp-post` | `tools/tofu-smtp-post/<provider>/` | verifies the Resend domain once DNS resolves |
+| `:once/ansible-local` | `ansible-local` | `tools/ansible-local/` | writes the managed `Host <profile>` block into `~/.ssh/config` |
+| `:once/ansible-remote` | `ansible-remote` | `tools/ansible/` | installs docker, ONCE, bb; creates the restricted `deploy` user; reconciles applications |
+
+Note the asymmetry: the compute step's work directory is `tofu-compute` but its templates live under `tools/tofu/`.
+
+### Rendering
+
+`green.scaffold` maps a qualified keyword to a classpath resource (`:io.github.bigconfig-ai.once.tools.tofu.oci/main.tf` → `io/github/bigconfig-ai/once/tools/tofu/oci/main.tf`) and renders it with Selmer. `tools/template-opts` overrides the delimiters, so templates use `<{ var }>` for values and `<% if … %>` for tags, leaving `{{ … }}` and `{% … %}` for Jinja2 in the Ansible files. Providers are selected by directory, not by conditionals in one file.
+
+Content that is computed rather than templated is written through `raw-spec`, which renders the one-line `raw` template: `apps.tf.json`, `smtp.tf.json`, `inventory.json`, and `once.yml`. `tools/render-fn` builds the two DNS files, using `tofu-construct` / `deep-merge` / `sort-nested-map` so the JSON is deterministic. `backend.tf.json` is the exception — `green.tofu` writes it directly from the backend advice, outside the scaffold.
+
+A `build` of the reference `green.edn` produces exactly:
+
+```text
+<workdir>/<profile>/
+├── tofu-compute/     backend.tf.json  main.tf
+├── tofu-smtp/        backend.tf.json  main.tf
+├── tofu-dns/         backend.tf.json  main.tf  apps.tf.json  smtp.tf.json
+├── tofu-smtp-post/   backend.tf.json  main.tf
+├── ansible-local/    ansible.cfg  inventory.ini  main.yml
+└── ansible-remote/   ansible.cfg  main.yml  inventory.json  once.yml
+                      files/deploy  library/once
 ```
 
-### Individual Tools (each requires `render` first)
-```bash
-bb run tofu render tofu:init tofu:apply:-auto-approve
-bb run tofu-smtp render tofu:init tofu:apply:-auto-approve
-bb run tofu-dns render tofu:init tofu:apply:-auto-approve
-bb run tofu-smtp-post render tofu:init tofu:apply:-auto-approve
-bb run ansible render -- ansible-playbook main.yml
-bb run ansible-local render -- ansible-playbook main.yml
-```
+The two generated DNS files are Cloudflare-only; `no-infra` DNS renders `main.tf` alone.
 
-The active profile is selected by editing `(def bb ...)` in `options.clj` (see Configuration Profiles below).
+### Parameter flow
 
-## Key Architecture Concepts
+1. `green.cli` reads the desired-state file and stamps `:green/event`.
+2. `start-step` overlays `GREEN_PAR_*`, then validates (`state-errors`, and `secret-errors` for real create/delete).
+3. Tofu stages parse their `params` output into `:once/compute-params` / `:once/smtp-params`; `joined-params` merges them into opts at the DNS join. Fallback maps (`fallback-compute-params`, `fallback-smtp-params`) stand in for `build` and dry-run so rendering never needs state.
+4. Delete cannot re-derive those values, so `adopt-existing-state` reads the already-applied outputs back out of Tofu state before teardown.
 
-### The Six-Stage Create Pipeline (`package.clj`)
-1. **tofu** — provision compute (DigitalOcean / hcloud / OCI / no-infra)
-2. **tofu-smtp** — set up SMTP (Resend)
-3. **tofu-dns** — configure DNS (Cloudflare), injecting SMTP records
-4. **tofu-smtp-post** — finalize SMTP after DNS verification
-5. **ansible-local** — local config: update `~/.ssh/config` so the remote host is reachable as `Host once` for the next stage
-6. **ansible** — remote host config: install Docker, ONCE, s-nail, configure `.mailrc`, provision the restricted `deploy` user (NOPASSWD sudo for `/usr/local/bin/once *` + `ForceCommand` Babashka script at `/usr/local/bin/deploy` authorized by `:deploy-pubkey`), deploy applications listed under `:once {:applications [...]}`
+### Secrets
 
-Delete reverses the Tofu stages (4→3→2→1 destroy order). Compute resources are rendered with `lifecycle { prevent_destroy = true }` by default; override with `BC_PAR_COMPUTE_PREVENT_DESTROY=false` before `bb run package delete`.
+Three separate channels, and nothing lands in a rendered file:
 
-`validate` and `describe` are opt-in workflow steps implemented with `big-config.workflow/run-steps` and exposed through `bb run package validate` and `bb run package describe`. Advanced SDK workflow steps (`lock`, `git-check`, `git-push`, `unlock-any`) can be chained in both package and tool workflows. These steps do not run automatically before `create`.
+- **OpenTofu**: `tools/credential-env` maps flat keys to the variables each provider reads natively (`:do-token` → `DIGITALOCEAN_TOKEN`, `:cloudflare-api-token` → `CLOUDFLARE_API_TOKEN`, …) and passes them through the process environment. Unset credentials are omitted, so build and dry-run stay credential-free.
+- **State backends**: R2 authenticates through `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`; naming them in `backend.tf.json` would also write them to `.terraform/terraform.tfstate`.
+- **Ansible**: `tools/par-lookup` emits `{{ lookup('env','GREEN_PAR_…') }}`, so the SMTP password and application `:env` values are resolved when the play runs, not when the file is rendered. `tools_test` asserts the secrets never appear in the YAML — keep those tests passing.
 
-### Template Rendering
-BigConfig SDK renders templates from `src/resources/` into `.dist/` using parameters. The Selmer parser is configured in `tools.clj` with custom delimiters (`:tag-open \<`, `:tag-close \>`, `:filter-open \{`, `:filter-close \}`), so variables in template file content are written as `<{ var }>` — this leaves literal `{{ ... }}` untouched so downstream tools like Ansible can interpret them. Provider switching is directory-level: each render step passes a `:transform [[<provider> delimiters]]` entry (e.g., `[["digitalocean" delimiters]]`) and the renderer copies only the matching subdirectory under `tools/<step>/`.
+### Backends
 
-### Parameter Flow
-1. Options maps in `options.clj` define base params under `::workflow/params`
-2. `params/opts-fn` composes three transformations: `workflow/read-bc-pars` (reads `BC_PAR_*` env vars) → `tofu-smtp-params` (extracts SMTP records from Tofu output) → `tofu-params` (extracts IP from Tofu output)
-3. Each later stage inherits outputs from earlier stages
+`backend-advice` writes `backend.tf.json` before each Tofu step: local, S3, or R2 as an S3-compatible backend with `region = "auto"`. Remote state keys are `<profile>/<tool>.tfstate`.
 
-### `BC_PAR_*` Environment Variable Overrides
-Any `::workflow/params` key can be overridden at runtime:
-```bash
-export BC_PAR_DOMAIN="example.com"
-export BC_PAR_PROVIDER_BACKEND="s3"   # or "r2" / "local"
-export BC_PAR_S3_BUCKET="my-tf-state-bucket"
-export BC_PAR_HCLOUD_TOKEN="xxx"
-```
-Variable names are uppercased; hyphens become underscores. Sensitive credentials go in `.envrc.private` (gitignored).
+### Delete semantics
 
-### Backend Advice
-The `green` script attaches `:before` advice to each OpenTofu step. The advice writes `backend.tf.json` based on `:provider-backend`, using Green's local and S3 helpers directly and representing Cloudflare R2 as an S3-compatible backend.
+Deleting has to render before it can destroy: `tofu-with-spec` and `ansible-local-step` scaffold with `:green/event :create`, run the tool, and only then scaffold with `:delete` to remove the rendered tree. `ansible-cleanup-step` replays `ansible-local` so the managed `~/.ssh/config` block is dropped. `:compute-prevent-destroy` defaults to `true` and renders `lifecycle { prevent_destroy = true }`; a real delete refuses to start until `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false`.
+
+### The remote host
+
+`tools/ansible/main.yml` installs Docker, ONCE, and Babashka, then creates a `deploy` user with NOPASSWD sudo limited to `/usr/local/bin/once *`, whose authorized key is pinned to a `ForceCommand` (`tools/ansible/files/deploy`). That script rejects anything but `once update <host>` for a host ONCE already serves. Applications are reconciled by `tools/ansible/library/once`, a Babashka Ansible module that diffs the desired list against `once list` and deploys or removes the difference, redacting secrets from anything it reports.
+
+## The contract number and `green pin`
+
+`utils/contract` and `launcher-contract` in the launcher are a compatibility handshake. A standalone launcher refuses to run when the `once` it resolved reports a lower contract, and names `green pin` instead of silently rendering from an older commit.
+
+**Bump `utils/contract` (and `launcher-contract` to match) on any change a launcher pinned to an older commit could not survive** — a changed template variable, a renamed desired-state key, a new function the launcher calls. Then, after committing and pushing: `bb green pin` stamps `once-sha` (and `green-sha`, when `GREEN_LIB_ROOT` points at a green checkout) and the result is committed as `fix: re-pin bundled launcher to once <sha>`. `pin` refuses to run on a dirty tree or an unpushed HEAD, and the pins are marked *managed — do not edit by hand*.
 
 ## Code Conventions
 
-### Naming
-- **Namespaces**: `io.github.bigconfig-ai.once.*`
-- **Keywords**: Fully namespaced (`::workflow/params`, `::bc/env`, `::render/profile`)
-- **Entry points**: Functions ending with `*` are CLI/REPL entry points (`tofu*`, `ansible*`, `once*`); `validation/validate` and `describe/describe` are workflow step functions, while `validate-report` / `describe-report` are pure report builders
-- **Private defs**: Use `^:private` metadata for implementation details not intended for external use
-
-### Configuration Profiles (`options.clj`)
-Two layers compose into a profile: private **compute** base maps (`oci`, `hcloud`, `digitalocean`, `no-infra-compute`) and public **application** profiles (`profile-alpha`, `profile-beta`, `profile-gamma`, `profile-no-infra`) that pin a domain, package name, and the `:once {:applications [...]}` list deployed by Ansible. All four application profiles also merge a private `deploy` sub-profile carrying two SSH public keys: `:compute-pubkey` (private half must be loaded in `ssh-agent` so Ansible can reach the freshly provisioned VM — `bb run package validate` enforces this for cloud compute profiles) and `:deploy-pubkey` (authorized on the remote `deploy` user with `ForceCommand`). Profiles are plain Clojure maps composed with `merge-with merge`:
-```clojure
-(def profile-alpha (merge-with merge resend cloudflare r2 digitalocean deploy
-                               {::render/profile "profile-alpha"
-                                ::workflow/params {:domain "alpha.example.com"
-                                                   :package "profile-alpha"
-                                                   :once {:applications [{:host "www.alpha.example.com"
-                                                                          :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"}]}}}))
-```
-`profile-alpha` rides on `digitalocean`; `profile-beta` and `profile-gamma` ride on `oci`; `profile-no-infra` targets an existing server. The `bb` var sets the active profile for the Babashka `run` script:
-```clojure
-(def bb profile-alpha)  ; change this to switch profiles
-```
-The profile names match the TypeScript implementation (`profileAlpha`, `profileBeta`, …) and are what `bb run package build` uses to name its output directory (`.dist/profile-alpha-<hash>/`).
-
-### REPL Development Pattern
-All source files contain `comment` blocks with live evaluation examples:
-```clojure
-(comment
-  (debug tap-values
-    (once* "create" options/oci))
-  (-> tap-values))
-```
-These are documentation-as-tests — use them to understand expected behavior and to test interactively. Use CIDER with `:dev` alias.
-
-### Data Transformation Pattern
-Functions follow a pipeline pattern where each function takes and returns an `opts` map:
-```clojure
-(def opts-fn (comp tofu-params tofu-smtp-params workflow/read-bc-pars))
-```
-
-## Supported Cloud Providers
-
-| Profile | Provider | Key params |
-|---------|----------|------------|
-| `oci` | Oracle Cloud | `oci-subnet-id`, `oci-compartment-id`, `oci-availability-domain`, `oci-shape` |
-| `hcloud` | Hetzner Cloud | `hcloud-name`, `hcloud-image`, `hcloud-server-type`, `hcloud-location` |
-| `digitalocean` | DigitalOcean | `digitalocean-name`, `digitalocean-region`, `digitalocean-size`, `digitalocean-image` |
-| `no-infra` | Existing server | `no-infra-compute-ip`, `no-infra-compute-user`, `no-infra-compute-sudoer` |
-
-All cloud profiles combine with `resend` (SMTP) and `cloudflare` (DNS) sub-profiles. The Cloudflare DNS template (provider `~> 5.0`) creates apex (`@`) and wildcard (`*`) A records proxied through Cloudflare and applies a fixed bundle of zone settings (TLS 1.3, strict SSL, always-use-HTTPS, brotli, etc.). Outgoing mail is sent from `info@notifications.<domain>`.
-
-## Dependencies
-
-`deps.edn` currently pins the Clojure SDK package (`big-config`) to a Git SHA from GitHub:
-```clojure
-io.github.amiorin/big-config {:git/sha "c20a1ab26c541f9080d6ef220fdc969058d622af"}
-```
-A `:local/root "../../big-config/clojure"` coordinate is kept commented beside it with `#_#_` so it can be swapped in for local SDK development. To switch, comment out the `:git/sha` line and uncomment the `:local/root` one, then re-run `clojure -P`.
+- **Namespaces**: `io.github.bigconfig-ai.once.*`. Three of them, mapping to distinct concerns — adding a fourth needs a genuinely new concern.
+- **Keys**: plain kebab-case keywords for desired state (they match template variable names); namespaced keywords for engine state (`:green/…`, `:once/…`).
+- **Steps** take `opts` and return `opts`, and report failure through `:green/exit` / `:green/err`.
+- **`^:private`** for everything not called from the launcher or the tests. The launcher's own helpers are `defn-`; the workflow steps it exposes are not.
+- **Pure builders stay pure**: `tools/render-fn`, `tools/inventory`, `tools/ansible-once`, `utils/apps-domain` take data and return data. `describe/describe-report` keeps its single-argument arity (which shells out) separate from the arities that take an injected runner, so report construction stays process-free — preserve that split.
+- **Tests avoid processes** by redefining `green.ansible/ansible-step` and `green.tofu/tofu-step`, or by driving the pure builders directly.
 
 ## Git Conventions
 
-Stay on `clojure` (each language has its own branch in this repo). Commit only when explicitly asked. Commit messages use [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` new feature
-- `fix:` bug fix
-- `refactor:` code restructuring
-- `docs:` documentation changes
-- `chore:` build / tooling
-- `deps:` dependency updates
+Stay on the `green` branch — each language has its own branch in this repository, and this one is the green rewrite. Commit only when explicitly asked. [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `deps:`, with `!` and a `BREAKING CHANGE:` footer when desired state or the contract changes.
 
 ## What to Avoid
 
-- Do not add error handling for cases that cannot happen (the SDK handles step failure via `::bc/exit` and `::bc/err`)
-- Do not create new namespaces unless a genuine new concern arises; the existing namespaces (`cli`, `options`, `package`, `params`, `tools`, `validation`, `describe`, `utils`) map cleanly to their responsibilities
-- Do not modify `.dist/` — it is generated output, not source
-- Credentials and tokens never go in source files; use `.envrc.private` (already gitignored via the whitelist `.gitignore`)
+- Do not reintroduce BigConfig SDK concepts: `bb run package …`, `::workflow/params`, `BC_PAR_*`, `options.clj` profile maps.
+- Do not add error handling for cases that cannot happen — failure travels through `:green/exit` and `:green/err`, and `green.workflow` converts thrown exceptions itself.
+- Do not edit `.green/` (or any configured `:workdir`) — it is generated output.
+- Do not put credentials, tokens, or private keys in source, in `green.edn`, or in a rendered file. `.envrc.private` is the local channel.
+- Do not give the launcher a dependency outside `green`, `once`, and Babashka's built-ins: it has to work as a lone file copied into a stranger's project.
+- Do not hand-edit `once-sha` / `green-sha`; run `bb green pin`.
+- When desired state changes, update all four surfaces that document it: `green.edn`, `green-once/references/configuration.md`, `green-once/SKILL.md`, and `index.html`.

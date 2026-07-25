@@ -2,7 +2,7 @@
 
 The generated `green.edn` is a flat EDN map. Include only selected providers' non-secret settings. Never add credentials or passwords.
 
-Every secret reaches the workflow through a `GREEN_PAR_*` environment variable, which is overlaid onto the matching flat key before anything runs. The variable name is the key uppercased with hyphens as underscores, so `:do-token` is supplied by `GREEN_PAR_DO_TOKEN`. There is no second mechanism: no `TF_VAR_*`, no provider-native variable names, no Ansible environment lookups. Overrides are coerced to the type of the value they replace, so booleans and integers stay booleans and integers.
+Every secret reaches the workflow through a `GREEN_PAR_*` environment variable, which is overlaid onto the matching flat key before anything runs. The variable name is the key uppercased with hyphens as underscores, so `:do-token` is supplied by `GREEN_PAR_DO_TOKEN`. That is the only name to set — there is no `TF_VAR_*` and no second mechanism. From there no secret is written into a rendered file: OpenTofu credentials are passed to each stage through the process environment under the variable that provider reads natively, and Ansible receives `{{ lookup('env','GREEN_PAR_…') }}` expressions that resolve when the play runs. Overrides are coerced to the type of the value they replace, so booleans and integers stay booleans and integers.
 
 ## Base shape
 

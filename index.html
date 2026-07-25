@@ -603,7 +603,7 @@
     <section id="introduction">
       <h2 class="anchor-heading"><a href="#introduction" aria-label="Link to Introduction">#</a>Introduction</h2>
       <p>Green Once provisions a server, configures DNS and outgoing email, installs Docker and <a href="https://github.com/basecamp/once" rel="noopener">Basecamp ONCE</a>, and reconciles the applications declared in <code>green.edn</code>. It combines a guided agent skill with an executable infrastructure workflow.</p>
-      <p>You provide a domain, application images, provider choices, non-secret settings, and public SSH keys. Credentials and application secrets stay in your environment. The result is an isolated set of OpenTofu and Ansible files plus a repeatable lifecycle command.</p>
+      <p>You provide application hostnames and images, provider choices, non-secret settings, and public SSH keys. The hostnames also decide the DNS zone and the mail domain, so there is no separate domain setting. Credentials and application secrets stay in your environment. The result is an isolated set of OpenTofu and Ansible files plus a repeatable lifecycle command.</p>
 
       <div class="callout success">
         <span class="callout-title">The safe default</span>
@@ -639,6 +639,7 @@
             <tr><td><code>OpenTofu</code></td><td>Real create, delete, and state-backed describe</td><td>Manages compute, SMTP, DNS, and verification state.</td></tr>
             <tr><td><code>Ansible</code></td><td>Real create</td><td>Configures the remote host and ONCE applications.</td></tr>
             <tr><td><code>OpenSSH</code></td><td>Create and describe</td><td>Private compute key should already be available through <code>ssh-agent</code>.</td></tr>
+            <tr><td><code>skopeo</code></td><td>Describe</td><td>Compares the running image digest against the registry. Without it, updates report as unknown.</td></tr>
           </tbody>
         </table>
       </div>
@@ -658,8 +659,8 @@
         </li>
         <li>
           <h3>Describe the deployment</h3>
-          <p>Tell the agent the profile name, domain, application hostnames and images, provider choices, and public-key file paths. Give it only the <em>names</em> of environment variables that hold application secrets—never secret values.</p>
-          <pre><code class="language-text">Create a Green Once project for example.com.
+          <p>Tell the agent the profile name, the application hostnames and images, provider choices, and public-key file paths. Every hostname must sit under one domain — that shared domain becomes the DNS zone and the mail domain. Give it only the <em>names</em> of environment variables that hold application secrets—never secret values.</p>
+          <pre><code class="language-text">Create a Green Once project.
 Deploy ghcr.io/example/site:latest at www.example.com.
 Use DigitalOcean, Resend, Cloudflare, and R2.
 Map DATABASE_URL to the key :site-database-url.</code></pre>
@@ -693,24 +694,22 @@ Map DATABASE_URL to the key :site-database-url.</code></pre>
       <p>Green executes the lifecycle as a directed acyclic graph. Independent work runs concurrently; downstream steps receive outputs from their upstream branches.</p>
 
       <h3>Create and build</h3>
-      <pre class="diagram"><code>                        ┌─ tofu-compute ─┐
-start + validation ─────┤                 ├─ tofu-dns ─ tofu-smtp-post ─┬─ ansible-local
-                        └─ tofu-smtp ─────┘                              └─ ansible-remote</code></pre>
+      <pre class="diagram"><code>                    ┌─ tofu-compute ─┐                             ┌─ ansible-local
+start + validation ─┤                ├─ tofu-dns ─ tofu-smtp-post ─┤
+                    └─ tofu-smtp ────┘                             └─ ansible-remote</code></pre>
       <div class="flow-list">
         <div class="flow-item"><b>1 · Compute + SMTP</b><span>Provisioned concurrently.</span></div>
         <div class="flow-item"><b>2 · DNS</b><span>Joins the server IP and SMTP records.</span></div>
         <div class="flow-item"><b>3 · SMTP post</b><span>Verifies the sending domain after DNS.</span></div>
-        <div class="flow-item"><b>4 · Local output</b><span>Writes an optional SSH config fragment.</span></div>
+        <div class="flow-item"><b>4 · Local setup</b><span>Writes the managed SSH config block.</span></div>
         <div class="flow-item"><b>5 · Remote setup</b><span>Installs ONCE and reconciles applications.</span></div>
       </div>
       <p>For <code>build</code>, the same graph renders deterministic configuration with safe placeholder outputs but does not invoke OpenTofu or Ansible.</p>
 
       <h3>Delete</h3>
-      <pre class="diagram"><code>start + validation
-        │
-        └─ ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
-                                                        └─ tofu-compute</code></pre>
-      <p>A real delete first removes generated Ansible files, then destroys SMTP verification and DNS, and finally destroys SMTP and compute concurrently. Existing OpenTofu outputs are loaded before teardown so dependent state can be addressed in reverse order.</p>
+      <pre class="diagram"><code>start + validation ─ ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
+                                                                  └─ tofu-compute</code></pre>
+      <p>A real delete first replays the local Ansible play to drop the managed <code>~/.ssh/config</code> block and removes the generated Ansible files, then destroys SMTP verification and DNS, and finally destroys SMTP and compute concurrently. Existing OpenTofu outputs are loaded before teardown so the destroy renders with the values create produced.</p>
     </section>
 
     <section id="desired-state">
@@ -747,7 +746,7 @@ start + validation ─────┤                 ├─ tofu-dns ─ tofu-s
       <p>A <code>GREEN_PAR_*</code> environment variable overrides a flat key. The launcher strips the prefix, lowercases the name, and changes underscores to hyphens. Existing boolean and integer values retain their types.</p>
       <pre><code class="language-bash">GREEN_PAR_DIGITALOCEAN_REGION=fra1 ./green build
 GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
-      <p>Use this mechanism for temporary deployment settings and the destruction guard. Provider credentials should use the provider-native environment variables listed under <a href="#secrets">Secrets and environment</a>.</p>
+      <p>Use this mechanism for temporary deployment settings, for the destruction guard, and for every credential — the same overlay carries secrets, as listed under <a href="#secrets">Secrets and environment</a>.</p>
     </section>
 
     <section id="generated-files">
@@ -757,33 +756,35 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
 └── production/
     ├── tofu-compute/
     │   ├── backend.tf.json
-    │   └── main.tf.json
+    │   └── main.tf
     ├── tofu-smtp/
     │   ├── backend.tf.json
-    │   └── main.tf.json
+    │   └── main.tf
     ├── tofu-dns/
     │   ├── backend.tf.json
-    │   ├── main.tf.json
+    │   ├── main.tf
     │   ├── apps.tf.json
     │   └── smtp.tf.json
     ├── tofu-smtp-post/
     │   ├── backend.tf.json
-    │   └── main.tf.json
+    │   └── main.tf
     ├── ansible-local/
-    │   └── config
+    │   ├── ansible.cfg
+    │   ├── inventory.ini
+    │   └── main.yml
     └── ansible-remote/
         ├── ansible.cfg
+        ├── main.yml
         ├── inventory.json
-        ├── main.json
-        ├── once.json
-        ├── mailrc.j2
+        ├── once.yml
         ├── files/deploy
         └── library/once</code></pre>
       <ul>
         <li>The work directory is generated output and should be ignored by Git.</li>
         <li>Local OpenTofu state remains in each tool directory. S3 and R2 use remote keys of the form <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</li>
-        <li>Generated Ansible templates contain environment lookups, not application or SMTP secret values.</li>
-        <li>The <code>ansible-local/config</code> file is an SSH fragment you may include from <code>~/.ssh/config</code>; Green does not overwrite your personal SSH configuration.</li>
+        <li>Generated Ansible files contain environment lookups, not application or SMTP secret values.</li>
+        <li><code>apps.tf.json</code> and <code>smtp.tf.json</code> are generated only for the Cloudflare DNS provider; <code>no-infra</code> renders <code>main.tf</code> alone.</li>
+        <li>The <code>ansible-local</code> play writes a managed <code>Host &lt;profile&gt;</code> block into <code>~/.ssh/config</code>, delimited by its own markers. Delete removes that block and leaves the rest of the file untouched.</li>
       </ul>
     </section>
 
@@ -846,7 +847,8 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
           </tbody>
         </table>
       </div>
-      <p>Every credential travels the same path: a <code>GREEN_PAR_*</code> variable overlaid onto the matching flat key. There is no <code>TF_VAR_*</code> or provider-native variable, and no Ansible environment lookup. Build and dry-run do not require these variables — unset values render empty, so a build never writes a secret to disk.</p>
+      <p>Every credential travels the same path into Green Once: a <code>GREEN_PAR_*</code> variable overlaid onto the matching flat key. <code>GREEN_PAR_*</code> is the only name you set — there is no <code>TF_VAR_*</code> and no second mechanism.</p>
+      <p>From there nothing is written into a rendered file. OpenTofu credentials are handed to each stage through the process environment under the variable that provider reads natively (<code>DIGITALOCEAN_TOKEN</code>, <code>CLOUDFLARE_API_TOKEN</code>, and so on), and R2 authenticates through <code>AWS_ACCESS_KEY_ID</code> / <code>AWS_SECRET_ACCESS_KEY</code>. Ansible receives <code>{{ lookup('env','GREEN_PAR_…') }}</code> expressions instead of values, so the SMTP password and application secrets are resolved when the play runs. Build and dry-run do not require these variables — unset credentials are simply omitted, so a build never writes a secret to disk.</p>
 
       <h3>Check presence without printing values</h3>
       <pre><code class="language-bash">for name in GREEN_PAR_DO_TOKEN GREEN_PAR_RESEND_API_KEY \
@@ -983,7 +985,7 @@ ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
 
     <section id="commands">
       <h2 class="anchor-heading"><a href="#commands" aria-label="Link to Command overview">#</a>Command overview</h2>
-      <pre><code class="language-text">Usage: ./green &lt;build|create|delete|describe&gt; [-f|--file green.edn] [--dry-run]</code></pre>
+      <pre><code class="language-text">Usage: ./green &lt;build|create|delete|describe|pin&gt; [-f|--file green.edn] [--dry-run]</code></pre>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Command</th><th>Effect</th><th>External changes</th></tr></thead>
@@ -997,6 +999,7 @@ ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
           </tbody>
         </table>
       </div>
+      <p><code>pin</code> also appears in the usage line. It is a maintenance command for the Green Once repository itself — it stamps the launcher with the commit its sources come from — and is not used in a normal project.</p>
     </section>
 
     <section id="build">
@@ -1019,7 +1022,7 @@ ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
     <section id="describe">
       <h2 class="anchor-heading"><a href="#describe" aria-label="Link to Describe">#</a>Describe</h2>
       <pre><code class="language-bash">./green describe</code></pre>
-      <p>Describe reads compute and SMTP outputs from their OpenTofu state, reports the selected providers, probes the server over SSH, and runs <code>sudo -n once list</code> when the host is reachable. Connectivity problems are reported without changing infrastructure.</p>
+      <p>Describe reads compute and SMTP outputs from their OpenTofu state, reports the selected providers, probes the server over SSH, and runs <code>sudo -n once list</code> when the host is reachable. For each application it compares the running image digest against the registry with <code>skopeo</code> and reports whether an update is available. Connectivity problems are reported without changing infrastructure; only a missing remote <code>once</code> command exits non-zero.</p>
       <p>For a remote backend, make sure its credentials are present so OpenTofu outputs can be read. The compute private key must be available to SSH.</p>
     </section>
 
@@ -1065,7 +1068,11 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <p>The remote server gets a restricted <code>deploy</code> account intended for CI or controlled update jobs. Its forced command rejects interactive sessions, malformed commands, and hosts not already known to ONCE.</p>
       <pre><code class="language-bash">ssh deploy@SERVER_IP sudo once update www.example.com</code></pre>
       <p>The key supplied as <code>:deploy-pubkey</code> is the only credential authorized for that account. You can also set <code>:auto_update true</code> on an application when ONCE should handle updates automatically.</p>
-      <p>Running <code>./green create</code> again is appropriate when infrastructure or declared application membership changes: the remote Ansible module adds missing hosts and removes hosts no longer present in desired state.</p>
+      <p>Running <code>./green create</code> again is appropriate when infrastructure or declared application membership changes: the remote module reconciles by hostname, deploying hosts that are missing and removing hosts no longer present in desired state.</p>
+      <div class="callout warning">
+        <span class="callout-title">Reconciliation is by hostname</span>
+        Changing the <code>:image</code>, <code>:env</code>, or resource settings of an application that is <em>already deployed</em> does not redeploy it — the host is still present, so there is nothing to reconcile. Pull a new image with <code>once update &lt;host&gt;</code>, or change the settings on the server itself.
+      </div>
     </section>
 
     <section id="troubleshooting">
@@ -1190,7 +1197,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
 │   ├── green                       # bundled self-contained launcher
 │   └── references/
 │       └── configuration.md        # skill configuration reference
-├── green                           # repository development launcher
+├── green                           # symlink to green-once/green
 ├── green.edn                       # repository example desired state
 ├── src/                            # Clojure implementation and resources
 ├── test/                           # Clojure tests
