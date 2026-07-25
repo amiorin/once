@@ -91,6 +91,30 @@
   (is (true? (#'d/update-available? "sha256:aaa" "sha256:bbb")))
   (is (nil? (#'d/update-available? nil "sha256:bbb"))))
 
+(deftest tofu-output-passes-state-backend-credentials
+  (testing "r2 state reads authenticate through the AWS chain"
+    (let [calls  (atom [])
+          run-fn (fn [args opts]
+                   (swap! calls conj [args opts])
+                   (ok (json/generate-string {:params {:value {:ip "203.0.113.10"}}})))
+          opts   (assoc base-opts
+                        :r2-access-key-id "r2-key"
+                        :r2-secret-access-key "r2-secret")]
+      (#'d/resolve-tofu-opts opts run-fn)
+      (is (= 2 (count @calls)) "compute and smtp state are both read")
+      (is (every? (fn [[args _]] (= ["tofu" "output" "-json"] args)) @calls))
+      (is (every? (fn [[_ o]] (= {"AWS_ACCESS_KEY_ID" "r2-key"
+                                  "AWS_SECRET_ACCESS_KEY" "r2-secret"}
+                                 (:extra-env o)))
+                  @calls))))
+  (testing "a local backend needs no credentials"
+    (let [calls  (atom [])
+          run-fn (fn [args opts]
+                   (swap! calls conj [args opts])
+                   (ok "{}"))]
+      (#'d/resolve-tofu-opts (assoc base-opts :provider-backend "local") run-fn)
+      (is (every? (fn [[_ o]] (nil? (:extra-env o))) @calls)))))
+
 (deftest describe-ssh-failure-soft-fails-and-skips-remote-apps
   (let [calls  (atom [])
         run-fn (fn [args _opts]

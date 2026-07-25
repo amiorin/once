@@ -338,7 +338,9 @@
   [run-fn opts tool]
   (let [dir (tools/tool-dir opts tool)
         result (run-fn ["tofu" "output" "-json"]
-                       {:dir dir :timeout-ms run-timeout-ms})]
+                       {:dir dir
+                        :extra-env (tools/backend-credential-env opts)
+                        :timeout-ms run-timeout-ms})]
     (if (:ok? result)
       (try
         {:params (or (get-in (json/parse-string (:out result) keyword)

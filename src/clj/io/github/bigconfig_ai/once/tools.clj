@@ -82,6 +82,13 @@
                    [(credential-env-vars k) v])))
          (concat ks (backend-credential-keys opts)))))
 
+(defn backend-credential-env
+  "Environment additions for a process that only reads OpenTofu state, such as
+  `tofu output`. Provider credentials are left out on purpose: reading state
+  never calls a provider API."
+  [opts]
+  (credential-env opts []))
+
 (defn- tofu-with-spec
   [opts dir specs fallback result-key env]
   (cond
