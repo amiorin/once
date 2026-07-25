@@ -71,7 +71,9 @@ nested `:once {:applications [...]}` collection:
  :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
  :once {:applications [{:host "www.example.com"
                         :image "ghcr.io/example/site:latest"
-                        :env {"DATABASE_URL" :app-database-url}}]}
+                        :env {"DATABASE_URL" :app-database-url}}
+                       {:host "www.example.net"
+                        :image "ghcr.io/example/another-site:latest"}]}
  :provider-compute "digitalocean" ; digitalocean, hcloud, oci, no-infra
  :provider-smtp "resend"          ; resend, no-infra
  :provider-dns "cloudflare"       ; cloudflare, no-infra
@@ -79,12 +81,12 @@ nested `:once {:applications [...]}` collection:
  :compute-prevent-destroy true}
 ```
 
-There is no domain key. The application hosts are the source of truth: the DNS
-zone is the last two labels they share, and it is also the parent of the Resend
-sending domain `notifications.<zone>` and of the `info@notifications.<zone>`
-From address. Applications spread over more than one domain are rejected. Each
-host gets its own proxied `A` record — there is no apex or wildcard record, so
-an unlisted host does not resolve.
+There is no domain key. Application hosts are the source of truth and may span
+domains. Green derives every DNS zone from each host's last two labels, creates
+and verifies a Resend sending domain at `notifications.<zone>`, and gives each
+application an `info@notifications.<zone>` From address in its own zone. Each
+host gets its own proxied `A` record — there is no implicit apex or wildcard
+record, so an unlisted host does not resolve.
 
 `:env` maps a container variable **name** to the flat key holding its value,
 never to the value itself.

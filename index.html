@@ -603,7 +603,7 @@
     <section id="introduction">
       <h2 class="anchor-heading"><a href="#introduction" aria-label="Link to Introduction">#</a>Introduction</h2>
       <p>Green Once provisions a server, configures DNS and outgoing email, installs Docker and <a href="https://github.com/basecamp/once" rel="noopener">Basecamp ONCE</a>, and reconciles the applications declared in <code>green.edn</code>. It combines a guided agent skill with an executable infrastructure workflow.</p>
-      <p>You provide application hostnames and images, provider choices, non-secret settings, and public SSH keys. The hostnames also decide the DNS zone and the mail domain, so there is no separate domain setting. Credentials and application secrets stay in your environment. The result is an isolated set of OpenTofu and Ansible files plus a repeatable lifecycle command.</p>
+      <p>You provide application hostnames and images, provider choices, non-secret settings, and public SSH keys. The hostnames decide the DNS zones and mail domains, so there is no separate domain setting and applications may span domains. Credentials and application secrets stay in your environment. The result is an isolated set of OpenTofu and Ansible files plus a repeatable lifecycle command.</p>
 
       <div class="callout success">
         <span class="callout-title">The safe default</span>
@@ -659,9 +659,10 @@
         </li>
         <li>
           <h3>Describe the deployment</h3>
-          <p>Tell the agent the profile name, the application hostnames and images, provider choices, and public-key file paths. Every hostname must sit under one domain — that shared domain becomes the DNS zone and the mail domain. Give it only the <em>names</em> of environment variables that hold application secrets—never secret values.</p>
+          <p>Tell the agent the profile name, the application hostnames and images, provider choices, and public-key file paths. Hostnames may span domains; each hostname determines its DNS zone and matching mail domain. Give the agent only the <em>names</em> of environment variables that hold application secrets—never secret values.</p>
           <pre><code class="language-text">Create a Green Once project.
 Deploy ghcr.io/example/site:latest at www.example.com.
+Deploy ghcr.io/example/another-site:latest at www.example.net.
 Use DigitalOcean, Resend, Cloudflare, and R2.
 Map DATABASE_URL to the key :site-database-url.</code></pre>
         </li>
@@ -725,7 +726,9 @@ start + validation ─┤                ├─ tofu-dns ─ tofu-smtp-post ─�
  :once {:applications
         [{:host "www.example.com"
           :image "ghcr.io/example/site:latest"
-          :env {"DATABASE_URL" :site-database-url}}]}
+          :env {"DATABASE_URL" :site-database-url}}
+         {:host "www.example.net"
+          :image "ghcr.io/example/another-site:latest"}]}
 
  :provider-compute "digitalocean"
  :provider-smtp "resend"
@@ -790,7 +793,7 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
 
     <section id="applications">
       <h2 class="anchor-heading"><a href="#applications" aria-label="Link to Applications">#</a>Applications</h2>
-      <p>Applications live in <code>:once {:applications [...]}</code>. Every application requires a hostname and a container image. The hostnames decide everything domain-related: they must share one domain, that shared domain is the DNS zone and the mail domain, and each hostname gets its own proxied A record. No apex or wildcard record is created, so a hostname that is not listed here does not resolve.</p>
+      <p>Applications live in <code>:once {:applications [...]}</code>. Every application requires a hostname and a container image. Hostnames may span domains. Green derives every DNS zone from the hostname's last two labels, creates a matching Resend sending domain, and assigns each application a From address in its own zone. Each hostname gets its own proxied A record. No implicit apex or wildcard record is created, so a hostname that is not listed here does not resolve.</p>
       <pre><code class="language-clojure">:once
 {:applications
  [{:host "www.example.com"
@@ -916,7 +919,7 @@ done</code></pre>
 
       <h3>Resend</h3>
       <pre><code class="language-clojure">:provider-smtp "resend"</code></pre>
-      <p>Resend needs no further keys: its relay is the same for every account, so <code>smtp.resend.com</code>, port <code>587</code>, and the user <code>resend</code> are hard-coded. The SMTP stage creates <code>notifications.&lt;domain&gt;</code> under the domain the application hostnames share, returns its DNS records, and the post stage verifies it after DNS is configured. Use <code>GREEN_PAR_RESEND_API_KEY</code> for the Resend API and <code>GREEN_PAR_RESEND_PASSWORD</code> for server-side SMTP authentication.</p>
+      <p>Resend needs no further keys: its relay is the same for every account, so <code>smtp.resend.com</code>, port <code>587</code>, and the user <code>resend</code> are hard-coded. The SMTP stage creates <code>notifications.&lt;zone&gt;</code> for every distinct application zone and returns each domain's DNS records; the post stage verifies every sending domain after DNS is configured. Each application sends from <code>info@notifications.&lt;its-zone&gt;</code>. Use <code>GREEN_PAR_RESEND_API_KEY</code> for the Resend API and <code>GREEN_PAR_RESEND_PASSWORD</code> for server-side SMTP authentication.</p>
 
       <h3>Existing SMTP</h3>
       <pre><code class="language-clojure">:provider-smtp "no-infra"
@@ -932,7 +935,7 @@ done</code></pre>
         <article class="card">
           <p class="label">Managed</p>
           <h3><code>cloudflare</code></h3>
-          <p>Finds the configured zone, creates a proxied A record for each application hostname, and adds the unproxied records returned by Resend. Requires <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code> with zone-read and DNS-edit access.</p>
+          <p>Finds every zone derived from the application hostnames, creates a proxied A record for each hostname in its zone, and adds each sending domain's unproxied Resend records. Requires <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code> with zone-read and DNS-edit access to every zone.</p>
         </article>
         <article class="card">
           <p class="label">External</p>
@@ -1109,7 +1112,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <p>Confirm Cloudflare received all unproxied Resend records and allow DNS propagation. Rerun create after the records are visible; OpenTofu will continue from existing state.</p>
 
       <h3>Cloudflare cannot find the zone</h3>
-      <p>The domain shared by the application hostnames must already belong to a zone accessible by <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code>. The token needs permission to read the zone and edit DNS records.</p>
+      <p>Every domain derived from the application hostnames must already belong to a zone accessible by <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code>. The token needs permission to read and edit DNS records in every zone.</p>
 
       <h3>An existing server fails during create</h3>
       <p>Verify direct SSH access with <code>:no-infra-compute-user</code>, passwordless privilege escalation for <code>:no-infra-compute-sudoer</code>, a supported Linux host, and outbound network access for installers.</p>
@@ -1131,7 +1134,9 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
     :env {"DATABASE_URL" :site-database-url
           "SECRET_KEY_BASE" :site-secret-key-base}
     :auto_update true
-    :auto_backup true}]}
+    :auto_backup true}
+   {:host "www.example.net"
+    :image "ghcr.io/example/another-site:latest"}]}
 
  :provider-compute "digitalocean"
  :provider-smtp "resend"

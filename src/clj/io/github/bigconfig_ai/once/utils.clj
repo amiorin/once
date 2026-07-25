@@ -11,10 +11,11 @@
   number and tells the user to repin.
 
   2: tools/backend-credential-env, which the launcher calls to read Tofu state.
-  3: desired state drops :domain and :package. The DNS zone is derived from the
-     application hosts through utils/apps-domain, and :profile alone names the
-     stack."
-  3)
+  3: desired state drops :domain and :package. DNS zones are derived from the
+     application hosts, and :profile alone names the stack.
+  4: applications may span DNS zones. utils/apps-domains replaces the singular
+     apps-domain contract used by the SMTP and DNS stages."
+  4)
 
 (defn strip-ansi [s]
   (-> s
@@ -95,12 +96,16 @@
     (when (<= 2 (count labels))
       (str/join "." (take-last 2 labels)))))
 
-(defn apps-domain
-  "The zone the stack lives in. Desired state carries no :domain: the DNS
-  records, the Resend sending domain and the From address all derive from the
-  application hosts, which the launcher checks share a single zone."
+(defn apps-domains
+  "The sorted DNS zones used by the applications. Desired state carries no
+  :domain: each application's DNS records, Resend sending domain, and From
+  address derive from that application's host."
   [opts]
-  (some-> (get-in opts [:once :applications]) first :host registrable-domain))
+  (->> (get-in opts [:once :applications])
+       (keep (comp registrable-domain :host))
+       distinct
+       sort
+       vec))
 
 (defn- green-par-key
   [env-name]

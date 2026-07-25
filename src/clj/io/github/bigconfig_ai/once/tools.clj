@@ -141,14 +141,19 @@
 
 (defn- fallback-smtp-params
   [{:keys [provider-smtp] :as opts}]
-  (merge {:id "domain-id-not-defined"
-          :records []}
+  (merge {:domains []}
          (case provider-smtp
            "no-infra" {:smtp_username (:no-infra-smtp-username opts)
                        :smtp_password (:no-infra-smtp-password opts)
                        :smtp_server (:no-infra-smtp-server opts)
                        :smtp_port (:no-infra-smtp-port opts)}
-           "resend" (assoc resend-smtp :smtp_password (:resend-password opts))
+           "resend" (assoc resend-smtp
+                           :smtp_password (:resend-password opts)
+                           :domains (mapv (fn [zone]
+                                            {:zone zone
+                                             :id (str "domain-id-not-defined-" zone)
+                                             :records []})
+                                          (utils/apps-domains opts)))
            {})))
 
 (defn tofu-compute-step
@@ -161,15 +166,35 @@
     (tofu-with-spec opts dir specs (fallback-compute-params opts) :once/compute-params
                     (credential-env opts [:do-token :hcloud-token]))))
 
-(defn- with-zone
-  "Templates that name the DNS zone read `zone`, which no key in desired state
-  supplies: it is derived from the application hosts."
+(defn- hcl-string-list
+  [xs]
+  (str "[" (str/join ", " (map json/generate-string xs)) "]"))
+
+(defn- hcl-string-map
+  [m]
+  (if (seq m)
+    (str "{\n"
+         (str/join ",\n"
+                   (map (fn [[k v]]
+                          (format "    %s : %s"
+                                  (json/generate-string k)
+                                  (json/generate-string v)))
+                        m))
+         "\n  }")
+    "{}"))
+
+(defn- with-zones
+  "Templates receive the sorted DNS zones derived from the application hosts;
+  no domain key is carried in desired state."
   [opts]
-  (assoc opts :zone (utils/apps-domain opts)))
+  (let [zones (utils/apps-domains opts)]
+    (assoc opts
+           :zones zones
+           :zones-hcl (hcl-string-list zones))))
 
 (defn tofu-smtp-step
   [opts]
-  (let [opts (with-zone opts)
+  (let [opts (with-zones opts)
         provider (or (:provider-smtp opts) "resend")
         dir (tool-dir opts "tofu-smtp")
         specs [(template-spec (tool-template "tofu-smtp" provider "main.tf")
@@ -212,17 +237,22 @@
     (sequential? x) (mapv sort-nested-map x)
     :else x))
 
+(defn- cloudflare-zone-id
+  [zone]
+  (format "${data.cloudflare_zone.domains[%s].id}" (pr-str zone)))
+
 (defn render-fn
-  [src {:keys [records applications ip]}]
+  [src {:keys [domains applications ip]}]
   (case src
-    ;; One proxied A record per application host. There is no apex or wildcard
-    ;; record: only the hosts desired state names resolve to the server.
+    ;; One proxied A record per application host. There is no implicit apex or
+    ;; wildcard record: only the hosts desired state names resolve to the server.
     :apps (let [app-records
-                (for [{:keys [host]} applications]
+                (for [{:keys [host]} applications
+                      :let [zone (utils/registrable-domain host)]]
                   (tofu-construct :resource
                                   :cloudflare_dns_record
                                   (add-fqn-suffix ::app-dns (str "-" host))
-                                  {:zone_id "${data.cloudflare_zone.domain.id}"
+                                  {:zone_id (cloudflare-zone-id zone)
                                    :name host
                                    :content ip
                                    :type "A"
@@ -233,11 +263,13 @@
                     {})]
             (json/generate-string m {:pretty true}))
     :smtp (let [cloudflare-records
-                (for [{:keys [name priority record type value]} records]
+                (for [{:keys [zone records]} domains
+                      {:keys [name priority record type value]} records]
                   (tofu-construct :resource
                                   :cloudflare_dns_record
-                                  (add-fqn-suffix ::smtp-dns (format "-%s-%s" record type))
-                                  (cond-> {:zone_id "${data.cloudflare_zone.domain.id}"
+                                  (add-fqn-suffix ::smtp-dns
+                                                  (format "-%s-%s-%s" zone record type))
+                                  (cond-> {:zone_id (cloudflare-zone-id zone)
                                            :name name
                                            :ttl "1"
                                            :type type
@@ -266,7 +298,7 @@
 
 (defn tofu-dns-step
   [opts]
-  (let [opts (with-zone (if (= :delete (:green/event opts)) opts (joined-params opts)))
+  (let [opts (with-zones (if (= :delete (:green/event opts)) opts (joined-params opts)))
         provider (or (:provider-dns opts) "cloudflare")
         dir (tool-dir opts "tofu-dns")
         specs (cond-> [(template-spec (tool-template "tofu-dns" provider "main.tf")
@@ -277,13 +309,17 @@
                                 (render-fn :apps {:applications (get-in opts [:once :applications])
                                                   :ip (:ip opts)}))
                       (raw-spec (str dir "/smtp.tf.json")
-                                (render-fn :smtp {:records (:records opts)}))))]
+                                (render-fn :smtp {:domains (:domains opts)}))))]
     (tofu-with-spec opts dir specs {} nil
                     (credential-env opts [:cloudflare-api-token]))))
 
 (defn tofu-smtp-post-step
   [opts]
-  (let [provider (or (:provider-smtp opts) "resend")
+  (let [domain-ids (into (sorted-map)
+                         (map (juxt :zone :id))
+                         (:domains opts))
+        opts (assoc opts :domain-ids-hcl (hcl-string-map domain-ids))
+        provider (or (:provider-smtp opts) "resend")
         dir (tool-dir opts "tofu-smtp-post")
         specs [(template-spec (tool-template "tofu-smtp-post" provider "main.tf")
                               (str dir "/main.tf")
@@ -349,8 +385,10 @@
 
 (defn- application-data
   [smtp app]
-  (cond-> (merge app smtp)
-    (map? (:env app)) (assoc :env (resolve-env (:env app)))))
+  (let [zone (utils/registrable-domain (:host app))
+        smtp (assoc smtp :smtp_from (format "Info <info@notifications.%s>" zone))]
+    (cond-> (merge app smtp)
+      (map? (:env app)) (assoc :env (resolve-env (:env app))))))
 
 (def ^:private smtp-password-keys
   {"resend" :resend-password
@@ -359,9 +397,7 @@
 (defn ansible-once
   [{:keys [once provider-smtp] :as opts}]
   (let [pw-key (smtp-password-keys (or provider-smtp "resend"))
-        smtp (-> (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
-                 (assoc :smtp_from (format "Info <info@notifications.%s>"
-                                           (utils/apps-domain opts))))
+        smtp (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
         smtp (cond-> smtp
                (and pw-key (:smtp_password smtp))
                (assoc :smtp_password (par-lookup pw-key)))

@@ -20,11 +20,12 @@
     (is (nil? (sut/registrable-domain "localhost")))
     (is (nil? (sut/registrable-domain nil)))))
 
-(deftest apps-domain-test
-  (testing "the zone comes from the application hosts, not desired state"
-    (is (= "example.com"
-           (sut/apps-domain {:once {:applications [{:host "www.example.com"}
-                                                   {:host "app.example.com"}]}}))))
+(deftest apps-domains-test
+  (testing "zones come from all application hosts, not desired state"
+    (is (= ["example.com" "example.net"]
+           (sut/apps-domains {:once {:applications [{:host "www.example.net"}
+                                                    {:host "app.example.com"}
+                                                    {:host "admin.example.net"}]}}))))
 
-  (testing "no applications, no zone"
-    (is (nil? (sut/apps-domain {})))))
+  (testing "no applications, no zones"
+    (is (= [] (sut/apps-domains {})))))

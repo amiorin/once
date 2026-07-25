@@ -1,8 +1,8 @@
 # Configuration reference
 
-The generated `green.edn` is a flat EDN map. Include only selected providers' non-secret settings. Never add credentials or passwords.
+The generated `green.edn` is one root EDN map with flat provider and setting keys, except for applications nested under `:once {:applications [...]}`. Include only selected providers' non-secret settings. Never add credentials or passwords.
 
-Every secret reaches the workflow through a `GREEN_PAR_*` environment variable, which is overlaid onto the matching flat key before anything runs. The variable name is the key uppercased with hyphens as underscores, so `:do-token` is supplied by `GREEN_PAR_DO_TOKEN`. That is the only name to set — there is no `TF_VAR_*` and no second mechanism. From there no secret is written into a rendered file: OpenTofu credentials are passed to each stage through the process environment under the variable that provider reads natively, and Ansible receives `{{ lookup('env','GREEN_PAR_…') }}` expressions that resolve when the play runs. Overrides are coerced to the type of the value they replace, so booleans and integers stay booleans and integers.
+Launcher-managed provider credentials and application secrets reach the workflow through `GREEN_PAR_*` environment variables, which are overlaid onto matching flat keys before anything runs. A variable name is the key uppercased with hyphens as underscores, so `:do-token` is supplied by `GREEN_PAR_DO_TOKEN`; there is no `TF_VAR_*` alias. S3 is the exception: OpenTofu resolves its ambient AWS credential chain directly. OCI authenticates through the selected profile in `~/.oci/config`, and SSH private keys remain outside the project in `ssh-agent`. From there no secret is written into a rendered file: launcher-managed OpenTofu credentials are passed to each stage under the variable that provider reads natively, and Ansible receives `{{ lookup('env','GREEN_PAR_…') }}` expressions that resolve when the play runs. Overrides are coerced to the type of the value they replace, so booleans and integers stay booleans and integers.
 
 ## Base shape
 
@@ -15,7 +15,9 @@ Every secret reaches the workflow through a `GREEN_PAR_*` environment variable, 
  :once {:applications
         [{:host "www.example.com"
           :image "ghcr.io/example/site:latest"
-          :env {"DATABASE_URL" :app-database-url}}]}
+          :env {"DATABASE_URL" :app-database-url}}
+         {:host "www.example.net"
+          :image "ghcr.io/example/another-site:latest"}]}
 
  :provider-compute "digitalocean"
  :provider-smtp "resend"
@@ -29,7 +31,7 @@ Every secret reaches the workflow through a `GREEN_PAR_*` environment variable, 
 
 `:profile` names the stack: it is the working-directory and state-key prefix, the `name` the compute stage reports, and the `Host` alias written into `~/.ssh/config`.
 
-There is no domain key. The application hostnames are the source of truth: the DNS zone and the Resend sending domain are the last two labels they share, so every application must sit under one domain. Each application gets its own proxied `A` record — no apex or wildcard record is created, so a hostname that is not listed here does not resolve.
+There is no domain key. Application hostnames are the source of truth and may span domains. Green derives each distinct DNS zone from the hostname's last two labels, creates one Resend sending domain (`notifications.<zone>`) per zone, and gives each application a matching `info@notifications.<zone>` From address. Each application gets its own proxied `A` record — no implicit apex or wildcard record is created, so a hostname that is not listed here does not resolve.
 
 `:env` maps a container variable name to the flat key holding its value; the value itself never appears in the file, and is supplied by the `GREEN_PAR_*` variable named after that key (`:app-database-url` ← `GREEN_PAR_APP_DATABASE_URL`). Application options supported by the ONCE reconciler also include `:auto_update`, `:auto_backup`, `:backup_path`, `:disable_tls`, `:cpus`, and `:memory`.
 
@@ -107,7 +109,7 @@ No compute API credential is required. SSH authentication must already work thro
 :provider-smtp "resend"
 ```
 
-Resend's relay (`smtp.resend.com:587`, user `resend`) is the same for every account, so it is hard-coded rather than configured. Mail is sent from `info@notifications.<domain>`, where the domain is the one shared by the application hosts.
+Resend's relay (`smtp.resend.com:587`, user `resend`) is the same for every account, so it is hard-coded rather than configured. Green registers and verifies `notifications.<zone>` for every distinct application zone. Each application sends from `info@notifications.<its-zone>`.
 
 Required credentials: `GREEN_PAR_RESEND_API_KEY` for the Resend API, and `GREEN_PAR_RESEND_PASSWORD` for the SMTP password written into the server's mail configuration.
 
@@ -126,7 +128,7 @@ Required credential: `GREEN_PAR_NO_INFRA_SMTP_PASSWORD`.
 
 Use `:provider-dns "cloudflare"` or `:provider-dns "no-infra"`.
 
-Cloudflare requires `GREEN_PAR_CLOUDFLARE_API_TOKEN`. The token needs permission to discover the zone the application hosts share and manage its DNS records: one proxied `A` record per application host, plus the Resend verification records. `no-infra` renders an empty DNS module and requires no credential.
+Cloudflare requires `GREEN_PAR_CLOUDFLARE_API_TOKEN`. The token needs permission to discover and manage every zone derived from the application hosts: one proxied `A` record per application host, plus each zone's Resend verification records. `no-infra` renders an empty DNS module and requires no credential.
 
 ## State backends
 

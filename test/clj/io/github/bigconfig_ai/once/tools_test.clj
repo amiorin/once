@@ -48,6 +48,15 @@
         (is (str/includes? yaml "smtp_username: \"user\""))
         (is (str/includes? yaml "smtp_from: \"Info <info@notifications.example.com>\"")))))
 
+  (testing "each application sends from its own domain"
+    (let [yaml (tools/ansible-once
+                (assoc-in (once-opts "resend" "secret")
+                          [:once :applications]
+                          [{:host "www.example.com" :image "image-one"}
+                           {:host "www.example.net" :image "image-two"}]))]
+      (is (str/includes? yaml "smtp_from: \"Info <info@notifications.example.com>\""))
+      (is (str/includes? yaml "smtp_from: \"Info <info@notifications.example.net>\""))))
+
   (testing "no-infra points at its own variable"
     (let [yaml (tools/ansible-once (once-opts "no-infra" "another_secret"))]
       (is (not (str/includes? yaml "another_secret")))
@@ -85,27 +94,83 @@
 (deftest dns-records-follow-the-applications
   (let [json (tools/render-fn :apps {:ip "203.0.113.10"
                                      :applications [{:host "www.example.com"}
-                                                    {:host "app.example.com"}]})
+                                                    {:host "app.example.net"}]})
         records (get-in (json/parse-string json true)
                         [:resource :cloudflare_dns_record])]
     (testing "one record per application host, and nothing else"
       (is (= 2 (count records)))
-      (is (= #{"www.example.com" "app.example.com"}
+      (is (= #{"www.example.com" "app.example.net"}
              (set (map :name (vals records)))))
       (is (not (str/includes? json "\"*\"")) "no wildcard record")
       (is (not (str/includes? json "\"@\"")) "no apex record"))
 
-    (testing "every host is a proxied A record pointing at the server"
-      (doseq [record (vals records)]
+    (testing "every host points at the server through its own zone"
+      (doseq [{:keys [name] :as record} (vals records)]
         (is (= "A" (:type record)))
         (is (true? (:proxied record)))
         (is (= 1 (:ttl record)))
         (is (= "203.0.113.10" (:content record)))
-        (is (= "${data.cloudflare_zone.domain.id}" (:zone_id record))))))
+        (is (= (case name
+                 "www.example.com" "${data.cloudflare_zone.domains[\"example.com\"].id}"
+                 "app.example.net" "${data.cloudflare_zone.domains[\"example.net\"].id}")
+               (:zone_id record)))))
 
-  (testing "no applications, no records"
-    (is (empty? (json/parse-string (tools/render-fn :apps {:ip "203.0.113.10"
-                                                           :applications []}))))))
+    (testing "no applications, no records"
+      (is (empty? (json/parse-string (tools/render-fn :apps {:ip "203.0.113.10"
+                                                             :applications []})))))))
+
+(deftest smtp-records-follow-the-sending-domains
+  (let [rendered (tools/render-fn
+                  :smtp
+                  {:domains [{:zone "example.com"
+                              :records [{:name "send.example.com"
+                                         :record "send"
+                                         :type "MX"
+                                         :priority 10
+                                         :value "feedback-smtp.eu-west-1.amazonses.com"}]}
+                             {:zone "example.net"
+                              :records [{:name "resend._domainkey.example.net"
+                                         :record "resend._domainkey"
+                                         :type "TXT"
+                                         :value "public-key"}]}]})
+        records (vals (get-in (json/parse-string rendered true)
+                              [:resource :cloudflare_dns_record]))]
+    (is (= 2 (count records)))
+    (is (= #{"${data.cloudflare_zone.domains[\"example.com\"].id}"
+             "${data.cloudflare_zone.domains[\"example.net\"].id}"}
+           (set (map :zone_id records))))
+    (is (= #{"send.example.com" "resend._domainkey.example.net"}
+           (set (map :name records))))))
+
+(deftest multi-domain-build-renders-all-provider-resources
+  (let [workdir (temp-dir)
+        opts {:workdir workdir
+              :profile "test"
+              :green/event :build
+              :provider-compute "no-infra"
+              :provider-smtp "resend"
+              :provider-dns "cloudflare"
+              :once {:applications [{:host "www.example.net"}
+                                    {:host "www.example.com"}]}}]
+    (try
+      (let [smtp-result (tools/tofu-smtp-step opts)
+            dns-result (tools/tofu-dns-step
+                        (assoc smtp-result :once/compute-params {:ip "203.0.113.10"}))
+            post-result (tools/tofu-smtp-post-step dns-result)
+            smtp-main (slurp (io/file (tools/tool-dir opts "tofu-smtp") "main.tf"))
+            dns-main (slurp (io/file (tools/tool-dir opts "tofu-dns") "main.tf"))
+            post-main (slurp (io/file (tools/tool-dir opts "tofu-smtp-post") "main.tf"))]
+        (is (zero? (:green/exit post-result)))
+        (testing "SMTP and DNS iterate over every sorted application zone"
+          (is (str/includes? smtp-main "toset([\"example.com\", \"example.net\"])"))
+          (is (str/includes? dns-main "toset([\"example.com\", \"example.net\"])")))
+        (testing "the post stage verifies every sending domain"
+          (is (str/includes? post-main
+                             "\"example.com\" : \"domain-id-not-defined-example.com\""))
+          (is (str/includes? post-main
+                             "\"example.net\" : \"domain-id-not-defined-example.net\""))))
+      (finally
+        (delete-tree! workdir)))))
 
 (deftest ansible-local-renders-and-runs-the-playbook
   (let [workdir (temp-dir)]

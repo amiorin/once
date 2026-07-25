@@ -97,7 +97,7 @@ A single flat EDN map, except for the nested `:once {:applications [...]}` colle
 
 Load-bearing rules:
 
-- **No domain key.** The application hosts are the source of truth. `utils/apps-domain` takes the last two labels they share; that zone is the Cloudflare zone, the parent of the Resend sending domain `notifications.<zone>`, and the `info@notifications.<zone>` From address. The launcher rejects applications spread over more than one domain. Templates read it as `<{ zone }>`, injected by `tools/with-zone` — nothing in desired state supplies it.
+- **No domain key.** Application hosts are the source of truth and may span domains. `utils/apps-domains` derives the sorted distinct zones from their last two labels. The SMTP stage creates `notifications.<zone>` for every zone, Cloudflare manages every zone, and each application gets the matching `info@notifications.<zone>` From address. Templates read HCL-encoded derived zone collections injected by `tools/with-zones` — nothing in desired state supplies them.
 - **No apex or wildcard DNS record.** Each application host gets its own proxied `A` record, so an unlisted host does not resolve.
 - **Resend's relay is hard-coded** (`smtp.resend.com`, 587, user `resend`) in `tools/resend-smtp`, because it is identical for every account. Only `GREEN_PAR_RESEND_API_KEY` and `GREEN_PAR_RESEND_PASSWORD` are configurable. The `no-infra` SMTP keys stay in desired state.
 - **`GREEN_PAR_*` is the only secret channel.** `utils/read-green-pars` overlays any such variable onto the matching flat key — uppercased, hyphens as underscores, so `:do-token` ← `GREEN_PAR_DO_TOKEN`. Overrides are coerced to the type of the value they replace, so `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false` stays a boolean. Any flat key can be overridden the same way. There is no `TF_VAR_*` and no second mechanism.
@@ -137,7 +137,7 @@ One map is threaded through every step. Reserved keys are namespaced; desired-st
 | `:green/dry-run` | set by `--dry-run` |
 | `:green/branches` | branch results at a join |
 | `:once/compute-params`, `:once/smtp-params` | outputs adopted from earlier stages |
-| `:zone` | derived DNS zone (see above) |
+| `:zones` | sorted distinct DNS zones derived from the application hosts |
 | `:green.scaffold/written`, `:green.scaffold/deleted` | paths a scaffold touched |
 
 ### Stages
@@ -147,9 +147,9 @@ Each stage owns an isolated directory, `tools/tool-dir` = `<workdir>/<profile>/<
 | Step | Work dir | Templates | Does |
 |---|---|---|---|
 | `:once/tofu-compute` | `tofu-compute` | `tools/tofu/<provider>/` | provisions the VM (or passes through `no-infra`), outputs ip/user/sudoer/name |
-| `:once/tofu-smtp` | `tofu-smtp` | `tools/tofu-smtp/<provider>/` | registers `notifications.<zone>` at Resend, outputs its id and DNS records |
-| `:once/tofu-dns` | `tofu-dns` | `tools/tofu-dns/<provider>/` | zone settings, plus generated `apps.tf.json` and `smtp.tf.json` |
-| `:once/tofu-smtp-post` | `tofu-smtp-post` | `tools/tofu-smtp-post/<provider>/` | verifies the Resend domain once DNS resolves |
+| `:once/tofu-smtp` | `tofu-smtp` | `tools/tofu-smtp/<provider>/` | registers `notifications.<zone>` for every application zone at Resend and outputs each id and DNS record set |
+| `:once/tofu-dns` | `tofu-dns` | `tools/tofu-dns/<provider>/` | settings for every zone, plus generated `apps.tf.json` and `smtp.tf.json` |
+| `:once/tofu-smtp-post` | `tofu-smtp-post` | `tools/tofu-smtp-post/<provider>/` | verifies every Resend domain once DNS resolves |
 | `:once/ansible-local` | `ansible-local` | `tools/ansible-local/` | writes the managed `Host <profile>` block into `~/.ssh/config` |
 | `:once/ansible-remote` | `ansible-remote` | `tools/ansible/` | installs docker, ONCE, bb; creates the restricted `deploy` user; reconciles applications |
 
@@ -215,7 +215,7 @@ Deleting has to render before it can destroy: `tofu-with-spec` and `ansible-loca
 - **Keys**: plain kebab-case keywords for desired state (they match template variable names); namespaced keywords for engine state (`:green/…`, `:once/…`).
 - **Steps** take `opts` and return `opts`, and report failure through `:green/exit` / `:green/err`.
 - **`^:private`** for everything not called from the launcher or the tests. The launcher's own helpers are `defn-`; the workflow steps it exposes are not.
-- **Pure builders stay pure**: `tools/render-fn`, `tools/inventory`, `tools/ansible-once`, `utils/apps-domain` take data and return data. `describe/describe-report` keeps its single-argument arity (which shells out) separate from the arities that take an injected runner, so report construction stays process-free — preserve that split.
+- **Pure builders stay pure**: `tools/render-fn`, `tools/inventory`, `tools/ansible-once`, `utils/apps-domains` take data and return data. `describe/describe-report` keeps its single-argument arity (which shells out) separate from the arities that take an injected runner, so report construction stays process-free — preserve that split.
 - **Tests avoid processes** by redefining `green.ansible/ansible-step` and `green.tofu/tofu-step`, or by driving the pure builders directly.
 
 ## Git Conventions

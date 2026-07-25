@@ -10,8 +10,14 @@ provider "resend" {
   # api_key comes from RESEND_API_KEY in the environment
 }
 
-resource "resend_domain" "domain1" {
-  name           = "notifications.<{ zone }>"
+locals {
+  zones = toset(<{ zones-hcl|safe }>)
+}
+
+resource "resend_domain" "domains" {
+  for_each = local.zones
+
+  name           = "notifications.${each.value}"
   region         = "eu-west-1"
   open_tracking  = false
   click_tracking = false
@@ -20,8 +26,13 @@ resource "resend_domain" "domain1" {
 
 output "params" {
   value = {
-    records = resend_domain.domain1.records
-    id = resend_domain.domain1.id
+    domains = [
+      for zone in sort(keys(resend_domain.domains)) : {
+        zone    = zone
+        records = resend_domain.domains[zone].records
+        id      = resend_domain.domains[zone].id
+      }
+    ]
   }
   sensitive = true
 }

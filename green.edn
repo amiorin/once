@@ -22,15 +22,17 @@
  :compute-pubkey "REPLACE_ME"
  :deploy-pubkey "REPLACE_ME"
 
- ;; Every application gets its own proxied A record; there is no apex or
- ;; wildcard record. The hosts also decide the DNS zone and the mail domain, so
- ;; they must all sit under one domain — here example.com.
+ ;; Every application gets its own proxied A record; there is no implicit apex
+ ;; or wildcard record. Hosts may span domains. Each distinct domain gets its
+ ;; own DNS zone integration and Resend sending domain.
  ;;
  ;; :env maps a container variable name to the flat key holding its value, so
  ;; the value arrives as GREEN_PAR_APP_EXAMPLE instead of living in this file.
  :once {:applications [{:host "www.example.com"
                         :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"
-                        :env {"EXAMPLE" :app-example}}]}
+                        :env {"EXAMPLE" :app-example}}
+                       {:host "www.example.net"
+                        :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"}]}
 
  :provider-compute "digitalocean"
  :provider-smtp "resend"
