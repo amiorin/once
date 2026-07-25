@@ -26,6 +26,62 @@
    :ip "203.0.113.10"
    :user "root"})
 
+(defn- once-opts
+  [provider-smtp password]
+  {:domain "example.com"
+   :provider-smtp provider-smtp
+   :smtp_server "smtp.example.com"
+   :smtp_port 587
+   :smtp_username "user"
+   :smtp_password password
+   :once {:applications [{:host "www.example.com"
+                          :image "ghcr.io/example/site:latest"}]}})
+
+(deftest ansible-once-never-renders-the-smtp-password
+  (testing "resend defers the password to a play-time env lookup"
+    (let [yaml (tools/ansible-once (once-opts "resend" "re_a_real_secret"))]
+      (is (not (str/includes? yaml "re_a_real_secret")))
+      (is (str/includes?
+           yaml
+           "smtp_password: \"{{ lookup('env','GREEN_PAR_RESEND_PASSWORD') }}\""))
+      (testing "the non-secret fields still render as values"
+        (is (str/includes? yaml "smtp_username: \"user\""))
+        (is (str/includes? yaml "smtp_from: \"Info <info@notifications.example.com>\"")))))
+
+  (testing "no-infra points at its own variable"
+    (let [yaml (tools/ansible-once (once-opts "no-infra" "another_secret"))]
+      (is (not (str/includes? yaml "another_secret")))
+      (is (str/includes?
+           yaml
+           "smtp_password: \"{{ lookup('env','GREEN_PAR_NO_INFRA_SMTP_PASSWORD') }}\""))))
+
+  (testing "an unset password stays absent, so the deploy flag is omitted"
+    (let [yaml (tools/ansible-once (once-opts "resend" nil))]
+      (is (not (str/includes? yaml "lookup("))))))
+
+(deftest ansible-once-never-renders-application-env-secrets
+  (let [opts (-> (once-opts "resend" "re_a_real_secret")
+                 (assoc-in [:once :applications 0 :env]
+                           {"DATABASE_URL" :app-database-url
+                            "SECRET_KEY_BASE" :app-secret-key-base})
+                 ;; the launcher has already overlaid the GREEN_PAR_* values
+                 (assoc :app-database-url "postgres://user:hunter2@db/app"
+                        :app-secret-key-base "s3cret-key-base"))
+        yaml (tools/ansible-once opts)]
+    (is (not (str/includes? yaml "hunter2")))
+    (is (not (str/includes? yaml "s3cret-key-base")))
+    (is (str/includes?
+         yaml
+         "\"DATABASE_URL={{ lookup('env','GREEN_PAR_APP_DATABASE_URL') }}\""))
+    (is (str/includes?
+         yaml
+         "\"SECRET_KEY_BASE={{ lookup('env','GREEN_PAR_APP_SECRET_KEY_BASE') }}\""))
+
+    (testing "an :env list is passed through as written"
+      (let [yaml (tools/ansible-once
+                  (assoc-in opts [:once :applications 0 :env] ["TARGET_EMAIL=forms@example.com"]))]
+        (is (str/includes? yaml "TARGET_EMAIL=forms@example.com"))))))
+
 (deftest ansible-local-renders-and-runs-the-playbook
   (let [workdir (temp-dir)]
     (try

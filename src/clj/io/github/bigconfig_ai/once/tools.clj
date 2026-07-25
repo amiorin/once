@@ -294,32 +294,48 @@
                                  :users {:hosts users-hosts}}}}]
     (json/generate-string result {:pretty true})))
 
+(defn- par-lookup
+  "Jinja expression resolving `k`'s GREEN_PAR_* variable when Ansible runs, so
+  the secret is templated at play time instead of written into the rendered
+  file. The renderer's delimiters are <{ }>, so {{ }} survives untouched."
+  [k]
+  (format "{{ lookup('env','GREEN_PAR_%s') }}"
+          (-> (name k) (str/replace "-" "_") str/upper-case)))
+
 (defn- resolve-env
   "Resolve an application `:env` map of container variable name -> flat opts key
-  into the [\"KEY=VALUE\"] list the once module expects. Values come from
-  green.edn or a `GREEN_PAR_*` override, so application secrets stay out of the
-  desired-state file. A list is passed through untouched."
-  [opts env]
+  into the [\"KEY=VALUE\"] list the once module expects. Each value defers to
+  the key's `GREEN_PAR_*` variable, looked up when Ansible runs, so application
+  secrets reach the host without being written into the rendered file. An unset
+  variable still resolves to an empty value rather than the string \"null\".
+  A list is passed through untouched."
+  [env]
   (if (map? env)
     (mapv (fn [[var-name k]]
-            ;; str, not format: an unresolved key renders an empty value rather
-            ;; than the string "null".
-            (str (name var-name) "=" (get opts (keyword k))))
+            (str (name var-name) "=" (par-lookup (keyword k))))
           env)
     env))
 
 (defn- application-data
-  [opts smtp app]
+  [smtp app]
   (cond-> (merge app smtp)
-    (map? (:env app)) (assoc :env (resolve-env opts (:env app)))))
+    (map? (:env app)) (assoc :env (resolve-env (:env app)))))
+
+(def ^:private smtp-password-keys
+  {"resend" :resend-password
+   "no-infra" :no-infra-smtp-password})
 
 (defn ansible-once
-  [{:keys [once domain] :as opts}]
-  (let [smtp (-> (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
+  [{:keys [once domain provider-smtp] :as opts}]
+  (let [pw-key (smtp-password-keys (or provider-smtp "resend"))
+        smtp (-> (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
                  (assoc :smtp_from (format "Info <info@notifications.%s>" domain)))
+        smtp (cond-> smtp
+               (and pw-key (:smtp_password smtp))
+               (assoc :smtp_password (par-lookup pw-key)))
         once (update once :applications
                      (fn [applications]
-                       (mapv #(application-data opts smtp %) applications)))
+                       (mapv #(application-data smtp %) applications)))
         data [{:name "Reconcile ONCE applications"
                :become true
                :once once}]]
