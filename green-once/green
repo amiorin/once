@@ -31,7 +31,7 @@
   "Minimum io.github.bigconfig-ai/once contract this launcher requires.
   Guarded at run time so a stale pin fails loudly instead of rendering
   templates from an older commit."
-  1)
+  2)
 
 ;; Managed by `green pin` — do not edit by hand.
 (def ^:private once-sha "31e333aa52bc5d9941af39b708c9f49fc0ca2249")
@@ -251,7 +251,9 @@
   no state yet."
   [opts tool]
   (try
-    (some-> (tofu/outputs (tools/tool-dir opts tool)) :params walk/keywordize-keys)
+    (some-> (tofu/outputs (tools/tool-dir opts tool)
+                          (tools/backend-credential-env opts))
+            :params walk/keywordize-keys)
     (catch Exception _ nil)))
 
 (defn- adopt-existing-state

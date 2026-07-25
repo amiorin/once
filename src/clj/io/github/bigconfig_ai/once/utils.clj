@@ -8,8 +8,10 @@
   "Compatibility number for the launcher that consumes these namespaces and the
   templates under src/resources. Bump it on any change a launcher pinned to an
   older commit could not survive; the launcher refuses to run against a lower
-  number and tells the user to repin."
-  1)
+  number and tells the user to repin.
+
+  2: tools/backend-credential-env, which the launcher calls to read Tofu state."
+  2)
 
 (defn strip-ansi [s]
   (-> s
