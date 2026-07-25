@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "cloudflare" {
-  api_token = "<{ cloudflare-api-token }>"
+  # api_token comes from CLOUDFLARE_API_TOKEN in the environment
 }
 
 data "cloudflare_zone" "domain" {

@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "digitalocean" {
-  token = "<{ do-token }>"
+  # token comes from DIGITALOCEAN_TOKEN in the environment
 }
 
 resource "digitalocean_droplet" "node1" {

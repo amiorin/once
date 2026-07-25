@@ -7,7 +7,7 @@ terraform {
 }
 
 provider "resend" {
-  api_key = "<{ resend-api-key }>"
+  # api_key comes from RESEND_API_KEY in the environment
 }
 
 resource "resend_domain" "domain1" {

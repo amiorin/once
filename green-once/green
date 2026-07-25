@@ -416,40 +416,71 @@
   (let [{:keys [exit out]} (apply git dir args)]
     (when (zero? exit) (str/trim out))))
 
-(defn- run-pin
-  "Stamp `once-sha` with this repository's HEAD so a standalone copy of the
-  launcher resolves the sources it was written against."
-  [_args]
-  (if-let [top (git-out script-dir "rev-parse" "--show-toplevel")]
+(defn- repo-head
+  "HEAD of the repository containing `dir`, once it is clean and pushed.
+  Returns [sha nil] or [nil error]."
+  [dir label]
+  (if-let [top (git-out dir "rev-parse" "--show-toplevel")]
     (let [dirty (git-out top "status" "--porcelain")
           sha (git-out top "rev-parse" "HEAD")
           remotes (git-out top "branch" "-r" "--contains" (str sha))]
       (cond
         (seq dirty)
-        {:green/exit 2 :green/err "working tree is dirty; commit before pinning"}
+        [nil (str label " working tree is dirty; commit before pinning")]
 
         (not (str/includes? (str remotes) "origin/"))
-        {:green/exit 2
-         :green/err (str "HEAD " (subs sha 0 7) " is not on any remote branch; "
-                         "push before pinning")}
+        [nil (str label " HEAD " (subs sha 0 7) " is not on any remote branch; "
+                  "push before pinning")]
 
-        (= sha once-sha)
-        {:green/exit 0 :green/err (str "already pinned to " (subs sha 0 7))}
+        :else [sha nil]))
+    [nil (str label " is not a git repository: " dir)]))
 
-        :else
-        (let [self (str (fs/canonicalize *file*))
-              old (slurp self)
-              new (str/replace old
-                               (str "(def ^:private once-sha \"" once-sha "\")")
-                               (str "(def ^:private once-sha \"" sha "\")"))]
-          (if (= old new)
-            {:green/exit 2 :green/err "could not locate the once-sha pin in this file"}
-            (do
-              (spit self new)
-              {:green/exit 0
-               :green/err (str "pinned once to " (subs sha 0 7)
-                               " (was " (subs once-sha 0 7) ")")})))))
-    {:green/exit 2 :green/err (str "not a git repository: " script-dir)}))
+(defn- replace-pin
+  [text sym old new]
+  (str/replace text
+               (str "(def ^:private " sym " \"" old "\")")
+               (str "(def ^:private " sym " \"" new "\")")))
+
+(defn- run-pin
+  "Stamp `once-sha` with this repository's HEAD so a standalone copy of the
+  launcher resolves the sources it was written against. When GREEN_LIB_ROOT
+  points at a green checkout, `green-sha` is stamped from it too — the two
+  pins move together whenever a change spans both repositories."
+  [_args]
+  (let [green-root (System/getenv "GREEN_LIB_ROOT")
+        [once-head once-err] (repo-head script-dir "once")
+        [green-head green-err] (if green-root
+                                 (repo-head green-root "green")
+                                 [nil nil])
+        once-stale? (and once-head (not= once-head once-sha))
+        green-stale? (and green-head (not= green-head green-sha))]
+    (cond
+      once-err {:green/exit 2 :green/err once-err}
+      green-err {:green/exit 2 :green/err green-err}
+
+      (not (or once-stale? green-stale?))
+      {:green/exit 0 :green/err (str "already pinned to " (subs once-sha 0 7))}
+
+      :else
+      (let [self (str (fs/canonicalize *file*))
+            old (slurp self)
+            new (cond-> old
+                  once-stale? (replace-pin "once-sha" once-sha once-head)
+                  green-stale? (replace-pin "green-sha" green-sha green-head))]
+        (if (= old new)
+          {:green/exit 2 :green/err "could not locate the pins in this file"}
+          (do
+            (spit self new)
+            {:green/exit 0
+             :green/err (str/join
+                         "\n"
+                         (cond-> []
+                           once-stale?
+                           (conj (str "pinned once to " (subs once-head 0 7)
+                                      " (was " (subs once-sha 0 7) ")"))
+                           green-stale?
+                           (conj (str "pinned green to " (subs green-head 0 7)
+                                      " (was " (subs green-sha 0 7) ")"))))}))))))
 
 ;; ---------------------------------------------------------------------------
 ;; CLI

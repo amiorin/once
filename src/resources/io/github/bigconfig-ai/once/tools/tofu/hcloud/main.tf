@@ -9,7 +9,7 @@ terraform {
 }
 
 provider "hcloud" {
-  token = "<{ hcloud-token }>"
+  # token comes from HCLOUD_TOKEN in the environment
 }
 
 resource "hcloud_server" "node1" {

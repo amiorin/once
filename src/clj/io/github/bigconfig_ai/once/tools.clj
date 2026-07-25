@@ -50,8 +50,28 @@
   [opts]
   (some-> (get-in opts [:tofu/outputs :params]) walk/keywordize-keys))
 
+(def ^:private credential-env-vars
+  "Flat key -> the variable each OpenTofu provider reads natively. Credentials
+  reach tofu through the process environment so they never render into .tf
+  files, where they would sit in plaintext under the work directory."
+  {:do-token "DIGITALOCEAN_TOKEN"
+   :hcloud-token "HCLOUD_TOKEN"
+   :resend-api-key "RESEND_API_KEY"
+   :cloudflare-api-token "CLOUDFLARE_API_TOKEN"})
+
+(defn- credential-env
+  "Environment additions for `ks`. Unset credentials are omitted, so build and
+  dry-run stay credential-free."
+  [opts ks]
+  (not-empty
+   (into {}
+         (keep (fn [k]
+                 (when-let [v (not-empty (str (get opts k)))]
+                   [(credential-env-vars k) v])))
+         ks)))
+
 (defn- tofu-with-spec
-  [opts dir specs fallback result-key]
+  [opts dir specs fallback result-key env]
   (cond
     (= :build (:green/event opts))
     (cond-> (sc/scaffold opts specs)
@@ -62,14 +82,14 @@
                        (assoc :green/event :create)
                        (sc/scaffold specs)
                        (assoc :green/event :delete))
-          result (tofu/tofu-step rendered {:dir dir})]
+          result (tofu/tofu-step rendered {:dir dir :env env})]
       (if (failed? result)
         result
         (sc/scaffold result specs)))
 
     :else
     (let [rendered (sc/scaffold opts specs)
-          result (tofu/tofu-step rendered {:dir dir})]
+          result (tofu/tofu-step rendered {:dir dir :env env})]
       (if (or (failed? result) (nil? result-key))
         result
         (assoc result result-key (merge fallback (or (output-params result) {})))))))
@@ -115,7 +135,8 @@
         specs [(template-spec (tool-template "tofu" provider "main.tf")
                               (str dir "/main.tf")
                               opts)]]
-    (tofu-with-spec opts dir specs (fallback-compute-params opts) :once/compute-params)))
+    (tofu-with-spec opts dir specs (fallback-compute-params opts) :once/compute-params
+                    (credential-env opts [:do-token :hcloud-token]))))
 
 (defn tofu-smtp-step
   [opts]
@@ -124,7 +145,8 @@
         specs [(template-spec (tool-template "tofu-smtp" provider "main.tf")
                               (str dir "/main.tf")
                               opts)]]
-    (tofu-with-spec opts dir specs (fallback-smtp-params opts) :once/smtp-params)))
+    (tofu-with-spec opts dir specs (fallback-smtp-params opts) :once/smtp-params
+                    (credential-env opts [:resend-api-key]))))
 
 (defn- add-fqn-suffix
   [fqn suffix]
@@ -206,7 +228,8 @@
                 (= provider "cloudflare")
                 (conj (raw-spec (str dir "/smtp.tf.json")
                                 (render-fn :smtp {:records (:records opts)}))))]
-    (tofu-with-spec opts dir specs {} nil)))
+    (tofu-with-spec opts dir specs {} nil
+                    (credential-env opts [:cloudflare-api-token]))))
 
 (defn tofu-smtp-post-step
   [opts]
@@ -215,7 +238,8 @@
         specs [(template-spec (tool-template "tofu-smtp-post" provider "main.tf")
                               (str dir "/main.tf")
                               opts)]]
-    (tofu-with-spec opts dir specs {} nil)))
+    (tofu-with-spec opts dir specs {} nil
+                    (credential-env opts [:resend-api-key]))))
 
 (defn data-fn
   ([data] (data-fn data nil))

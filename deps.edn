@@ -4,7 +4,7 @@
  ;; green source.
  :deps    {org.clojure/clojure          {:mvn/version "1.12.5"}
            io.github.amiorin/green      {:git/url "https://github.com/amiorin/green.git"
-                                         :git/sha "0301621045bc513d603e05ec4f6bd453dddae317"}
+                                         :git/sha "1bcee232c98a9562d12a795c03978094ccc7a7cc"}
            #_#_io.github.amiorin/green  {:local/root "/home/ubuntu/code/green"}}
  :aliases {:dev  {:extra-paths ["env/dev/clj" "test/clj"]}
            :test {:extra-paths ["test/clj"]
