@@ -85,9 +85,18 @@ Required credential: `GREEN_PAR_HCLOUD_TOKEN`.
 :yandex-memory-gb 2
 :yandex-core-fraction 100
 :yandex-disk-size-gb 20
+;; Optional:
+:yandex-static-ip true
+:yandex-allow-stopping-for-update false
 ```
 
 Green creates a network, subnet, NAT-enabled instance, and boot disk. The public key is installed for the `ubuntu` user; keep its private half in `ssh-agent`. Required credential: `GREEN_PAR_YANDEX_TOKEN`, passed to OpenTofu as the provider-native `YC_TOKEN`.
+
+`:yandex-static-ip` reserves a `yandex_vpc_address` and pins the instance's NAT to it. Yandex releases an ephemeral NAT address whenever an instance stops, so without a reserved address a restarted instance returns on a different IP and anything bound to the old one — a DNS record, a certificate, an `~/.ssh/config` entry — silently breaks.
+
+`:yandex-allow-stopping-for-update` lets OpenTofu stop the instance to apply a change Yandex cannot make in place, such as `:yandex-cores`, `:yandex-memory-gb`, or `:yandex-platform-id`. Leave it off for a server that carries traffic: the apply then fails naming the flag instead of taking the instance down mid-deploy, and it can be enabled for the single deploy that resizes the instance (`GREEN_PAR_YANDEX_ALLOW_STOPPING_FOR_UPDATE=true`). Attaching a reserved address does not require it.
+
+Both keys are optional and absent by default, which renders exactly as before.
 
 ### Oracle Cloud Infrastructure
 
