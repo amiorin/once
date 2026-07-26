@@ -6,7 +6,10 @@
 ;; environment variable, which is overlaid onto the matching flat key.
 ;;
 ;; This file is both the skill payload and the repository entry point —
-;; ./green in the project root is a symlink to it.
+;; ./green in the project root is a symlink to it. It deliberately holds no
+;; logic of its own: validation, the workflow graph, and the steps all live in
+;; the `once` library, where they are covered by tests. What remains is the
+;; part that cannot live there — resolving the library in the first place.
 
 (require '[babashka.fs :as fs]
          '[clojure.java.io :as io]
@@ -31,9 +34,9 @@
   "Minimum io.github.bigconfig-ai/once contract this launcher requires.
   Guarded at run time so a stale pin fails loudly instead of rendering
   templates from an older commit."
-  4)
+  5)
 
-;; Managed by `green pin` — do not edit by hand.
+;; Managed by `bb pin` — do not edit by hand.
 (def ^:private once-sha "858ec677a615cb2c8ea8c34b594d242ac5cb1194")
 (def ^:private green-sha "1bcee232c98a9562d12a795c03978094ccc7a7cc")
 
@@ -53,17 +56,17 @@
            'io.github.amiorin/green (lib-coord "GREEN_LIB_ROOT" green-git-url green-sha)}}))
 
 (require '[babashka.cli :as bb-cli]
-         '[clojure.edn :as edn]
-         '[clojure.java.shell :as sh]
-         '[clojure.walk :as walk]
-         '[green.cli :as green-cli]
-         '[green.dry-run :as dry-run]
-         '[green.progress :as progress]
-         '[green.tofu :as tofu]
-         '[green.workflow :as wf]
-         '[io.github.bigconfig-ai.once.describe :as describe]
-         '[io.github.bigconfig-ai.once.tools :as tools]
-         '[io.github.bigconfig-ai.once.utils :as utils])
+         '[green.cli :as green-cli])
+
+;; A pin old enough to predate a namespace this launcher needs would fail with
+;; a bare "could not locate" error, which says nothing about what to do. Load
+;; them defensively so the contract check below can answer instead.
+(def ^:private load-error
+  (try
+    (require 'io.github.bigconfig-ai.once.describe
+             'io.github.bigconfig-ai.once.workflow)
+    nil
+    (catch Throwable t (or (ex-message t) (str (class t))))))
 
 (defn- once-contract
   []
@@ -73,292 +76,14 @@
 (defn- contract-error
   "Return an outcome map when the resolved `once` predates this launcher."
   []
-  (let [resolved (once-contract)]
+  (let [resolved (if load-error 0 (once-contract))]
     (when (< resolved launcher-contract)
       {:green/exit 2
        :green/err (str "this launcher requires once contract " launcher-contract
                        " but resolved " resolved "\n"
                        "the pinned commit " (subs once-sha 0 7)
-                       " predates this launcher; run: green pin")})))
-
-;; ---------------------------------------------------------------------------
-;; Desired state and validation
-
-(defn- placeholder?
-  [x]
-  (or (nil? x)
-      (and (string? x)
-           (or (str/blank? x)
-               (= "REPLACE_ME" (str/upper-case x))))))
-
-(defn- green-par-name
-  "GREEN_PAR_* environment variable that supplies a flat key."
-  [k]
-  (str "GREEN_PAR_" (-> (name k) str/upper-case (str/replace "-" "_"))))
-
-(def ^:private compute-providers #{"digitalocean" "hcloud" "oci" "no-infra"})
-(def ^:private smtp-providers #{"resend" "no-infra"})
-(def ^:private dns-providers #{"cloudflare" "no-infra"})
-(def ^:private backend-providers #{"local" "s3" "r2"})
-
-;; Non-secret keys each provider's templates interpolate.
-(def ^:private compute-required
-  {"digitalocean" [:digitalocean-name :digitalocean-region :digitalocean-size
-                   :digitalocean-image :digitalocean-ssh-keys]
-   "hcloud" [:hcloud-name :hcloud-image :hcloud-server-type :hcloud-location
-             :hcloud-ssh-keys]
-   "oci" [:oci-config-file-profile :oci-subnet-id :oci-compartment-id
-          :oci-availability-domain :oci-display-name :oci-shape :oci-ocpus
-          :oci-memory-in-gbs :oci-boot-volume-size-in-gbs
-          :oci-boot-volume-vpus-per-gb :oci-ssh-authorized-keys]
-   "no-infra" [:no-infra-compute-ip :no-infra-compute-user
-               :no-infra-compute-sudoer :no-infra-compute-uid]})
-
-(def ^:private smtp-required
-  ;; Resend needs nothing here: its relay is hard-coded in the once library.
-  {"resend" []
-   "no-infra" [:no-infra-smtp-server :no-infra-smtp-port
-               :no-infra-smtp-username]})
-
-(def ^:private dns-required
-  {"cloudflare" [] "no-infra" []})
-
-(def ^:private backend-required
-  {"local" [] "s3" [:s3-bucket :s3-region] "r2" [:r2-bucket :r2-endpoint]})
-
-;; Credential keys, expected from GREEN_PAR_* rather than green.edn.
-(def ^:private compute-secrets
-  {"digitalocean" [:do-token] "hcloud" [:hcloud-token] "oci" [] "no-infra" []})
-
-(def ^:private smtp-secrets
-  {"resend" [:resend-api-key :resend-password]
-   "no-infra" [:no-infra-smtp-password]})
-
-(def ^:private dns-secrets
-  {"cloudflare" [:cloudflare-api-token] "no-infra" []})
-
-(def ^:private backend-secrets
-  {"local" [] "s3" [] "r2" [:r2-access-key-id :r2-secret-access-key]})
-
-(def ^:private domain-re
-  #"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$")
-(def ^:private env-name-re #"^[A-Z_][A-Z0-9_]*$")
-
-(defn- provider-keys
-  [table opts provider-key]
-  (get table (get opts provider-key) []))
-
-(defn- required-keys
-  [opts]
-  (concat [:profile :workdir :deploy-pubkey]
-          (provider-keys compute-required opts :provider-compute)
-          (provider-keys smtp-required opts :provider-smtp)
-          (provider-keys dns-required opts :provider-dns)
-          (provider-keys backend-required opts :provider-backend)))
-
-(defn- secret-keys
-  [opts]
-  (concat (provider-keys compute-secrets opts :provider-compute)
-          (provider-keys smtp-secrets opts :provider-smtp)
-          (provider-keys dns-secrets opts :provider-dns)
-          (provider-keys backend-secrets opts :provider-backend)))
-
-(defn- missing-keys
-  [opts keys]
-  (keep (fn [k] (when (placeholder? (get opts k)) k)) keys))
-
-(defn- app-errors
-  [applications]
-  (mapcat
-   (fn [[idx {:keys [host image env]}]]
-     (concat
-      (when (or (placeholder? host) (not (re-matches domain-re (str host))))
-        [(format ":once :applications[%d] has an invalid :host" idx)])
-      (when (placeholder? image)
-        [(format ":once :applications[%d] requires :image" idx)])
-      (when-not (or (nil? env) (map? env) (sequential? env))
-        [(format ":once :applications[%d] :env must map container variable names to green.edn keys"
-                 idx)])
-      (when (map? env)
-        (mapcat (fn [[var-name k]]
-                  (concat
-                   (when-not (re-matches env-name-re (str (name var-name)))
-                     [(format ":once :applications[%d] has an invalid container variable name %s"
-                              idx var-name)])
-                   (when (placeholder? k)
-                     [(format ":once :applications[%d] :env %s needs a green.edn key"
-                              idx var-name)])))
-                env))))
-   (map-indexed vector applications)))
-
-(defn- app-secret-keys
-  "Flat keys referenced by application :env maps."
-  [applications]
-  (->> applications
-       (mapcat (fn [{:keys [env]}] (when (map? env) (vals env))))
-       (remove placeholder?)
-       (map keyword)))
-
-(defn- state-errors
-  [opts]
-  (let [applications (get-in opts [:once :applications])]
-    (vec
-     (concat
-      (map #(str % " is required") (missing-keys opts (required-keys opts)))
-      (for [[provider-key table] [[:provider-compute compute-providers]
-                                  [:provider-smtp smtp-providers]
-                                  [:provider-dns dns-providers]
-                                  [:provider-backend backend-providers]]
-            :let [provider (get opts provider-key)]
-            :when (not (contains? table provider))]
-        (str "unsupported " provider-key " " (pr-str provider)))
-      (when-not (and (sequential? applications) (seq applications))
-        [":once :applications must be a non-empty sequence"])
-      (when (sequential? applications)
-        (app-errors applications))
-      (when-not (boolean? (:compute-prevent-destroy opts))
-        [":compute-prevent-destroy must be true or false"])
-      (when-not (str/starts-with? (str (:deploy-pubkey opts)) "ssh-")
-        [":deploy-pubkey must be an SSH public key"])
-      ;; :compute-pubkey is not consumed by any template — providers reference
-      ;; keys already registered with them — so it is optional, but a value
-      ;; that is present must still look like a public key.
-      (when-not (or (nil? (:compute-pubkey opts))
-                    (placeholder? (:compute-pubkey opts))
-                    (str/starts-with? (str (:compute-pubkey opts)) "ssh-"))
-        [":compute-pubkey must be an SSH public key"])))))
-
-(defn- secret-errors
-  [opts]
-  (let [applications (get-in opts [:once :applications])
-        keys (cond-> (secret-keys opts)
-               (= :create (:green/event opts))
-               (concat (app-secret-keys applications)))]
-    (map #(str "required credential is not set: " (green-par-name %))
-         (distinct (missing-keys opts keys)))))
-
-;; ---------------------------------------------------------------------------
-;; Workflow steps
-
-(defn- state-output
-  "Read a previously applied stage's `params` output, or nil when the stage has
-  no state yet."
-  [opts tool]
-  (try
-    (some-> (tofu/outputs (tools/tool-dir opts tool)
-                          (tools/backend-credential-env opts))
-            :params walk/keywordize-keys)
-    (catch Exception _ nil)))
-
-(defn- adopt-existing-state
-  "Delete renders the same templates as create, so a destroy needs the params
-  earlier stages produced (compute ip, smtp domain id and records)."
-  [opts]
-  (let [compute (state-output opts "tofu-compute")
-        smtp (state-output opts "tofu-smtp")]
-    (cond-> opts
-      compute (-> (merge compute) (assoc :once/compute-params compute))
-      smtp (-> (merge smtp) (assoc :once/smtp-params smtp)))))
-
-(defn start-step
-  [opts]
-  (let [opts (utils/read-green-pars (merge {:compute-prevent-destroy true} opts))
-        event (:green/event opts)
-        real? (not (:green/dry-run opts))
-        lifecycle? (contains? #{:create :delete} event)
-        errors (vec (concat (state-errors opts)
-                            (when (and real? lifecycle?) (secret-errors opts))
-                            (when (and real? (= :delete event)
-                                       (:compute-prevent-destroy opts))
-                              [(str "compute destruction is protected; set "
-                                    (green-par-name :compute-prevent-destroy)
-                                    "=false to delete")])))]
-    (cond
-      (seq errors) (assoc opts :green/exit 2 :green/err (str/join "\n" errors))
-      (and real? (= :delete event)) (assoc (adopt-existing-state opts) :green/exit 0)
-      :else (assoc opts :green/exit 0))))
-
-(defn ansible-cleanup-step
-  "Undo what the Ansible stages applied, then remove their rendered trees.
-  ansible-local runs its playbook once more to drop the managed ~/.ssh/config
-  block; both steps then scaffold against :green/event :delete, which deletes
-  their targets."
-  [opts]
-  (-> opts tools/ansible-local-step tools/ansible-remote-step))
-
-(def tofu-steps
-  [:once/tofu-compute :once/tofu-smtp :once/tofu-dns :once/tofu-smtp-post])
-
-(def side-effecting-steps
-  (into tofu-steps [:once/ansible-local :once/ansible-remote
-                    :once/ansible-cleanup]))
-
-(defn wire-fn
-  [step run-opts]
-  (if (= :delete (:green/event run-opts))
-    (case step
-      :once/start           [start-step :once/ansible-cleanup]
-      :once/ansible-cleanup [ansible-cleanup-step :once/tofu-smtp-post]
-      :once/tofu-smtp-post  [tools/tofu-smtp-post-step :once/tofu-dns]
-      :once/tofu-dns        [tools/tofu-dns-step :once/tofu-smtp :once/tofu-compute]
-      :once/tofu-smtp       [tools/tofu-smtp-step]
-      :once/tofu-compute    [tools/tofu-compute-step])
-    (case step
-      :once/start           [start-step :once/tofu-compute :once/tofu-smtp]
-      :once/tofu-compute    [tools/tofu-compute-step :once/tofu-dns]
-      :once/tofu-smtp       [tools/tofu-smtp-step :once/tofu-dns]
-      :once/tofu-dns        [tools/tofu-dns-step :once/tofu-smtp-post]
-      :once/tofu-smtp-post  [tools/tofu-smtp-post-step :once/ansible-local :once/ansible-remote]
-      :once/ansible-local   [tools/ansible-local-step]
-      :once/ansible-remote  [tools/ansible-remote-step])))
-
-(defn- r2-backend-advice
-  [dir-fn tool]
-  (tofu/s3-backend-advice
-   dir-fn
-   (fn [opts]
-     {:bucket (:r2-bucket opts)
-      :key (str (or (:profile opts) "default") "/" tool ".tfstate")
-      :region "auto"
-      ;; access_key/secret_key come from AWS_ACCESS_KEY_ID and
-      ;; AWS_SECRET_ACCESS_KEY in the environment. Naming them here would
-      ;; write them to backend.tf.json and to OpenTofu's resolved-config
-      ;; cache in .terraform/terraform.tfstate.
-      :endpoints {:s3 (:r2-endpoint opts)}
-      :skip_credentials_validation true
-      :skip_metadata_api_check true
-      :skip_region_validation true
-      :skip_requesting_account_id true
-      :use_path_style false})))
-
-(defn- backend-advice
-  [tool]
-  (let [dir-fn #(tools/tool-dir % tool)]
-    (fn [opts]
-      (case (or (:provider-backend opts) "local")
-        "local" ((tofu/local-backend-advice dir-fn) opts)
-        "s3" ((tofu/s3-backend-advice
-                dir-fn
-                {:bucket (:s3-bucket opts)
-                 :key (str (or (:profile opts) "default") "/" tool ".tfstate")
-                 :region (:s3-region opts)})
-              opts)
-        "r2" ((r2-backend-advice dir-fn tool) opts)
-        (throw (ex-info "unsupported OpenTofu backend"
-                        {:provider-backend (:provider-backend opts)}))))))
-
-(def workflow
-  (-> (wf/workflow {:start :once/start :wire-fn wire-fn})
-      (wf/advice-add :once/tofu-compute :before ::backend
-                     (backend-advice "tofu-compute"))
-      (wf/advice-add :once/tofu-smtp :before ::backend
-                     (backend-advice "tofu-smtp"))
-      (wf/advice-add :once/tofu-dns :before ::backend
-                     (backend-advice "tofu-dns"))
-      (wf/advice-add :once/tofu-smtp-post :before ::backend
-                     (backend-advice "tofu-smtp-post"))
-      progress/advise
-      (dry-run/advise side-effecting-steps)))
+                       " predates this launcher; update the skill or repin"
+                       (when load-error (str "\n" load-error)))})))
 
 ;; ---------------------------------------------------------------------------
 ;; Desired-state file resolution
@@ -386,107 +111,17 @@
     (cond-> args
       (not-any? file-arg? args) (conj "-f" (default-file)))))
 
-;; ---------------------------------------------------------------------------
-;; describe
-
-(defn- run-describe
+(defn- describe-args
   [args]
-  (try
-    (let [{:keys [opts]} (bb-cli/parse-args (vec (rest args))
-                                            {:spec {:file {:alias :f
-                                                           :default (default-file)}}})
-          file (io/file (:file opts))]
-      (if-not (.exists file)
-        {:green/exit 2 :green/err (str "desired state file not found: " file)}
-        (-> (edn/read-string (slurp file))
-            utils/read-green-pars
-            describe/describe)))
-    (catch Throwable t
-      {:green/exit 2 :green/err (or (ex-message t) (str (class t)))})))
-
-;; ---------------------------------------------------------------------------
-;; pin
-
-(defn- git
-  [dir & args]
-  (apply sh/sh "git" "-C" (str dir) args))
-
-(defn- git-out
-  [dir & args]
-  (let [{:keys [exit out]} (apply git dir args)]
-    (when (zero? exit) (str/trim out))))
-
-(defn- repo-head
-  "HEAD of the repository containing `dir`, once it is clean and pushed.
-  Returns [sha nil] or [nil error]."
-  [dir label]
-  (if-let [top (git-out dir "rev-parse" "--show-toplevel")]
-    (let [dirty (git-out top "status" "--porcelain")
-          sha (git-out top "rev-parse" "HEAD")
-          remotes (git-out top "branch" "-r" "--contains" (str sha))]
-      (cond
-        (seq dirty)
-        [nil (str label " working tree is dirty; commit before pinning")]
-
-        (not (str/includes? (str remotes) "origin/"))
-        [nil (str label " HEAD " (subs sha 0 7) " is not on any remote branch; "
-                  "push before pinning")]
-
-        :else [sha nil]))
-    [nil (str label " is not a git repository: " dir)]))
-
-(defn- replace-pin
-  [text sym old new]
-  (str/replace text
-               (str "(def ^:private " sym " \"" old "\")")
-               (str "(def ^:private " sym " \"" new "\")")))
-
-(defn- run-pin
-  "Stamp `once-sha` with this repository's HEAD so a standalone copy of the
-  launcher resolves the sources it was written against. When GREEN_LIB_ROOT
-  points at a green checkout, `green-sha` is stamped from it too — the two
-  pins move together whenever a change spans both repositories."
-  [_args]
-  (let [green-root (System/getenv "GREEN_LIB_ROOT")
-        [once-head once-err] (repo-head script-dir "once")
-        [green-head green-err] (if green-root
-                                 (repo-head green-root "green")
-                                 [nil nil])
-        once-stale? (and once-head (not= once-head once-sha))
-        green-stale? (and green-head (not= green-head green-sha))]
-    (cond
-      once-err {:green/exit 2 :green/err once-err}
-      green-err {:green/exit 2 :green/err green-err}
-
-      (not (or once-stale? green-stale?))
-      {:green/exit 0 :green/err (str "already pinned to " (subs once-sha 0 7))}
-
-      :else
-      (let [self (str (fs/canonicalize *file*))
-            old (slurp self)
-            new (cond-> old
-                  once-stale? (replace-pin "once-sha" once-sha once-head)
-                  green-stale? (replace-pin "green-sha" green-sha green-head))]
-        (if (= old new)
-          {:green/exit 2 :green/err "could not locate the pins in this file"}
-          (do
-            (spit self new)
-            {:green/exit 0
-             :green/err (str/join
-                         "\n"
-                         (cond-> []
-                           once-stale?
-                           (conj (str "pinned once to " (subs once-head 0 7)
-                                      " (was " (subs once-sha 0 7) ")"))
-                           green-stale?
-                           (conj (str "pinned green to " (subs green-head 0 7)
-                                      " (was " (subs green-sha 0 7) ")"))))}))))))
+  (:file (:opts (bb-cli/parse-args (vec (rest args))
+                                   {:spec {:file {:alias :f
+                                                  :default (default-file)}}}))))
 
 ;; ---------------------------------------------------------------------------
 ;; CLI
 
 (def usage
-  "Usage: green <build|create|delete|describe|pin> [-f|--file green.edn] [--dry-run]")
+  "Usage: green <build|create|delete|describe> [-f|--file green.edn] [--dry-run]")
 
 (defn run
   "REPL-friendly entry point that returns the final opts map."
@@ -494,13 +129,17 @@
   (let [args (default-args args)
         command (first args)]
     (cond
-      (= "pin" command) (run-pin args)
       (contains? #{"help" "--help" "-h"} command) {:green/exit 0 :green/err usage}
       (contains? #{"create" "delete" "build" "describe"} command)
+      ;; resolved rather than aliased: the namespaces are only known to have
+      ;; loaded once contract-error has passed
       (or (contract-error)
           (if (= "describe" command)
-            (run-describe args)
-            (green-cli/run-cli workflow args)))
+            ((requiring-resolve 'io.github.bigconfig-ai.once.describe/describe-file)
+             (describe-args args))
+            (green-cli/run-cli
+             @(requiring-resolve 'io.github.bigconfig-ai.once.workflow/workflow)
+             args)))
       :else {:green/exit 2 :green/err usage})))
 
 (defn -main

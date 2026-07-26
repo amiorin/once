@@ -3,7 +3,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is]]
-   [io.github.bigconfig-ai.once.utils :as utils]))
+   [green.process :as process]))
 
 (def deploy-script
   (.getAbsolutePath
@@ -43,7 +43,7 @@
   ([ssh-original-command shim]
    (let [env (cond-> {"SSH_ORIGINAL_COMMAND" (or ssh-original-command "")}
                shim (assoc "PATH" (str (:dir shim) ":" (System/getenv "PATH"))))]
-     (utils/shell-cmd ["bb" deploy-script] {:extra-env env}))))
+     (process/run ["bb" deploy-script] {:extra-env env}))))
 
 (deftest rejects-empty-ssh-command
   (let [{:keys [exit err]} (run-deploy "")]

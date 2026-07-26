@@ -1,14 +1,7 @@
 (ns io.github.bigconfig-ai.once.utils-test
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [io.github.bigconfig-ai.once.utils :as sut]))
-
-(deftest strip-ansi-test
-  (testing "strips ANSI escape sequences and OSC 8 hyperlinks"
-    (let [ansi (slurp (io/resource "ansi.output"))
-          normal (slurp (io/resource "normal.output"))]
-      (is (= normal (sut/strip-ansi ansi))))))
 
 (deftest registrable-domain-test
   (testing "the zone is the last two labels"

@@ -7,9 +7,12 @@
   but `running`, and a missing remote `once` command, marks the step failed."
   (:require
    [cheshire.core :as json]
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
    [clojure.string :as str]
-   [io.github.bigconfig-ai.once.tools :as tools]
-   [io.github.bigconfig-ai.once.utils :as utils]))
+   [green.cli :as green-cli]
+   [green.process :as process]
+   [io.github.bigconfig-ai.once.tools :as tools]))
 
 ;;; -------------------------------------------------------------- command helpers
 
@@ -22,7 +25,7 @@
   ([args {:keys [timeout-ms]
           :or {timeout-ms run-timeout-ms}
           :as opts}]
-   (utils/run-with-timeout args (dissoc opts :timeout-ms) timeout-ms)))
+   (process/run-with-timeout args (dissoc opts :timeout-ms) timeout-ms)))
 
 (defn- trim-snippet [s]
   (let [s (some-> s str/trim)]
@@ -121,18 +124,12 @@
 
 ;;; -------------------------------------------------------------- once list parsing
 
-(defn strip-ansi
-  [s]
-  (-> (or s "")
-      (str/replace #"\x1b\]8;[^\x07]*\x07" "")
-      (str/replace #"\x1b\[[0-9;?]*[ -/]*[@-~]" "")))
-
 (def ^:private host-status-rx
   #"([A-Za-z0-9](?:[A-Za-z0-9.-]{0,253}[A-Za-z0-9])?\.[A-Za-z]{2,})(?:\s+\(([^)]*)\))?")
 
 (defn parse-once-list
   [output]
-  (->> (str/split-lines (strip-ansi output))
+  (->> (str/split-lines (process/strip-ansi output))
        (keep (fn [line]
                (when-let [[_ host status] (re-find host-status-rx line)]
                  (cond-> {:host host}
@@ -317,13 +314,13 @@
                     (if (empty? ids)
                       {:ok? true
                        :applications (mapv #(assoc %
-                                                    :status (or (:status %) "unknown")
-                                                    :image nil
-                                                    :version nil
-                                                    :digest nil
-                                                    :registry-digest nil
-                                                    :new-version? nil)
-                                          once-apps)}
+                                                   :status (or (:status %) "unknown")
+                                                   :image nil
+                                                   :version nil
+                                                   :digest nil
+                                                   :registry-digest nil
+                                                   :new-version? nil)
+                                           once-apps)}
                       (let [{:keys [ok? out] :as container-result}
                             (ssh-run run-fn compute
                                      (into ["sudo" "-n" "docker" "inspect" "--type" "container"] ids))]
@@ -490,3 +487,18 @@
              {:green/exit 1 :green/err (compute-error (:compute result))}
 
              :else {:green/exit 0}))))
+
+(defn describe-file
+  "Read a desired-state file, overlay `GREEN_PAR_*`, and describe the stack it
+  names. Describing reads OpenTofu state and the host rather than changing
+  either, so it runs outside the workflow and needs no validation gate."
+  [path]
+  (try
+    (let [file (io/file path)]
+      (if-not (.exists file)
+        {:green/exit 2 :green/err (str "desired state file not found: " file)}
+        (-> (edn/read-string (slurp file))
+            green-cli/read-pars
+            describe)))
+    (catch Throwable t
+      {:green/exit 2 :green/err (or (ex-message t) (str (class t)))})))

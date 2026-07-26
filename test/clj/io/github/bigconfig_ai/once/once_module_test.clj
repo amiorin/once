@@ -4,7 +4,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [io.github.bigconfig-ai.once.utils :as utils]))
+   [green.process :as process]))
 
 (def module
   (.getAbsolutePath
@@ -42,8 +42,8 @@
         shim (failing-deploy-shim! dir)
         args-file (io/file dir "args.json")]
     (spit args-file (json/generate-string {:applications [app]}))
-    (utils/shell-cmd ["bb" module (.getAbsolutePath args-file)]
-                     {:extra-env {"PATH" (str shim ":" (System/getenv "PATH"))}})))
+    (process/run ["bb" module (.getAbsolutePath args-file)]
+                 {:extra-env {"PATH" (str shim ":" (System/getenv "PATH"))}})))
 
 (deftest a-failed-deploy-reports-no-secrets
   (let [{:keys [exit out]} (run-module {:host "www.example.com"

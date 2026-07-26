@@ -7,7 +7,10 @@
    [green.ansible :as ansible]
    [green.scaffold :as sc]
    [green.tofu :as tofu]
-   [io.github.bigconfig-ai.once.utils :as utils]))
+   [green.workflow :as wf]
+   [green.yaml :as yaml]
+   [io.github.bigconfig-ai.once.utils :as utils]
+   [io.github.bigconfig-ai.once.validate :as validate]))
 
 (def ^:private template-root "io.github.bigconfig-ai.once.tools")
 (def ^:private raw-template :io.github.bigconfig-ai.once/raw)
@@ -42,76 +45,43 @@
   [target content]
   (template-spec raw-template target {:content content}))
 
-(defn- failed?
-  [opts]
-  (pos? (:green/exit opts 0)))
-
 (defn- output-params
   [opts]
   (some-> (get-in opts [:tofu/outputs :params]) walk/keywordize-keys))
 
-(def ^:private credential-env-vars
-  "Flat key -> the variable each OpenTofu provider reads natively. Credentials
-  reach tofu through the process environment so they never render into .tf
-  files, where they would sit in plaintext under the work directory."
-  {:do-token "DIGITALOCEAN_TOKEN"
-   :hcloud-token "HCLOUD_TOKEN"
-   :resend-api-key "RESEND_API_KEY"
-   :cloudflare-api-token "CLOUDFLARE_API_TOKEN"
-   :r2-access-key-id "AWS_ACCESS_KEY_ID"
-   :r2-secret-access-key "AWS_SECRET_ACCESS_KEY"})
-
-(defn- backend-credential-keys
-  "State-backend credentials. Unlike provider credentials these belong to every
-  stage, since each one reads and writes state. R2 is an S3-compatible backend,
-  so it authenticates through the AWS chain; s3 uses the ambient chain already
-  and local needs nothing."
-  [opts]
-  (if (= "r2" (:provider-backend opts))
-    [:r2-access-key-id :r2-secret-access-key]
-    []))
-
 (defn- credential-env
-  "Environment additions for `ks`, plus whatever the state backend needs. Unset
-  credentials are omitted, so build and dry-run stay credential-free."
-  [opts ks]
+  "Environment additions for the providers selected in `slots`, plus whatever
+  the state backend needs — every stage reads and writes state, so the backend
+  credentials belong to all of them. Unset credentials are omitted, so build
+  and dry-run stay credential-free."
+  [opts & slots]
   (not-empty
    (into {}
-         (keep (fn [k]
+         (keep (fn [[k env-var]]
                  (when-let [v (not-empty (str (get opts k)))]
-                   [(credential-env-vars k) v])))
-         (concat ks (backend-credential-keys opts)))))
+                   [env-var v])))
+         (apply merge (map #(validate/tofu-env opts %)
+                           (conj (vec slots) :provider-backend))))))
 
 (defn backend-credential-env
   "Environment additions for a process that only reads OpenTofu state, such as
   `tofu output`. Provider credentials are left out on purpose: reading state
   never calls a provider API."
   [opts]
-  (credential-env opts []))
+  (credential-env opts))
 
 (defn- tofu-with-spec
+  "green.tofu/tofu-with-spec plus this project's params adoption: on a real
+  apply the stage's `params` output becomes `result-key`, and `fallback`
+  stands in for the values a build or dry-run cannot know."
   [opts dir specs fallback result-key env]
-  (cond
-    (= :build (:green/event opts))
-    (cond-> (sc/scaffold opts specs)
-      result-key (assoc result-key fallback))
-
-    (= :delete (:green/event opts))
-    (let [rendered (-> opts
-                       (assoc :green/event :create)
-                       (sc/scaffold specs)
-                       (assoc :green/event :delete))
-          result (tofu/tofu-step rendered {:dir dir :env env})]
-      (if (failed? result)
-        result
-        (sc/scaffold result specs)))
-
-    :else
-    (let [rendered (sc/scaffold opts specs)
-          result (tofu/tofu-step rendered {:dir dir :env env})]
-      (if (or (failed? result) (nil? result-key))
-        result
-        (assoc result result-key (merge fallback (or (output-params result) {})))))))
+  (let [result (tofu/tofu-with-spec opts specs {:dir dir :env env})]
+    (cond
+      (or (nil? result-key) (wf/failed? result)) result
+      (= :build (:green/event opts)) (assoc result result-key fallback)
+      (= :delete (:green/event opts)) result
+      :else (assoc result result-key
+                   (merge fallback (or (output-params result) {}))))))
 
 (defn- fallback-compute-params
   [{:keys [profile provider-compute] :as opts}]
@@ -123,10 +93,10 @@
              :name name
              :user "ubuntu"}
       "no-infra" (cond-> {:ip (or (:no-infra-compute-ip opts) "192.168.0.1")
-                            :sudoer (or (:no-infra-compute-sudoer opts) "root")
-                            :name name
-                            :user (or (:no-infra-compute-user opts) "root")}
-                     (:no-infra-compute-uid opts) (assoc :uid (:no-infra-compute-uid opts)))
+                          :sudoer (or (:no-infra-compute-sudoer opts) "root")
+                          :name name
+                          :user (or (:no-infra-compute-user opts) "root")}
+                   (:no-infra-compute-uid opts) (assoc :uid (:no-infra-compute-uid opts)))
       {:ip "192.168.0.1"
        :sudoer "root"
        :name name
@@ -164,24 +134,7 @@
                               (str dir "/main.tf")
                               opts)]]
     (tofu-with-spec opts dir specs (fallback-compute-params opts) :once/compute-params
-                    (credential-env opts [:do-token :hcloud-token]))))
-
-(defn- hcl-string-list
-  [xs]
-  (str "[" (str/join ", " (map json/generate-string xs)) "]"))
-
-(defn- hcl-string-map
-  [m]
-  (if (seq m)
-    (str "{\n"
-         (str/join ",\n"
-                   (map (fn [[k v]]
-                          (format "    %s : %s"
-                                  (json/generate-string k)
-                                  (json/generate-string v)))
-                        m))
-         "\n  }")
-    "{}"))
+                    (credential-env opts :provider-compute))))
 
 (defn- with-zones
   "Templates receive the sorted DNS zones derived from the application hosts;
@@ -190,7 +143,7 @@
   (let [zones (utils/apps-domains opts)]
     (assoc opts
            :zones zones
-           :zones-hcl (hcl-string-list zones))))
+           :zones-hcl (tofu/hcl-list zones))))
 
 (defn tofu-smtp-step
   [opts]
@@ -201,41 +154,13 @@
                               (str dir "/main.tf")
                               opts)]]
     (tofu-with-spec opts dir specs (fallback-smtp-params opts) :once/smtp-params
-                    (credential-env opts [:resend-api-key]))))
+                    (credential-env opts :provider-smtp))))
 
 (defn- add-fqn-suffix
   [fqn suffix]
   (if-let [ns (namespace fqn)]
     (keyword ns (str (name fqn) suffix))
     (keyword (str (name fqn) suffix))))
-
-(defn- tofu-fqn->name
-  [fqn]
-  (let [sanitize #(str/replace % #"[-\.]" "_")
-        ns (some-> (namespace fqn) sanitize)
-        n (sanitize (name fqn))]
-    (str ns (when ns "_") n)))
-
-(defn- tofu-construct
-  [group type fqn block]
-  {group {type {(tofu-fqn->name fqn) block}}})
-
-(defn- deep-merge
-  [& maps]
-  (apply merge-with (fn [a b]
-                      (if (and (map? a) (map? b))
-                        (deep-merge a b)
-                        b))
-         maps))
-
-(defn- sort-nested-map
-  [x]
-  (cond
-    (map? x) (into (sorted-map)
-                   (map (fn [[k v]] [k (sort-nested-map v)]))
-                   x)
-    (sequential? x) (mapv sort-nested-map x)
-    :else x))
 
 (defn- cloudflare-zone-id
   [zone]
@@ -246,41 +171,33 @@
   (case src
     ;; One proxied A record per application host. There is no implicit apex or
     ;; wildcard record: only the hosts desired state names resolve to the server.
-    :apps (let [app-records
-                (for [{:keys [host]} applications
-                      :let [zone (utils/registrable-domain host)]]
-                  (tofu-construct :resource
-                                  :cloudflare_dns_record
-                                  (add-fqn-suffix ::app-dns (str "-" host))
-                                  {:zone_id (cloudflare-zone-id zone)
-                                   :name host
-                                   :content ip
-                                   :type "A"
-                                   :proxied true
-                                   :ttl 1}))
-                m (if (seq app-records)
-                    (sort-nested-map (apply deep-merge app-records))
-                    {})]
-            (json/generate-string m {:pretty true}))
-    :smtp (let [cloudflare-records
-                (for [{:keys [zone records]} domains
-                      {:keys [name priority record type value]} records]
-                  (tofu-construct :resource
-                                  :cloudflare_dns_record
-                                  (add-fqn-suffix ::smtp-dns
-                                                  (format "-%s-%s-%s" zone record type))
-                                  (cond-> {:zone_id (cloudflare-zone-id zone)
-                                           :name name
-                                           :ttl "1"
-                                           :type type
-                                           :proxied false}
-                                    (= type "TXT") (merge {:content (format "\"%s\"" value)})
-                                    (= type "MX") (merge {:priority priority
-                                                          :content value}))))
-                m (if (seq cloudflare-records)
-                    (sort-nested-map (apply deep-merge cloudflare-records))
-                    {})]
-            (json/generate-string m {:pretty true}))))
+    :apps (tofu/constructs-json
+           (for [{:keys [host]} applications
+                 :let [zone (utils/registrable-domain host)]]
+             (tofu/construct :resource
+                             :cloudflare_dns_record
+                             (add-fqn-suffix ::app-dns (str "-" host))
+                             {:zone_id (cloudflare-zone-id zone)
+                              :name host
+                              :content ip
+                              :type "A"
+                              :proxied true
+                              :ttl 1})))
+    :smtp (tofu/constructs-json
+           (for [{:keys [zone records]} domains
+                 {:keys [name priority record type value]} records]
+             (tofu/construct :resource
+                             :cloudflare_dns_record
+                             (add-fqn-suffix ::smtp-dns
+                                             (format "-%s-%s-%s" zone record type))
+                             (cond-> {:zone_id (cloudflare-zone-id zone)
+                                      :name name
+                                      :ttl "1"
+                                      :type type
+                                      :proxied false}
+                               (= type "TXT") (merge {:content (format "\"%s\"" value)})
+                               (= type "MX") (merge {:priority priority
+                                                     :content value})))))))
 
 (defn- joined-params
   [opts]
@@ -311,21 +228,21 @@
                       (raw-spec (str dir "/smtp.tf.json")
                                 (render-fn :smtp {:domains (:domains opts)}))))]
     (tofu-with-spec opts dir specs {} nil
-                    (credential-env opts [:cloudflare-api-token]))))
+                    (credential-env opts :provider-dns))))
 
 (defn tofu-smtp-post-step
   [opts]
   (let [domain-ids (into (sorted-map)
                          (map (juxt :zone :id))
                          (:domains opts))
-        opts (assoc opts :domain-ids-hcl (hcl-string-map domain-ids))
+        opts (assoc opts :domain-ids-hcl (tofu/hcl-map domain-ids))
         provider (or (:provider-smtp opts) "resend")
         dir (tool-dir opts "tofu-smtp-post")
         specs [(template-spec (tool-template "tofu-smtp-post" provider "main.tf")
                               (str dir "/main.tf")
                               opts)]]
     (tofu-with-spec opts dir specs {} nil
-                    (credential-env opts [:resend-api-key]))))
+                    (credential-env opts :provider-smtp))))
 
 (defn data-fn
   ([data] (data-fn data nil))
@@ -407,7 +324,7 @@
         data [{:name "Reconcile ONCE applications"
                :become true
                :once once}]]
-    (utils/generate-yaml data)))
+    (yaml/generate-string data)))
 
 (defn render
   [target data]
@@ -479,22 +396,6 @@
                              :ip (:ip data)
                              :user (:user data)
                              :block_state (if delete? "absent" "present")}}]
-    (cond
-      (= :build (:green/event opts))
-      (sc/scaffold opts specs)
-
-      ;; Delete renders the playbook so it can run, removes the managed block
-      ;; from ~/.ssh/config, then deletes the rendered tree. Mirrors
-      ;; tofu-with-spec: the tool runs while its inputs still exist.
-      delete?
-      (let [rendered (-> opts
-                         (assoc :green/event :create)
-                         (sc/scaffold specs)
-                         (assoc :green/event :delete))
-            result (ansible/ansible-step rendered config)]
-        (if (failed? result)
-          result
-          (sc/scaffold result specs)))
-
-      :else
-      (ansible/ansible-step (sc/scaffold opts specs) config))))
+    ;; Delete renders the playbook so it can run, removes the managed block
+    ;; from ~/.ssh/config, and only then deletes the rendered tree.
+    (ansible/ansible-with-spec opts config specs)))
