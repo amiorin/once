@@ -6,7 +6,8 @@ import { run as runWorkflow } from "red/workflow";
 import { run as runCli } from "../src/cli.ts";
 import { describeReport, imageRepositoryTag, parseOnceList } from "../src/describe.ts";
 import { ansibleOnce, renderFn } from "../src/tools.ts";
-import { appsDomains, readOncePars } from "../src/utils.ts";
+import { readPars } from "red/cli";
+import { appsDomains } from "../src/utils.ts";
 import { stateErrors } from "../src/validate.ts";
 import { onceWorkflow, startStep, wireFn } from "../src/workflow.ts";
 
@@ -43,8 +44,11 @@ test("unknown commands are rejected", async () => {
   expect((await runCli("bogus"))["red/exit"]).toBe(2);
 });
 
-test("portable parameters override native values", () => {
-  expect(readOncePars({ port: 1 }, { RED_PAR_PORT: "2", ONCE_PAR_PORT: "3" }).port).toBe(3);
+test("one parameter namespace, and no colour keeps one of its own", () => {
+  expect(readPars({ port: 1 }, { COLORS_PAR_PORT: "3" }).port).toBe(3);
+  expect(
+    readPars({ port: 1 }, { RED_PAR_PORT: "2", ONCE_PAR_PORT: "2", GREEN_PAR_PORT: "2" }).port,
+  ).toBe(1);
 });
 
 test("zones and generated application DNS records", () => {
@@ -62,10 +66,7 @@ test("Ansible rendering defers secrets and is color-portable", () => {
     once: { applications: [{ host: "www.example.com", image: "app", env: { DATABASE_URL: "app-database-url" } }] },
   });
   expect(yaml).not.toContain("real-secret");
-  expect(yaml).toContain("ONCE_PAR_APP_DATABASE_URL");
-  expect(yaml).toContain("GREEN_PAR_APP_DATABASE_URL");
-  expect(yaml).toContain("RED_PAR_APP_DATABASE_URL");
-  expect(yaml).toContain("BLUE_PAR_APP_DATABASE_URL");
+  expect(yaml).toContain("COLORS_PAR_APP_DATABASE_URL");
 });
 
 test("validation and lifecycle safety", async () => {
@@ -73,7 +74,7 @@ test("validation and lifecycle safety", async () => {
   expect((await startStep({ ...valid, "red/event": "build" }, {}))["red/exit"]).toBe(0);
   const created = await startStep({ ...valid, "red/event": "create" }, {});
   expect(created["red/exit"]).toBe(2);
-  expect(created["red/err"]).toMatch(/RED_PAR_DO_TOKEN/);
+  expect(created["red/err"]).toMatch(/COLORS_PAR_DO_TOKEN/);
 });
 
 test("create/build and delete use inverse graphs", () => {

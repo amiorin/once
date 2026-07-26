@@ -1,16 +1,6 @@
-import { readPars } from "red/cli";
 import type { Opts } from "red/workflow";
 
-export const contract = 1;
-
-export function readOncePars(
-  opts: Opts,
-  env: Record<string, string | undefined> = process.env,
-): Opts {
-  const portable = Object.fromEntries(Object.entries(env).flatMap(([name, value]) =>
-    name.startsWith("ONCE_PAR_") ? [[`RED_PAR_${name.slice("ONCE_PAR_".length)}`, value]] : []));
-  return readPars(readPars(opts, env), portable);
-}
+export const contract = 2;
 
 export function registrableDomain(host: unknown): string | undefined {
   const labels = String(host ?? "").split(".");

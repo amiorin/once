@@ -100,12 +100,12 @@ export function stateErrors(opts: Opts): string[] {
     if (placeholder(app.host) || !domainRe.test(String(app.host))) errors.push(`once applications[${index}] has an invalid host`);
     if (placeholder(app.image)) errors.push(`once applications[${index}] requires image`);
     if (app.env !== undefined && !Array.isArray(app.env) && (app.env === null || typeof app.env !== "object")) {
-      errors.push(`once applications[${index}] env must map container variable names to red.yml keys`);
+      errors.push(`once applications[${index}] env must map container variable names to colors.yml keys`);
     }
     if (app.env && !Array.isArray(app.env) && typeof app.env === "object") {
       for (const [name, key] of Object.entries(app.env)) {
         if (!envNameRe.test(name)) errors.push(`once applications[${index}] has an invalid container variable name ${name}`);
-        if (placeholder(key)) errors.push(`once applications[${index}] env ${name} needs a red.yml key`);
+        if (placeholder(key)) errors.push(`once applications[${index}] env ${name} needs a colors.yml key`);
       }
     }
   }

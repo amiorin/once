@@ -45,7 +45,7 @@
       smtp (-> (merge smtp) (assoc :once/smtp-params smtp)))))
 
 (defn start-step
-  "Overlay `GREEN_PAR_*`, validate, and — for a real delete — read back what
+  "Overlay `COLORS_PAR_*`, validate, and — for a real delete — read back what
   the earlier stages left in OpenTofu state.
 
   Credentials are only required for a lifecycle event that actually reaches a
@@ -53,10 +53,10 @@
   stay usable without any secret in the environment.
 
   The two-argument arity takes the environment to overlay, so a test does not
-  inherit whatever `GREEN_PAR_*` variables the developer happens to have set."
+  inherit whatever `COLORS_PAR_*` variables the developer happens to have set."
   ([opts] (start-step opts (System/getenv)))
   ([opts env]
-   (let [opts (utils/read-pars (merge {:compute-prevent-destroy true} opts) env)
+   (let [opts (green-cli/read-pars (merge {:compute-prevent-destroy true} opts) env)
          event (:green/event opts)
          real? (not (:green/dry-run opts))
          lifecycle? (contains? #{:create :delete} event)

@@ -4,7 +4,7 @@
 installation with OpenTofu and Ansible. It uses the
 [`green`](https://github.com/amiorin/green) DAG workflow engine. This is the
 Clojure implementation in a byte-compatible Green/Red/Blue monorepo; all three
-can manage the same `.once/<profile>/` state between completed commands.
+can manage the same `.colors/<profile>/` state between completed commands.
 
 The implementation ships a thin launcher at
 `../skills/package-once-green/green`, symlinked here as `./green`. The same
@@ -48,7 +48,7 @@ reads the compute and SMTP outputs already in state so the destroy renders with
 real values.
 
 Generated files and isolated OpenTofu state directories live under
-`.once/<profile>/`.
+`.colors/<profile>/`.
 
 ## Requirements
 
@@ -59,28 +59,36 @@ Generated files and isolated OpenTofu state directories live under
 - `skopeo` for registry comparisons in `describe`
 
 Cloud-provider credentials are needed only for the providers selected in
-`green.edn`, and only for a real `create` or `delete`.
+`colors.yml`, and only for a real `create` or `delete`.
 
 ## Configuration
 
-Desired state is the flat map in [`green.edn`](green.edn), except for the
-nested `:once {:applications [...]}` collection:
+Desired state is the flat map in [`colors.yml`](../colors.yml), except for the
+nested `once.applications` collection. Green finds it by walking up from the
+working directory, and reads it with yamlstar under the YAML 1.2 core schema —
+so `no` is the string `no`, and `012` is twelve:
 
-```clojure
-{:profile "production"          ; names the workdir, the state keys, the compute
- :workdir ".once"               ; resource, and the ~/.ssh/config Host alias
- :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
- :once {:applications [{:host "www.example.com"
-                        :image "ghcr.io/example/site:latest"
-                        :env {"DATABASE_URL" :app-database-url}}
-                       {:host "www.example.net"
-                        :image "ghcr.io/example/another-site:latest"}]}
- :provider-compute "digitalocean" ; digitalocean, hcloud, yandex, oci, no-infra
- :provider-smtp "resend"          ; resend, no-infra
- :provider-dns "cloudflare"       ; cloudflare, no-infra
- :provider-backend "r2"           ; r2, s3, local
- :compute-prevent-destroy true}
+```yaml
+profile: production      # names the workdir, the state keys, the compute
+workdir: .colors         # resource, and the ~/.ssh/config Host alias
+deploy-pubkey: ssh-ed25519 AAAA... ci-deploy
+once:
+  applications:
+    - host: www.example.com
+      image: ghcr.io/example/site:latest
+      env:
+        DATABASE_URL: app-database-url
+    - host: www.example.net
+      image: ghcr.io/example/another-site:latest
+provider-compute: digitalocean  # digitalocean, hcloud, yandex, oci, no-infra
+provider-smtp: resend           # resend, no-infra
+provider-dns: cloudflare        # cloudflare, no-infra
+provider-backend: r2            # r2, s3, local
+compute-prevent-destroy: true
 ```
+
+A relative `workdir` is resolved next to `colors.yml`, not next to the caller,
+so every colour shares one work directory whatever subdirectory you run from.
 
 There is no domain key. Application hosts are the source of truth and may span
 domains. Green derives every DNS zone from each host's last two labels, creates
@@ -89,35 +97,35 @@ application an `info@notifications.<zone>` From address in its own zone. Each
 host gets its own proxied `A` record — there is no implicit apex or wildcard
 record, so an unlisted host does not resolve.
 
-`:env` maps a container variable **name** to the flat key holding its value,
+`env` maps a container variable **name** to the flat key holding its value,
 never to the value itself.
 
-Credential keys are absent from the committed file: they arrive as native
-`GREEN_PAR_*` variables or portable `ONCE_PAR_*` aliases, which are overlaid
-onto the matching flat key before the workflow starts. Any flat key can be overridden the same way; names are
-lowercased and underscores become hyphens, and the override takes the type of
-the value it replaces:
+Credential keys are absent from the committed file: they arrive as
+`COLORS_PAR_*` variables — one namespace shared by green, red and blue — which
+are overlaid onto the matching flat key before the workflow starts. Any flat
+key can be overridden the same way; names are lowercased and underscores become
+hyphens, and the override takes the type of the value it replaces:
 
 ```bash
-export GREEN_PAR_DO_TOKEN="..."
-export GREEN_PAR_CLOUDFLARE_API_TOKEN="..."
-export GREEN_PAR_RESEND_API_KEY="..."
-export GREEN_PAR_RESEND_PASSWORD="..."
-export GREEN_PAR_R2_ACCESS_KEY_ID="..."
-export GREEN_PAR_R2_SECRET_ACCESS_KEY="..."
-export GREEN_PAR_APP_DATABASE_URL="..."   # one per application :env entry
+export COLORS_PAR_DO_TOKEN="..."
+export COLORS_PAR_CLOUDFLARE_API_TOKEN="..."
+export COLORS_PAR_RESEND_API_KEY="..."
+export COLORS_PAR_RESEND_PASSWORD="..."
+export COLORS_PAR_R2_ACCESS_KEY_ID="..."
+export COLORS_PAR_R2_SECRET_ACCESS_KEY="..."
+export COLORS_PAR_APP_DATABASE_URL="..."   # one per application env entry
 ```
 
 Nothing lands in a rendered file. OpenTofu credentials are passed to the
 process environment under the variable each provider reads natively; Ansible
-receives a byte-compatible expression that checks `ONCE_PAR_*` and all color
-prefixes when the play runs.
+receives a byte-compatible expression that resolves `COLORS_PAR_*` when the
+play runs.
 
 Use `.envrc.private` for local secrets. To permit compute destruction when the
 default safeguard is enabled:
 
 ```bash
-export GREEN_PAR_COMPUTE_PREVENT_DESTROY=false
+export COLORS_PAR_COMPUTE_PREVENT_DESTROY=false
 ```
 
 ## Commands
@@ -125,7 +133,7 @@ export GREEN_PAR_COMPUTE_PREVENT_DESTROY=false
 Run from the repository root:
 
 ```bash
-bb green build                 # render .once/<profile>/ only
+bb green build                 # render .colors/<profile>/ only
 bb green create                # provision and configure
 bb green create --dry-run      # print the DAG actions, touch nothing
 bb green delete                # destroy infrastructure
@@ -139,13 +147,13 @@ with the current HEAD.
 Use another desired-state file with `-f` or `--file`:
 
 ```bash
-bb green build -f production.edn
+bb green build -f production.yml
 ```
 
 `build` and `--dry-run` require no credentials. A real `create` additionally
-validates every provider credential and every application `:env` reference; a
+validates every provider credential and every application `env` reference; a
 real `delete` validates provider credentials and refuses while
-`:compute-prevent-destroy` is true.
+`compute-prevent-destroy` is true.
 
 `describe` reads compute and SMTP values from their OpenTofu state before
 probing the remote host. Compute is reported as `running`, `unreachable` (state
@@ -158,8 +166,8 @@ the remaining live checks are soft failures named in the report.
 
 - Compute templates: DigitalOcean, Hetzner Cloud, Yandex Cloud, OCI, and an
   existing `no-infra` host. Yandex creates its own network and subnet, installs
-  `:compute-pubkey` through instance metadata, and authenticates with
-  `GREEN_PAR_YANDEX_TOKEN`.
+  `compute-pubkey` through instance metadata, and authenticates with
+  `COLORS_PAR_YANDEX_TOKEN`.
 - SMTP templates: Resend or `no-infra` SMTP settings.
 - DNS templates: Cloudflare or `no-infra`; the per-application and Resend DNS
   records are generated as `apps.tf.json` and `smtp.tf.json` at the
@@ -175,7 +183,7 @@ the remaining live checks are soft failures named in the report.
 A build of the example desired state produces:
 
 ```text
-.once/production/
+.colors/production/
 ├── tofu-compute/     backend.tf.json  main.tf
 ├── tofu-smtp/        backend.tf.json  main.tf
 ├── tofu-dns/         backend.tf.json  main.tf  apps.tf.json  smtp.tf.json
@@ -195,7 +203,7 @@ clj-kondo --lint src/clj test/clj ../skills/package-once-green/green
 ```
 
 Source namespaces are under `src/clj/io/github/bigconfig_ai/once/`; templates
-are under `src/resources/io/github/bigconfig-ai/once/tools/`. `.once/` is
+are under `src/resources/io/github/bigconfig-ai/once/tools/`. `.colors/` is
 generated and must not be edited.
 
 After committing and pushing a change to the launcher, `src/clj`, or the

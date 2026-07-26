@@ -5,7 +5,8 @@ from blue.runtime import ExecResult
 from blue.workflow import run
 from package_once_blue.describe import describe_report, image_repository_tag, parse_once_list
 from package_once_blue.tools import ansible_once, render_fn
-from package_once_blue.utils import apps_domains, read_once_pars
+from blue.cli import read_pars
+from package_once_blue.utils import apps_domains
 from package_once_blue.validate import state_errors
 from package_once_blue.workflow import once_workflow, start_step, wire_fn
 
@@ -27,8 +28,14 @@ valid = {
 }
 
 
-def test_portable_parameters_override_native_values():
-    assert read_once_pars({"port": 1}, {"BLUE_PAR_PORT": "2", "ONCE_PAR_PORT": "3"})["port"] == 3
+def test_one_parameter_namespace_and_no_colour_keeps_one_of_its_own():
+    assert read_pars({"port": 1}, {"COLORS_PAR_PORT": "3"})["port"] == 3
+    assert (
+        read_pars({"port": 1}, {"BLUE_PAR_PORT": "2", "ONCE_PAR_PORT": "2", "RED_PAR_PORT": "2"})[
+            "port"
+        ]
+        == 1
+    )
 
 
 def test_zones_and_generated_application_dns_records():
@@ -58,8 +65,7 @@ def test_ansible_rendering_defers_secrets_and_is_color_portable():
         }
     )
     assert "real-secret" not in rendered
-    for prefix in ["ONCE", "GREEN", "RED", "BLUE"]:
-        assert f"{prefix}_PAR_APP_DATABASE_URL" in rendered
+    assert "COLORS_PAR_APP_DATABASE_URL" in rendered
 
 
 async def test_validation_and_lifecycle_safety():
@@ -67,7 +73,7 @@ async def test_validation_and_lifecycle_safety():
     assert (await start_step({**valid, "blue/event": "build"}, {}))["blue/exit"] == 0
     created = await start_step({**valid, "blue/event": "create"}, {})
     assert created["blue/exit"] == 2
-    assert "BLUE_PAR_DO_TOKEN" in created["blue/err"]
+    assert "COLORS_PAR_DO_TOKEN" in created["blue/err"]
 
 
 def test_create_build_and_delete_use_inverse_graphs():

@@ -6,7 +6,7 @@ and `/home/ubuntu/code/blue/README.md` before editing.
 ```sh
 uv sync
 uv run python -m pytest -q
-uv run python -m package_once_blue build -f blue.yml
+uv run python -m package_once_blue build
 ```
 
 Source and packaged resources live under `src/package_once_blue/`; tests are in
@@ -17,6 +17,12 @@ or async, return new dicts, and keep engine state under `blue/*`. Use Blue's
 runtime seam and pass subprocess environments explicitly; never mutate global
 environment around parallel branches.
 
-`.once/` is generated and shared state—never edit it. Secrets use `BLUE_PAR_*`
-or `ONCE_PAR_*` and must never be written to desired state or generated files.
-Keep domain logic out of the copied launcher.
+`.colors/` is generated and shared state—never edit it. Secrets use
+`COLORS_PAR_*`, the one namespace every colour shares, and must never be
+written to `colors.yml` or generated files. Keep domain logic out of the copied
+launcher.
+
+Blue reads YAML through PyYAML, whose defaults are YAML 1.1. `blue.cli` replaces
+both the boolean and integer resolvers — and the integer constructor — to reach
+1.2 core-schema semantics. Do not relax that: `./scripts/parity.sh` asserts blue
+types every scalar exactly as green and red do.

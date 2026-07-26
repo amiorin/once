@@ -12,7 +12,7 @@ __pycache__/
 *.pyc
 dist/
 target/
-.once/
+.colors/
 
 /.clj-kondo/*
 !/.clj-kondo

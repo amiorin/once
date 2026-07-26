@@ -51,7 +51,7 @@
     (let [result (sut/start-step (assoc valid :green/event :create) {})]
       (is (= 2 (:green/exit result)))
       (is (str/includes? (:green/err result)
-                         "GREEN_PAR_NO_INFRA_SMTP_PASSWORD"))))
+                         "COLORS_PAR_NO_INFRA_SMTP_PASSWORD"))))
 
   (testing "build renders from desired state alone"
     (is (= 0 (:green/exit (sut/start-step (assoc valid :green/event :build) {})))))
@@ -64,32 +64,32 @@
 
   (testing "supplied through the environment, they satisfy the gate"
     (is (= 0 (:green/exit (sut/start-step (assoc valid :green/event :create)
-                                          {"GREEN_PAR_NO_INFRA_SMTP_PASSWORD" "pw"
-                                           "GREEN_PAR_CLOUDFLARE_API_TOKEN" "cf"}))))))
+                                          {"COLORS_PAR_NO_INFRA_SMTP_PASSWORD" "pw"
+                                           "COLORS_PAR_CLOUDFLARE_API_TOKEN" "cf"}))))))
 
 (deftest compute-destruction-is-protected-by-default
   (testing "delete stops before it starts"
     (let [result (sut/start-step (assoc valid :green/event :delete)
-                                 {"GREEN_PAR_NO_INFRA_SMTP_PASSWORD" "pw"
-                                  "GREEN_PAR_CLOUDFLARE_API_TOKEN" "cf"})]
+                                 {"COLORS_PAR_NO_INFRA_SMTP_PASSWORD" "pw"
+                                  "COLORS_PAR_CLOUDFLARE_API_TOKEN" "cf"})]
       (is (= 2 (:green/exit result)))
       (is (str/includes? (:green/err result)
-                         "GREEN_PAR_COMPUTE_PREVENT_DESTROY=false"))))
+                         "COLORS_PAR_COMPUTE_PREVENT_DESTROY=false"))))
 
   (testing "the guard is on unless desired state says otherwise"
     (is (str/includes?
          (:green/err (sut/start-step (dissoc (assoc valid :green/event :delete)
                                              :compute-prevent-destroy)
-                                     {"GREEN_PAR_NO_INFRA_SMTP_PASSWORD" "pw"
-                                      "GREEN_PAR_CLOUDFLARE_API_TOKEN" "cf"}))
+                                     {"COLORS_PAR_NO_INFRA_SMTP_PASSWORD" "pw"
+                                      "COLORS_PAR_CLOUDFLARE_API_TOKEN" "cf"}))
          "compute destruction is protected")))
 
   (testing "the environment override releases it, as a boolean not a string"
     (is (= 0 (:green/exit
               (sut/start-step (assoc valid :green/event :delete)
-                              {"GREEN_PAR_NO_INFRA_SMTP_PASSWORD" "pw"
-                               "GREEN_PAR_CLOUDFLARE_API_TOKEN" "cf"
-                               "GREEN_PAR_COMPUTE_PREVENT_DESTROY" "false"})))))
+                              {"COLORS_PAR_NO_INFRA_SMTP_PASSWORD" "pw"
+                               "COLORS_PAR_CLOUDFLARE_API_TOKEN" "cf"
+                               "COLORS_PAR_COMPUTE_PREVENT_DESTROY" "false"})))))
 
   (testing "a dry-run delete needs no override — it destroys nothing"
     (is (= 0 (:green/exit (sut/start-step (assoc valid

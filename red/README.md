@@ -2,16 +2,18 @@
 
 The TypeScript/Bun implementation of the production ONCE deployment package.
 It is byte-compatible with the Green and Blue implementations and manages the
-same `.once/<profile>/` state.
+same `.colors/<profile>/` state.
 
 ```sh
 bun install
-./red build -f red.yml
-./red create --dry-run -f red.yml
+./red build
+./red create --dry-run
 bun test
 bun run typecheck
 ```
 
-Desired state is YAML. Secrets use `RED_PAR_*` or portable `ONCE_PAR_*`; never
-place them in `red.yml`. See the unified [`../index.html`](../index.html) manual
-and [`../skills/package-once-red`](../skills/package-once-red).
+Desired state is the `colors.yml` found by walking up from the working
+directory — the same file green and blue read, so switching colours needs no
+change to it. Secrets use `COLORS_PAR_*`; never place them in `colors.yml`. See
+the unified [`../index.html`](../index.html) manual and
+[`../skills/package-once-red`](../skills/package-once-red).

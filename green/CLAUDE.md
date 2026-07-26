@@ -28,7 +28,7 @@ The repository ships two things from one file:
 ```
 green/
 ├── green                    # symlink -> ../skills/package-once-green/green
-├── green.edn                # desired state for this repository's own stack
+├── (colors.yml at the repo root — one desired state for every colour)
 ├── src/
 │   ├── clj/io/github/bigconfig_ai/once/
 │   │   ├── tools.clj        # the six step functions, template specs, generated JSON
@@ -70,7 +70,7 @@ bb green delete                # destroy, in reverse
 bb green describe              # providers, compute status, deployed apps, image updates
 bb pin                         # stamp the launcher with this repository's HEAD (maintainers)
 
-bb green build -f production.edn   # -f/--file selects a desired-state file (default: ./green.edn)
+bb green build -f production.yml   # -f/--file overrides the colors.yml found by walking up
 
 clojure -M:test                # cognitect test-runner over test/clj
 clojure-lsp clean-ns && clojure-lsp format
@@ -79,31 +79,38 @@ clj-kondo --lint src/clj test/clj ../skills/package-once-green/green
 
 The root CI runs this suite together with Red, Blue, and byte parity.
 
-## Desired state (`green.edn`)
+## Desired state (`colors.yml`)
 
-A single flat EDN map, except for the nested `:once {:applications [...]}` collection. Provider selection and non-secret settings live here; credentials never do.
+A single flat YAML map, except for the nested `once.applications` collection, read by yamlstar under the YAML 1.2 core schema and found by walking up from the working directory. Provider selection and non-secret settings live here; credentials never do.
 
-```clojure
-{:profile "production"          ; names the workdir, the state keys, the compute
- :workdir ".once"               ; resource, and the ~/.ssh/config Host alias
- :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
- :once {:applications [{:host "www.example.com"
-                        :image "ghcr.io/example/site:latest"
-                        :env {"DATABASE_URL" :app-database-url}}]}
- :provider-compute "digitalocean"  ; digitalocean | hcloud | oci | no-infra
- :provider-smtp "resend"           ; resend | no-infra
- :provider-dns "cloudflare"        ; cloudflare | no-infra
- :provider-backend "r2"            ; local | s3 | r2
- :compute-prevent-destroy true}
+Keys arrive as kebab-case keywords, the shape the EDN reader used to deliver;
+`green.cli/read-state` keywordizes every map in the tree, so `env` names become
+keywords too and reach templates through `name`.
+
+```yaml
+profile: production      # names the workdir, the state keys, the compute
+workdir: .colors         # resource, and the ~/.ssh/config Host alias
+deploy-pubkey: ssh-ed25519 AAAA... ci-deploy
+once:
+  applications:
+    - host: www.example.com
+      image: ghcr.io/example/site:latest
+      env:
+        DATABASE_URL: app-database-url
+provider-compute: digitalocean  # digitalocean | hcloud | oci | no-infra
+provider-smtp: resend           # resend | no-infra
+provider-dns: cloudflare        # cloudflare | no-infra
+provider-backend: r2            # local | s3 | r2
+compute-prevent-destroy: true
 ```
 
 Load-bearing rules:
 
 - **No domain key.** Application hosts are the source of truth and may span domains. `utils/apps-domains` derives the sorted distinct zones from their last two labels. The SMTP stage creates `notifications.<zone>` for every zone, Cloudflare manages every zone, and each application gets the matching `info@notifications.<zone>` From address. Templates read HCL-encoded derived zone collections injected by `tools/with-zones` — nothing in desired state supplies them.
 - **No apex or wildcard DNS record.** Each application host gets its own proxied `A` record, so an unlisted host does not resolve.
-- **Resend's relay is hard-coded** (`smtp.resend.com`, 587, user `resend`) in `tools/resend-smtp`, because it is identical for every account. Only `GREEN_PAR_RESEND_API_KEY` and `GREEN_PAR_RESEND_PASSWORD` are configurable. The `no-infra` SMTP keys stay in desired state.
-- **Environment parameters are the only secret channel.** Native `GREEN_PAR_*` and portable `ONCE_PAR_*` overlay matching flat keys; the portable form wins if both are set. Overrides retain existing boolean/integer types. There is no `TF_VAR_*` mechanism.
-- Application `:env` maps a container variable **name** to the flat key holding its value, never to the value itself.
+- **Resend's relay is hard-coded** (`smtp.resend.com`, 587, user `resend`) in `tools/resend-smtp`, because it is identical for every account. Only `COLORS_PAR_RESEND_API_KEY` and `COLORS_PAR_RESEND_PASSWORD` are configurable. The `no-infra` SMTP keys stay in desired state.
+- **Environment parameters are the only secret channel.** `COLORS_PAR_*` — one namespace shared by green, red and blue — overlays matching flat keys. There is no per-colour prefix and no portable alias. Overrides retain existing boolean/integer types. There is no `TF_VAR_*` mechanism.
+- Application `env` maps a container variable **name** to the flat key holding its value, never to the value itself.
 
 ## Architecture
 
@@ -163,7 +170,7 @@ Note the asymmetry: the compute step's work directory is `tofu-compute` but its 
 
 Content that is computed rather than templated is written through `raw-spec`, which renders the one-line `raw` template: `apps.tf.json`, `smtp.tf.json`, `inventory.json`, and `once.yml`. `tools/render-fn` builds the two DNS files from `green.tofu/construct` and `constructs-json`, which merges and sorts them so the JSON is deterministic. `backend.tf.json` is the exception — `green.tofu` writes it directly from the backend advice, outside the scaffold.
 
-A `build` of the reference `green.edn` produces exactly:
+A `build` of the reference `colors.yml` produces exactly:
 
 ```text
 <workdir>/<profile>/
@@ -180,8 +187,8 @@ The two generated DNS files are Cloudflare-only; `no-infra` DNS renders `main.tf
 
 ### Parameter flow
 
-1. `green.cli` reads the desired-state file, overlays `GREEN_PAR_*`, and stamps `:green/event`.
-2. `workflow/start-step` overlays `GREEN_PAR_*` again (idempotent, and it also covers the REPL and test paths), then validates (`validate/state-errors`, and `validate/secret-errors` for a real create/delete).
+1. `green.cli` reads the desired-state file, overlays `COLORS_PAR_*`, and stamps `:green/event` and `:green/state-file` (the absolute path, which `tools/tool-dir` anchors a relative `:workdir` against).
+2. `workflow/start-step` overlays `COLORS_PAR_*` again (idempotent, and it also covers the REPL and test paths), then validates (`validate/state-errors`, and `validate/secret-errors` for a real create/delete).
 3. Tofu stages parse their `params` output into `:once/compute-params` / `:once/smtp-params`; `joined-params` merges them into opts at the DNS join. Fallback maps (`fallback-compute-params`, `fallback-smtp-params`) stand in for `build` and dry-run so rendering never needs state.
 4. Delete cannot re-derive those values, so `workflow/adopt-existing-state` reads the already-applied outputs back out of Tofu state before teardown.
 
@@ -191,7 +198,7 @@ Three separate channels, and nothing lands in a rendered file:
 
 - **OpenTofu**: `validate/providers` is the single registry — per provider, the non-secret keys its templates need (`:required`), the credentials it needs (`:secrets`), and which of those OpenTofu reads natively (`:tofu-env`, e.g. `:do-token` → `DIGITALOCEAN_TOKEN`). Validation and `tools/credential-env` both read it, so a provider cannot be checked against one set of keys and run with another. Credentials travel in the process environment; unset ones are omitted, so build and dry-run stay credential-free. A secret absent from `:tofu-env` reaches its tool another way — the SMTP passwords go through Ansible.
 - **State backends**: R2 authenticates through `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`; naming them in `backend.tf.json` would also write them to `.terraform/terraform.tfstate`.
-- **Ansible**: `tools/par-lookup` emits the shared expression checking `ONCE_PAR_*`, Green, Red, and Blue prefixes, so secrets resolve when the play runs. The exact bytes are a cross-language contract.
+- **Ansible**: `tools/par-lookup` emits the shared expression resolving `COLORS_PAR_*`, so secrets reach the play at run time. The exact bytes are a cross-language contract.
 
 ### Backends
 
@@ -199,7 +206,7 @@ Three separate channels, and nothing lands in a rendered file:
 
 ### Delete semantics
 
-Deleting has to render before it can destroy: `green.tofu/tofu-with-spec` and `green.ansible/ansible-with-spec` scaffold with `:green/event :create`, run the tool, and only then scaffold with `:delete` to remove the rendered tree. `workflow/ansible-cleanup-step` replays `ansible-local` so the managed `~/.ssh/config` block is dropped. `:compute-prevent-destroy` defaults to `true` and renders `lifecycle { prevent_destroy = true }`; a real delete refuses to start until `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false`.
+Deleting has to render before it can destroy: `green.tofu/tofu-with-spec` and `green.ansible/ansible-with-spec` scaffold with `:green/event :create`, run the tool, and only then scaffold with `:delete` to remove the rendered tree. `workflow/ansible-cleanup-step` replays `ansible-local` so the managed `~/.ssh/config` block is dropped. `:compute-prevent-destroy` defaults to `true` and renders `lifecycle { prevent_destroy = true }`; a real delete refuses to start until `COLORS_PAR_COMPUTE_PREVENT_DESTROY=false`.
 
 ### The remote host
 
@@ -230,8 +237,8 @@ Stay on the `green` branch — each language has its own branch in this reposito
 
 - Do not reintroduce BigConfig SDK concepts: `bb run package …`, `::workflow/params`, `BC_PAR_*`, `options.clj` profile maps.
 - Do not add error handling for cases that cannot happen — failure travels through `:green/exit` and `:green/err`, and `green.workflow` converts thrown exceptions itself.
-- Do not edit `.once/` (or any configured `:workdir`) — it is generated output.
-- Do not put credentials, tokens, or private keys in source, in `green.edn`, or in a rendered file. `.envrc.private` is the local channel.
+- Do not edit `.colors/` (or any configured `:workdir`) — it is generated output.
+- Do not put credentials, tokens, or private keys in source, in `colors.yml`, or in a rendered file. `.envrc.private` is the local channel.
 - Do not give the launcher a dependency outside `green`, `once`, and Babashka's built-ins: it has to work as a lone file copied into a stranger's project.
 - Do not hand-edit `once-sha` / `green-sha`; run `bb pin`.
-- When desired state changes, update `green.edn`, the package README, the root manual, and `../skills/package-once-green/`.
+- When desired state changes, update the root `colors.yml`, the package README, the root manual, and `../skills/package-once-green/`.

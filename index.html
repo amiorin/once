@@ -573,6 +573,7 @@
       <ul>
         <li><a href="#safe-lifecycle">Safe lifecycle</a></li>
         <li><a href="#deploy-updates">Application updates</a></li>
+        <li><a href="#upgrading">Upgrading an existing project</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
       </ul>
 
@@ -602,7 +603,7 @@
 
     <section id="introduction">
       <h2 class="anchor-heading"><a href="#introduction" aria-label="Link to Introduction">#</a>Introduction</h2>
-      <p>Once provisions a server, configures DNS and outgoing email, installs Docker and <a href="https://github.com/basecamp/once" rel="noopener">Basecamp ONCE</a>, and reconciles declared applications. Green reads <code>green.edn</code>; Red and Blue read <code>red.yml</code> and <code>blue.yml</code>. The three packages render byte-identical infrastructure artifacts and can manage the same state.</p>
+      <p>Once provisions a server, configures DNS and outgoing email, installs Docker and <a href="https://github.com/basecamp/once" rel="noopener">Basecamp ONCE</a>, and reconciles declared applications. All three read one <code>colors.yml</code>, found by walking up from the working directory, so switching colours needs no change to desired state. They render byte-identical infrastructure artifacts and manage the same state.</p>
       <p>You provide application hostnames and images, provider choices, non-secret settings, and public SSH keys. The hostnames decide the DNS zones and mail domains, so there is no separate domain setting and applications may span domains. Credentials and application secrets stay in your environment. The result is an isolated set of OpenTofu and Ansible files plus a repeatable lifecycle command.</p>
 
       <div class="callout success">
@@ -614,11 +615,11 @@
     <section id="implementations">
       <h2 class="anchor-heading"><a href="#implementations" aria-label="Link to Choose an implementation">#</a>Choose an implementation</h2>
       <div class="cards">
-        <article class="card"><p class="label">Clojure / Babashka</p><h3><code>package-once-green</code></h3><p>Uses <code>./green</code>, <code>green.edn</code>, and <code>GREEN_PAR_*</code>.</p></article>
-        <article class="card"><p class="label">TypeScript / Bun</p><h3><code>package-once-red</code></h3><p>Uses <code>./red</code>, <code>red.yml</code>, and <code>RED_PAR_*</code>.</p></article>
-        <article class="card"><p class="label">Python / uv</p><h3><code>package-once-blue</code></h3><p>Uses <code>./blue</code>, <code>blue.yml</code>, and <code>BLUE_PAR_*</code>.</p></article>
+        <article class="card"><p class="label">Clojure / Babashka</p><h3><code>package-once-green</code></h3><p>Run with <code>./green</code>. Reads YAML with yamlstar.</p></article>
+        <article class="card"><p class="label">TypeScript / Bun</p><h3><code>package-once-red</code></h3><p>Run with <code>./red</code>. Reads YAML with <code>Bun.YAML</code>.</p></article>
+        <article class="card"><p class="label">Python / uv</p><h3><code>package-once-blue</code></h3><p>Run with <code>./blue</code>. Reads YAML with PyYAML.</p></article>
       </div>
-      <p>Each skill gathers non-secret inputs, creates its launcher and desired-state file, protects <code>.once/</code>, and runs build plus dry-run checks. The portable <code>ONCE_PAR_*</code> prefix works across implementations. Switch only between completed commands; never run implementations concurrently against the same state.</p>
+      <p>Each skill gathers non-secret inputs, creates its launcher and <code>colors.yml</code>, protects <code>.colors/</code>, and runs build plus dry-run checks. The <code>COLORS_PAR_*</code> namespace is shared by every colour. Switch only between completed commands; never run implementations concurrently against the same state.</p>
     </section>
 
     <section id="requirements">
@@ -664,19 +665,19 @@ Map DATABASE_URL to the key :site-database-url.</code></pre>
         </li>
         <li>
           <h3>Review generated project files</h3>
-          <p>The skill writes the selected launcher and desired-state file. Green uses EDN; Red and Blue use equivalent YAML. No credential or application secret value belongs in either.</p>
+          <p>The skill writes the selected launcher and one <code>colors.yml</code>. Every colour reads the same file. No credential or application secret value belongs in it.</p>
         </li>
         <li>
           <h3>Run safe checks</h3>
           <p>The skill builds generated configuration and prints the execution graph without provisioning anything:</p>
-          <pre><code class="language-bash">./green build -f green.edn       # or: ./red build -f red.yml
+          <pre><code class="language-bash">./green build                    # or: ./red build / ./blue build
 ./green create --dry-run          # or the equivalent ./blue command</code></pre>
         </li>
         <li>
           <h3>Provision explicitly</h3>
           <p>Set the required environment variables through your private shell or secret manager, review the dry-run, and explicitly approve the real operation:</p>
-          <pre><code class="language-bash">./green create -f green.edn       # substitute red/blue as selected
-./green describe -f green.edn</code></pre>
+          <pre><code class="language-bash">./green create                    # substitute red/blue as selected
+./green describe</code></pre>
         </li>
       </ol>
 
@@ -711,47 +712,49 @@ start + validation ─┤                ├─ tofu-dns ─ tofu-smtp-post ─�
 
     <section id="desired-state">
       <h2 class="anchor-heading"><a href="#desired-state" aria-label="Link to Desired state">#</a>Desired state</h2>
-      <p><code>green.edn</code> is a flat EDN map except for applications. <code>red.yml</code> and <code>blue.yml</code> carry the same kebab-case keys in YAML, without the leading EDN colons. Keep credentials, passwords, private keys, and application secret values out of every form.</p>
+      <p><code>colors.yml</code> is a flat YAML map except for applications, with kebab-case keys. Every colour reads it under the YAML 1.2 core schema, so <code>no</code> is the string <code>no</code> and <code>012</code> is twelve; quote anything that should stay text. Keep credentials, passwords, private keys, and application secret values out of it.</p>
       <div class="callout info"><span class="callout-title">Interchangeable state</span>Use the same <code>profile</code>, <code>workdir: .once</code>, providers, and settings when switching colors. Generated paths, resource addresses, and bytes are identical.</div>
 
-      <pre><code class="language-clojure">{:profile "production"
- :workdir ".once"
+      <pre><code class="language-yaml">profile: production
+workdir: .colors
 
- :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
+deploy-pubkey: ssh-ed25519 AAAA... ci-deploy
 
- :once {:applications
-        [{:host "www.example.com"
-          :image "ghcr.io/example/site:latest"
-          :env {"DATABASE_URL" :site-database-url}}
-         {:host "www.example.net"
-          :image "ghcr.io/example/another-site:latest"}]}
+once:
+  applications:
+    - host: www.example.com
+      image: ghcr.io/example/site:latest
+      env:
+        DATABASE_URL: site-database-url
+    - host: www.example.net
+      image: ghcr.io/example/another-site:latest
 
- :provider-compute "digitalocean"
- :provider-smtp "resend"
- :provider-dns "cloudflare"
- :provider-backend "r2"
- :compute-prevent-destroy true
+provider-compute: digitalocean
+provider-smtp: resend
+provider-dns: cloudflare
+provider-backend: r2
+compute-prevent-destroy: true
 
- :digitalocean-name "once"
- :digitalocean-region "ams3"
- :digitalocean-size "s-1vcpu-1gb-35gb-intel"
- :digitalocean-image "ubuntu-24-04-x64"
- :digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
+digitalocean-name: once
+digitalocean-region: ams3
+digitalocean-size: s-1vcpu-1gb-35gb-intel
+digitalocean-image: ubuntu-24-04-x64
+digitalocean-ssh-keys: fingerprint-or-id-already-in-the-account
 
- :r2-bucket "once-tfstate"
- :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"}</code></pre>
+r2-bucket: once-tfstate
+r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
 
       <h3>Non-secret overrides</h3>
-      <p>A native color variable or portable <code>ONCE_PAR_*</code> variable overrides a flat key. The launcher strips the prefix, lowercases the name, and changes underscores to hyphens. Existing boolean and integer values retain their types.</p>
-      <pre><code class="language-bash">GREEN_PAR_DIGITALOCEAN_REGION=fra1 ./green build
-GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
+      <p>A <code>COLORS_PAR_*</code> variable overrides a flat key. The launcher strips the prefix, lowercases the name, and changes underscores to hyphens. Existing boolean and integer values retain their types.</p>
+      <pre><code class="language-bash">COLORS_PAR_DIGITALOCEAN_REGION=fra1 ./green build
+COLORS_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
       <p>Use this mechanism for temporary deployment settings, for the destruction guard, and for every credential — the same overlay carries secrets, as listed under <a href="#secrets">Secrets and environment</a>.</p>
     </section>
 
     <section id="generated-files">
       <h2 class="anchor-heading"><a href="#generated-files" aria-label="Link to Generated files">#</a>Generated files</h2>
       <p>Every tool gets an isolated directory under <code>&lt;workdir&gt;/&lt;profile&gt;/</code>. With the recommended defaults, a build resembles:</p>
-      <pre><code class="language-text">.once/
+      <pre><code class="language-text">.colors/
 └── production/
     ├── tofu-compute/
     │   ├── backend.tf.json
@@ -781,7 +784,7 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
       <ul>
         <li>The work directory is generated output and should be ignored by Git.</li>
         <li>Local OpenTofu state remains in each tool directory. S3 and R2 use remote keys of the form <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</li>
-        <li>Generated Ansible files contain environment lookups, not application or SMTP secret values — provided each application's <code>:env</code> uses the map form, which is the one that defers to a <code>GREEN_PAR_*</code> lookup.</li>
+        <li>Generated Ansible files contain environment lookups, not application or SMTP secret values — provided each application's <code>env</code> uses the map form, which is the one that defers to a <code>COLORS_PAR_*</code> lookup.</li>
         <li><code>apps.tf.json</code> and <code>smtp.tf.json</code> are generated only for the Cloudflare DNS provider; <code>no-infra</code> renders <code>main.tf</code> alone.</li>
         <li>The <code>ansible-local</code> play writes a managed <code>Host &lt;profile&gt;</code> block into <code>~/.ssh/config</code>, delimited by its own markers. Delete removes that block and leaves the rest of the file untouched.</li>
       </ul>
@@ -789,35 +792,36 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
 
     <section id="applications">
       <h2 class="anchor-heading"><a href="#applications" aria-label="Link to Applications">#</a>Applications</h2>
-      <p>Applications live in <code>:once {:applications [...]}</code>. Every application requires a hostname and a container image. Hostnames may span domains. Green derives every DNS zone from the hostname's last two labels, creates a matching Resend sending domain, and assigns each application a From address in its own zone. Each hostname gets its own proxied A record. No implicit apex or wildcard record is created, so a hostname that is not listed here does not resolve.</p>
-      <pre><code class="language-clojure">:once
-{:applications
- [{:host "www.example.com"
-   :image "ghcr.io/example/site:latest"
-   :env {"DATABASE_URL" :site-database-url
-         "SECRET_KEY_BASE" :site-secret-key-base}
-   :auto_update true
-   :auto_backup true
-   :backup_path "/var/backups/site"
-   :cpus 2
-   :memory "2g"}]}</code></pre>
+      <p>Applications live in <code>once {:applications [...]}</code>. Every application requires a hostname and a container image. Hostnames may span domains. Green derives every DNS zone from the hostname's last two labels, creates a matching Resend sending domain, and assigns each application a From address in its own zone. Each hostname gets its own proxied A record. No implicit apex or wildcard record is created, so a hostname that is not listed here does not resolve.</p>
+      <pre><code class="language-yaml">once:
+  applications:
+    - host: www.example.com
+      image: ghcr.io/example/site:latest
+      env:
+        DATABASE_URL: site-database-url
+        SECRET_KEY_BASE: site-secret-key-base
+      auto_update: true
+      auto_backup: true
+      backup_path: /var/backups/site
+      cpus: 2
+      memory: 2g</code></pre>
 
       <h3>Environment indirection</h3>
-      <p><code>:env</code> maps a container variable name to the flat <code>green.edn</code> key that holds its value. It never maps to a secret value. The value is supplied by the <code>GREEN_PAR_*</code> variable named after that key — <code>:site-database-url</code> comes from <code>GREEN_PAR_SITE_DATABASE_URL</code> — and the launcher verifies every reference resolves before a real create.</p>
+      <p><code>env</code> maps a container variable name to the flat <code>colors.yml</code> key that holds its value. It never maps to a secret value. The value is supplied by the <code>COLORS_PAR_*</code> variable named after that key — <code>site-database-url</code> comes from <code>COLORS_PAR_SITE_DATABASE_URL</code> — and the launcher verifies every reference resolves before a real create.</p>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>Application key</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><code>:host</code></td><td>Required FQDN served by the application.</td></tr>
-            <tr><td><code>:image</code></td><td>Required container image reference.</td></tr>
-            <tr><td><code>:env</code></td><td>Map of container variable names to the <code>green.edn</code> keys holding their values.</td></tr>
-            <tr><td><code>:auto_update</code></td><td>Enable ONCE automatic image updates.</td></tr>
-            <tr><td><code>:auto_backup</code></td><td>Enable ONCE automatic backups.</td></tr>
-            <tr><td><code>:backup_path</code></td><td>Set the application backup path.</td></tr>
-            <tr><td><code>:disable_tls</code></td><td>Disable ONCE-managed TLS for the application.</td></tr>
-            <tr><td><code>:cpus</code></td><td>Set the container CPU allocation.</td></tr>
-            <tr><td><code>:memory</code></td><td>Set the container memory allocation.</td></tr>
+            <tr><td><code>host</code></td><td>Required FQDN served by the application.</td></tr>
+            <tr><td><code>image</code></td><td>Required container image reference.</td></tr>
+            <tr><td><code>env</code></td><td>Map of container variable names to the <code>colors.yml</code> keys holding their values.</td></tr>
+            <tr><td><code>auto_update</code></td><td>Enable ONCE automatic image updates.</td></tr>
+            <tr><td><code>auto_backup</code></td><td>Enable ONCE automatic backups.</td></tr>
+            <tr><td><code>backup_path</code></td><td>Set the application backup path.</td></tr>
+            <tr><td><code>disable_tls</code></td><td>Disable ONCE-managed TLS for the application.</td></tr>
+            <tr><td><code>cpus</code></td><td>Set the container CPU allocation.</td></tr>
+            <tr><td><code>memory</code></td><td>Set the container memory allocation.</td></tr>
           </tbody>
         </table>
       </div>
@@ -834,26 +838,26 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
         <table>
           <thead><tr><th>Selection</th><th>Required environment variables</th><th>When</th></tr></thead>
           <tbody>
-            <tr><td>DigitalOcean</td><td><code>COLOR_PAR_DO_TOKEN</code> or <code>ONCE_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
-            <tr><td>Hetzner Cloud</td><td><code>COLOR_PAR_HCLOUD_TOKEN</code> or portable alias</td><td>Create and delete</td></tr>
-            <tr><td>Yandex Cloud</td><td><code>COLOR_PAR_YANDEX_TOKEN</code> or portable alias</td><td>Create and delete</td></tr>
+            <tr><td>DigitalOcean</td><td><code>COLORS_PAR_DO_TOKEN</code> or <code>COLORS_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Hetzner Cloud</td><td><code>COLORS_PAR_HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Yandex Cloud</td><td><code>COLORS_PAR_YANDEX_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Oracle Cloud</td><td>None — authenticates through the configured OCI profile</td><td>—</td></tr>
-            <tr><td>Resend</td><td><code>COLOR_PAR_RESEND_API_KEY</code> and <code>COLOR_PAR_RESEND_PASSWORD</code>, or portable aliases</td><td>Create and delete</td></tr>
-            <tr><td>Existing SMTP</td><td><code>COLOR_PAR_NO_INFRA_SMTP_PASSWORD</code> or portable alias</td><td>Create and delete</td></tr>
-            <tr><td>Cloudflare DNS</td><td><code>COLOR_PAR_CLOUDFLARE_API_TOKEN</code> or portable alias</td><td>Create and delete</td></tr>
-            <tr><td>R2 backend</td><td><code>COLOR_PAR_R2_ACCESS_KEY_ID</code> and <code>COLOR_PAR_R2_SECRET_ACCESS_KEY</code>, or portable aliases</td><td>Create and delete</td></tr>
+            <tr><td>Resend</td><td><code>COLORS_PAR_RESEND_API_KEY</code> and <code>COLORS_PAR_RESEND_PASSWORD</code></td><td>Create and delete</td></tr>
+            <tr><td>Existing SMTP</td><td><code>COLORS_PAR_NO_INFRA_SMTP_PASSWORD</code></td><td>Create and delete</td></tr>
+            <tr><td>Cloudflare DNS</td><td><code>COLORS_PAR_CLOUDFLARE_API_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>R2 backend</td><td><code>COLORS_PAR_R2_ACCESS_KEY_ID</code> and <code>COLORS_PAR_R2_SECRET_ACCESS_KEY</code></td><td>Create and delete</td></tr>
             <tr><td>S3 backend</td><td>None — OpenTofu resolves its AWS credential chain</td><td>Create and delete</td></tr>
-            <tr><td>Application environment</td><td>One native color or <code>ONCE_PAR_*</code> variable per mapped key</td><td>Create</td></tr>
+            <tr><td>Application environment</td><td>One <code>COLORS_PAR_*</code> variable per mapped key</td><td>Create</td></tr>
           </tbody>
         </table>
       </div>
-      <p>Use the selected implementation's native prefix or portable <code>ONCE_PAR_*</code>. For example, <code>GREEN_PAR_DO_TOKEN</code>, <code>RED_PAR_DO_TOKEN</code>, <code>BLUE_PAR_DO_TOKEN</code>, and <code>ONCE_PAR_DO_TOKEN</code> fill the same key. There is no <code>TF_VAR_*</code> alias.</p>
-      <p>Nothing is written into a rendered file. OpenTofu credentials are passed through the process environment under provider-native names. The byte-identical Ansible expression checks <code>ONCE_PAR_*</code> and all three native prefixes at play time. Build and dry-run require none of them.</p>
+      <p>One namespace serves every colour: <code>COLORS_PAR_DO_TOKEN</code> fills the same key whether you run green, red or blue. There is no per-colour prefix and no <code>TF_VAR_*</code> alias.</p>
+      <p>Nothing is written into a rendered file. OpenTofu credentials are passed through the process environment under provider-native names. The byte-identical Ansible expression resolves <code>COLORS_PAR_*</code> at play time. Build and dry-run require none of them.</p>
 
       <h3>Check presence without printing values</h3>
-      <pre><code class="language-bash">for name in GREEN_PAR_DO_TOKEN GREEN_PAR_RESEND_API_KEY \
-  GREEN_PAR_RESEND_PASSWORD GREEN_PAR_CLOUDFLARE_API_TOKEN \
-  GREEN_PAR_R2_ACCESS_KEY_ID GREEN_PAR_R2_SECRET_ACCESS_KEY; do
+      <pre><code class="language-bash">for name in COLORS_PAR_DO_TOKEN COLORS_PAR_RESEND_API_KEY \
+  COLORS_PAR_RESEND_PASSWORD COLORS_PAR_CLOUDFLARE_API_TOKEN \
+  COLORS_PAR_R2_ACCESS_KEY_ID COLORS_PAR_R2_SECRET_ACCESS_KEY; do
   if [ -n "${!name:-}" ]; then
     printf '%s: set\n' "$name"
   else
@@ -867,78 +871,78 @@ done</code></pre>
       <h2 class="anchor-heading"><a href="#compute-providers" aria-label="Link to Compute providers">#</a>Compute providers</h2>
 
       <h3>DigitalOcean</h3>
-      <pre><code class="language-clojure">:provider-compute "digitalocean"
-:digitalocean-name "once"
-:digitalocean-region "ams3"
-:digitalocean-size "s-1vcpu-1gb-35gb-intel"
-:digitalocean-image "ubuntu-24-04-x64"
-:digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
-;; Optional:
-:digitalocean-vpc-uuid "non-secret-vpc-uuid"</code></pre>
-      <p>The droplet attaches the key named by <code>:digitalocean-ssh-keys</code>, which must already exist in the account — give it a fingerprint or key id. Credential: <code>GREEN_PAR_DO_TOKEN</code>.</p>
+      <pre><code class="language-yaml">provider-compute: digitalocean
+digitalocean-name: once
+digitalocean-region: ams3
+digitalocean-size: s-1vcpu-1gb-35gb-intel
+digitalocean-image: ubuntu-24-04-x64
+digitalocean-ssh-keys: fingerprint-or-id-already-in-the-account
+# Optional:
+digitalocean-vpc-uuid: non-secret-vpc-uuid</code></pre>
+      <p>The droplet attaches the key named by <code>digitalocean-ssh-keys</code>, which must already exist in the account — give it a fingerprint or key id. Credential: <code>COLORS_PAR_DO_TOKEN</code>.</p>
 
       <h3>Hetzner Cloud</h3>
-      <pre><code class="language-clojure">:provider-compute "hcloud"
-:hcloud-name "once"
-:hcloud-image "ubuntu-24.04"
-:hcloud-server-type "cx23"
-:hcloud-location "hel1"
-:hcloud-ssh-keys "key-name-or-id-already-in-the-project"</code></pre>
-      <p>Creates an IPv4 server attached to the key named by <code>:hcloud-ssh-keys</code>, which must already exist in the project. Credential: <code>GREEN_PAR_HCLOUD_TOKEN</code>.</p>
+      <pre><code class="language-yaml">provider-compute: hcloud
+hcloud-name: once
+hcloud-image: ubuntu-24.04
+hcloud-server-type: cx23
+hcloud-location: hel1
+hcloud-ssh-keys: key-name-or-id-already-in-the-project</code></pre>
+      <p>Creates an IPv4 server attached to the key named by <code>hcloud-ssh-keys</code>, which must already exist in the project. Credential: <code>COLORS_PAR_HCLOUD_TOKEN</code>.</p>
 
       <h3>Yandex Cloud</h3>
-      <pre><code class="language-clojure">:provider-compute "yandex"
-:compute-pubkey "ssh-ed25519 AAAA... operator"
-:yandex-cloud-id "b1g..."
-:yandex-folder-id "b1g..."
-:yandex-zone "ru-central1-a"
-:yandex-image-family "ubuntu-2404-lts"
-:yandex-name "once"
-:yandex-subnet-cidr "10.0.0.0/24"
-:yandex-platform-id "standard-v3"
-:yandex-cores 2
-:yandex-memory-gb 2
-:yandex-core-fraction 100
-:yandex-disk-size-gb 20</code></pre>
-      <p>Creates a network, subnet, NAT-enabled Ubuntu instance, and boot disk. <code>:compute-pubkey</code> is installed for the <code>ubuntu</code> user; keep the private half in <code>ssh-agent</code>. Credential: <code>GREEN_PAR_YANDEX_TOKEN</code>, passed to OpenTofu as <code>YC_TOKEN</code>.</p>
+      <pre><code class="language-yaml">provider-compute: yandex
+compute-pubkey: ssh-ed25519 AAAA... operator
+yandex-cloud-id: b1g...
+yandex-folder-id: b1g...
+yandex-zone: ru-central1-a
+yandex-image-family: ubuntu-2404-lts
+yandex-name: once
+yandex-subnet-cidr: 10.0.0.0/24
+yandex-platform-id: standard-v3
+yandex-cores: 2
+yandex-memory-gb: 2
+yandex-core-fraction: 100
+yandex-disk-size-gb: 20</code></pre>
+      <p>Creates a network, subnet, NAT-enabled Ubuntu instance, and boot disk. <code>compute-pubkey</code> is installed for the <code>ubuntu</code> user; keep the private half in <code>ssh-agent</code>. Credential: <code>COLORS_PAR_YANDEX_TOKEN</code>, passed to OpenTofu as <code>YC_TOKEN</code>.</p>
 
       <h3>Oracle Cloud Infrastructure</h3>
-      <pre><code class="language-clojure">:provider-compute "oci"
-:oci-config-file-profile "DEFAULT"
-:oci-subnet-id "ocid1.subnet..."
-:oci-compartment-id "ocid1.compartment..."
-:oci-availability-domain "..."
-:oci-display-name "once"
-:oci-shape "VM.Standard.A1.Flex"
-:oci-ocpus 1
-:oci-memory-in-gbs 4
-:oci-boot-volume-size-in-gbs 50
-:oci-boot-volume-vpus-per-gb 30
-:oci-ssh-authorized-keys "/home/user/.ssh/once.pub"</code></pre>
-      <p>The current default shape is ARM-based. <code>:oci-ssh-authorized-keys</code> is a path to a public-key file on the machine running the launcher; its contents are written into instance metadata at plan time. OCI authenticates through the named profile in <code>~/.oci/config</code>, so no credential variable is required.</p>
+      <pre><code class="language-yaml">provider-compute: oci
+oci-config-file-profile: DEFAULT
+oci-subnet-id: ocid1.subnet...
+oci-compartment-id: ocid1.compartment...
+oci-availability-domain: ...
+oci-display-name: once
+oci-shape: VM.Standard.A1.Flex
+oci-ocpus: 1
+oci-memory-in-gbs: 4
+oci-boot-volume-size-in-gbs: 50
+oci-boot-volume-vpus-per-gb: 30
+oci-ssh-authorized-keys: /home/user/.ssh/once.pub</code></pre>
+      <p>The current default shape is ARM-based. <code>oci-ssh-authorized-keys</code> is a path to a public-key file on the machine running the launcher; its contents are written into instance metadata at plan time. OCI authenticates through the named profile in <code>~/.oci/config</code>, so no credential variable is required.</p>
 
       <h3>Existing server</h3>
-      <pre><code class="language-clojure">:provider-compute "no-infra"
-:no-infra-compute-ip "203.0.113.10"
-:no-infra-compute-user "root"
-:no-infra-compute-sudoer "root"
-:no-infra-compute-uid 0</code></pre>
-      <p>No compute resource or API credential is required. The server must be reachable using the configured user and an SSH identity already loaded into <code>ssh-agent</code>. The host is reported under <code>:profile</code>, so it needs no name of its own.</p>
+      <pre><code class="language-yaml">provider-compute: no-infra
+no-infra-compute-ip: 203.0.113.10
+no-infra-compute-user: root
+no-infra-compute-sudoer: root
+no-infra-compute-uid: 0</code></pre>
+      <p>No compute resource or API credential is required. The server must be reachable using the configured user and an SSH identity already loaded into <code>ssh-agent</code>. The host is reported under <code>profile</code>, so it needs no name of its own.</p>
     </section>
 
     <section id="smtp-providers">
       <h2 class="anchor-heading"><a href="#smtp-providers" aria-label="Link to SMTP providers">#</a>SMTP providers</h2>
 
       <h3>Resend</h3>
-      <pre><code class="language-clojure">:provider-smtp "resend"</code></pre>
-      <p>Resend needs no further keys: its relay is the same for every account, so <code>smtp.resend.com</code>, port <code>587</code>, and the user <code>resend</code> are hard-coded. The SMTP stage creates <code>notifications.&lt;zone&gt;</code> for every distinct application zone and returns each domain's DNS records; the post stage verifies every sending domain after DNS is configured. Each application sends from <code>info@notifications.&lt;its-zone&gt;</code>. Use <code>GREEN_PAR_RESEND_API_KEY</code> for the Resend API and <code>GREEN_PAR_RESEND_PASSWORD</code> for server-side SMTP authentication.</p>
+      <pre><code class="language-yaml">provider-smtp: resend</code></pre>
+      <p>Resend needs no further keys: its relay is the same for every account, so <code>smtp.resend.com</code>, port <code>587</code>, and the user <code>resend</code> are hard-coded. The SMTP stage creates <code>notifications.&lt;zone&gt;</code> for every distinct application zone and returns each domain's DNS records; the post stage verifies every sending domain after DNS is configured. Each application sends from <code>info@notifications.&lt;its-zone&gt;</code>. Use <code>COLORS_PAR_RESEND_API_KEY</code> for the Resend API and <code>COLORS_PAR_RESEND_PASSWORD</code> for server-side SMTP authentication.</p>
 
       <h3>Existing SMTP</h3>
-      <pre><code class="language-clojure">:provider-smtp "no-infra"
-:no-infra-smtp-server "smtp.example.net"
-:no-infra-smtp-port 587
-:no-infra-smtp-username "smtp-user"</code></pre>
-      <p>No SMTP infrastructure is created. A real create still requires <code>GREEN_PAR_NO_INFRA_SMTP_PASSWORD</code> so the remote ONCE server can send mail.</p>
+      <pre><code class="language-yaml">provider-smtp: no-infra
+no-infra-smtp-server: smtp.example.net
+no-infra-smtp-port: 587
+no-infra-smtp-username: smtp-user</code></pre>
+      <p>No SMTP infrastructure is created. A real create still requires <code>COLORS_PAR_NO_INFRA_SMTP_PASSWORD</code> so the remote ONCE server can send mail.</p>
     </section>
 
     <section id="dns-providers">
@@ -947,7 +951,7 @@ done</code></pre>
         <article class="card">
           <p class="label">Managed</p>
           <h3><code>cloudflare</code></h3>
-          <p>Finds every zone derived from the application hostnames, creates a proxied A record for each hostname in its zone, and adds each sending domain's unproxied Resend records. Requires <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code> with zone-read and DNS-edit access to every zone.</p>
+          <p>Finds every zone derived from the application hostnames, creates a proxied A record for each hostname in its zone, and adds each sending domain's unproxied Resend records. Requires <code>COLORS_PAR_CLOUDFLARE_API_TOKEN</code> with zone-read and DNS-edit access to every zone.</p>
         </article>
         <article class="card">
           <p class="label">External</p>
@@ -955,7 +959,7 @@ done</code></pre>
           <p>Creates no DNS resources and requires no DNS credential. You are responsible for application and SMTP records outside Once.</p>
         </article>
       </div>
-      <pre><code class="language-clojure">:provider-dns "cloudflare"  ; or "no-infra"</code></pre>
+      <pre><code class="language-yaml">provider-dns: cloudflare  # or "no-infra"</code></pre>
     </section>
 
     <section id="state-backends">
@@ -963,20 +967,20 @@ done</code></pre>
       <p>Backend advice writes a backend configuration before every OpenTofu stage. State is isolated by both profile and tool.</p>
 
       <h3>Local</h3>
-      <pre><code class="language-clojure">:provider-backend "local"</code></pre>
+      <pre><code class="language-yaml">provider-backend: local</code></pre>
       <p>Best for experiments. Protect and back up the work directory; losing local state makes safe lifecycle management difficult.</p>
 
       <h3>Amazon S3</h3>
-      <pre><code class="language-clojure">:provider-backend "s3"
-:s3-bucket "once-tfstate"
-:s3-region "eu-west-1"</code></pre>
+      <pre><code class="language-yaml">provider-backend: s3
+s3-bucket: once-tfstate
+s3-region: eu-west-1</code></pre>
       <p>The generated backend names only the bucket, key, and region, so OpenTofu resolves credentials through its own AWS chain — environment variables, a shared profile, or an instance role. State keys are <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</p>
 
       <h3>Cloudflare R2</h3>
-      <pre><code class="language-clojure">:provider-backend "r2"
-:r2-bucket "once-tfstate"
-:r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"</code></pre>
-      <p>Uses the S3-compatible backend with <code>region = "auto"</code>, taking the R2 access key from <code>GREEN_PAR_R2_ACCESS_KEY_ID</code> and <code>GREEN_PAR_R2_SECRET_ACCESS_KEY</code>. State keys are <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</p>
+      <pre><code class="language-yaml">provider-backend: r2
+r2-bucket: once-tfstate
+r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
+      <p>Uses the S3-compatible backend with <code>region = "auto"</code>, taking the R2 access key from <code>COLORS_PAR_R2_ACCESS_KEY_ID</code> and <code>COLORS_PAR_R2_SECRET_ACCESS_KEY</code>. State keys are <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code>.</p>
     </section>
 
     <section id="ssh-configuration">
@@ -984,12 +988,12 @@ done</code></pre>
       <div class="cards">
         <article class="card">
           <p class="label">Operations</p>
-          <h3><code>:compute-pubkey</code></h3>
-          <p>Required by Yandex Cloud, which installs it for the <code>ubuntu</code> user through instance metadata. Other providers use a key already registered with them (<code>:digitalocean-ssh-keys</code>, <code>:hcloud-ssh-keys</code>) or a local public-key file (<code>:oci-ssh-authorized-keys</code>). The matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
+          <h3><code>compute-pubkey</code></h3>
+          <p>Required by Yandex Cloud, which installs it for the <code>ubuntu</code> user through instance metadata. Other providers use a key already registered with them (<code>digitalocean-ssh-keys</code>, <code>hcloud-ssh-keys</code>) or a local public-key file (<code>oci-ssh-authorized-keys</code>). The matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
         </article>
         <article class="card">
           <p class="label">Deployment</p>
-          <h3><code>:deploy-pubkey</code></h3>
+          <h3><code>deploy-pubkey</code></h3>
           <p>Authorizes the remote <code>deploy</code> user through a forced command. Interactive sessions are denied; only <code>sudo once update &lt;configured-host&gt;</code> is accepted.</p>
         </article>
       </div>
@@ -1031,7 +1035,7 @@ Colors: green / red / blue</code></pre>
       <p>Dry-run validates desired-state structure and prints planned DAG actions without requiring provider credentials. Real create additionally checks provider and application environment variables, applies the four OpenTofu stages, and configures the host with Ansible.</p>
       <div class="callout warning">
         <span class="callout-title">Real infrastructure operation</span>
-        A real create can incur cloud costs, create public DNS records, and deploy internet-facing applications. Review <code>green.edn</code>, <code>build</code>, and dry-run first.
+        A real create can incur cloud costs, create public DNS records, and deploy internet-facing applications. Review <code>colors.yml</code>, <code>build</code>, and dry-run first.
       </div>
     </section>
 
@@ -1058,11 +1062,11 @@ Colors: green / red / blue</code></pre>
     <section id="delete">
       <h2 class="anchor-heading"><a href="#delete" aria-label="Link to Delete and dry-run">#</a>Delete and dry-run</h2>
       <pre><code class="language-bash">./green delete --dry-run
-ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
-      <p>Dry-run prints teardown order and changes nothing. A real delete is refused while <code>:compute-prevent-destroy</code> is <code>true</code>, which is the required default. Deliberately override it only for the exact delete you have approved.</p>
+COLORS_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
+      <p>Dry-run prints teardown order and changes nothing. A real delete is refused while <code>compute-prevent-destroy</code> is <code>true</code>, which is the required default. Deliberately override it only for the exact delete you have approved.</p>
       <div class="callout danger">
         <span class="callout-title">Destructive operation</span>
-        Delete removes managed DNS, SMTP, and compute resources. Verify backups and state access first. The protection override should be temporary rather than committed to <code>green.edn</code>.
+        Delete removes managed DNS, SMTP, and compute resources. Verify backups and state access first. The protection override should be temporary rather than committed to <code>colors.yml</code>.
       </div>
     </section>
 
@@ -1078,7 +1082,7 @@ ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
     <section id="safe-lifecycle">
       <h2 class="anchor-heading"><a href="#safe-lifecycle" aria-label="Link to Safe lifecycle">#</a>Safe lifecycle</h2>
       <ol>
-        <li>Keep <code>green.edn</code> free of secrets and commit it for review.</li>
+        <li>Keep <code>colors.yml</code> free of secrets and commit it for review.</li>
         <li>Keep <code>&lt;workdir&gt;/</code> and private environment files ignored by Git.</li>
         <li>Load the compute private key into <code>ssh-agent</code>; never copy it into the project.</li>
         <li>Load required credentials through a private environment or secret manager.</li>
@@ -1096,12 +1100,26 @@ ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <h2 class="anchor-heading"><a href="#deploy-updates" aria-label="Link to Application updates">#</a>Application updates</h2>
       <p>The remote server gets a restricted <code>deploy</code> account intended for CI or controlled update jobs. Its forced command rejects interactive sessions, malformed commands, and hosts not already known to ONCE.</p>
       <pre><code class="language-bash">ssh deploy@SERVER_IP sudo once update www.example.com</code></pre>
-      <p>The key supplied as <code>:deploy-pubkey</code> is the only credential authorized for that account. You can also set <code>:auto_update true</code> on an application when ONCE should handle updates automatically.</p>
+      <p>The key supplied as <code>deploy-pubkey</code> is the only credential authorized for that account. You can also set <code>auto_update true</code> on an application when ONCE should handle updates automatically.</p>
       <p>Running <code>./green create</code> again is appropriate when infrastructure or declared application membership changes: the remote module reconciles by hostname, deploying hosts that are missing and removing hosts no longer present in desired state.</p>
       <div class="callout warning">
         <span class="callout-title">Reconciliation is by hostname</span>
-        Changing the <code>:image</code>, <code>:env</code>, or resource settings of an application that is <em>already deployed</em> does not redeploy it — the host is still present, so there is nothing to reconcile. Pull a new image with <code>once update &lt;host&gt;</code>, or change the settings on the server itself.
+        Changing the <code>image</code>, <code>env</code>, or resource settings of an application that is <em>already deployed</em> does not redeploy it — the host is still present, so there is nothing to reconcile. Pull a new image with <code>once update &lt;host&gt;</code>, or change the settings on the server itself.
       </div>
+    </section>
+
+    <section id="upgrading">
+      <h2 class="anchor-heading"><a href="#upgrading" aria-label="Link to Upgrading an existing project">#</a>Upgrading an existing project</h2>
+      <p>Three things were renamed, and none of them is picked up automatically. A project created before this change must be migrated by hand.</p>
+      <div class="callout danger"><span class="callout-title">Move the work directory before running anything</span>The work directory is now <code>.colors/</code>. On the <code>local</code> state backend — the default when <code>provider-backend</code> is unset — your OpenTofu state lives <em>inside</em> it. If you run a command before moving it, OpenTofu finds no state, reports that everything is missing, and a <code>create</code> will happily build a second server, a second sending domain, and a second set of DNS records alongside the ones you already have. Run <code>mv .once .colors</code> first. Projects on the <code>s3</code> or <code>r2</code> backend keep their state remotely under <code>&lt;profile&gt;/&lt;tool&gt;.tfstate</code> and are not affected.</div>
+      <ol class="steps">
+        <li>Rename the work directory: <code>mv .once .colors</code>, and update the ignore rule to <code>.colors/</code>.</li>
+        <li>Rename desired state to <code>colors.yml</code>. Green projects must also convert from EDN to YAML: drop the leading colons from keys, unwrap the outer braces, and quote nothing that was already a plain string. Red and Blue projects only need the filename changed.</li>
+        <li>Set <code>workdir: .colors</code> inside that file.</li>
+        <li>Rename every credential variable to the <code>COLORS_PAR_*</code> namespace. The old <code>GREEN_PAR_*</code>, <code>RED_PAR_*</code>, <code>BLUE_PAR_*</code>, and <code>ONCE_PAR_*</code> names are no longer read at all — a stale one is silently ignored, and the run stops with <code>required credential is not set</code>.</li>
+        <li>Re-run the skill installation so the launcher is replaced. An old launcher refuses to run against the new library rather than rendering from a stale contract.</li>
+      </ol>
+      <p>After migrating, <code>./&lt;color&gt; build</code> should regenerate an identical tree, and <code>./&lt;color&gt; describe</code> should report the same running server as before. Confirm both before attempting a <code>create</code> or <code>delete</code>.</p>
     </section>
 
     <section id="troubleshooting">
@@ -1114,18 +1132,19 @@ ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <p>Add the missing non-secret field for the selected provider. Remove unused providers' fields rather than filling them with credentials or passwords.</p>
 
       <h3>A required environment variable is not set</h3>
-      <p>Set the named variable through your private environment loader or secret manager. Check presence only; do not print the value. Application variable names come from each application's <code>:env</code> map.</p>
+      <p>Set the named variable through your private environment loader or secret manager. Check presence only; do not print the value. Application variable names come from each application's <code>env</code> map.</p>
 
-      <h3><code>:env must map container names...</code></h3>
-      <p>The error fires when <code>:env</code> is neither a map nor a list — a bare string or number, say. Use the map form:</p>
-      <pre><code class="language-clojure">:env {"DATABASE_URL" :site-database-url}</code></pre>
+      <h3><code>env must map container names...</code></h3>
+      <p>The error fires when <code>env</code> is neither a map nor a list — a bare string or number, say. Use the map form:</p>
+      <pre><code class="language-yaml">env:
+  DATABASE_URL: site-database-url</code></pre>
       <div class="callout warning">
-        <span class="callout-title">A list <code>:env</code> is accepted, and written out literally</span>
+        <span class="callout-title">A list <code>env</code> is accepted, and written out literally</span>
         <p>A vector of <code>"KEY=value"</code> strings passes validation and is copied verbatim into the rendered Ansible file. That is fine for a non-secret value such as <code>["TARGET_EMAIL=forms@example.com"]</code>, but it is the one form that puts its values on disk. Anything secret belongs in the map form, which renders an environment lookup instead.</p>
       </div>
 
       <h3>Compute destruction is protected</h3>
-      <p>This is expected. First run <code>./green delete --dry-run</code>. After explicit approval, set <code>GREEN_PAR_COMPUTE_PREVENT_DESTROY=false</code> only for the real delete command.</p>
+      <p>This is expected. First run <code>./green delete --dry-run</code>. After explicit approval, set <code>COLORS_PAR_COMPUTE_PREVENT_DESTROY=false</code> only for the real delete command.</p>
 
       <h3>SSH is not reachable</h3>
       <ul>
@@ -1136,51 +1155,52 @@ ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       </ul>
 
       <h3>OpenTofu output or state is missing</h3>
-      <p>Use the same <code>:profile</code>, <code>:workdir</code>, backend selection, and backend credentials used during create. Do not delete the local work directory when using local state.</p>
+      <p>Use the same <code>profile</code>, <code>workdir</code>, backend selection, and backend credentials used during create. Do not delete the local work directory when using local state.</p>
 
       <h3>Resend verification is delayed</h3>
       <p>Confirm Cloudflare received all unproxied Resend records and allow DNS propagation. Rerun create after the records are visible; OpenTofu will continue from existing state.</p>
 
       <h3>Cloudflare cannot find the zone</h3>
-      <p>Every domain derived from the application hostnames must already belong to a zone accessible by <code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code>. The token needs permission to read and edit DNS records in every zone.</p>
+      <p>Every domain derived from the application hostnames must already belong to a zone accessible by <code>COLORS_PAR_CLOUDFLARE_API_TOKEN</code>. The token needs permission to read and edit DNS records in every zone.</p>
 
       <h3>An existing server fails during create</h3>
-      <p>Verify direct SSH access with <code>:no-infra-compute-user</code>, passwordless privilege escalation for <code>:no-infra-compute-sudoer</code>, a supported Linux host, and outbound network access for installers.</p>
+      <p>Verify direct SSH access with <code>no-infra-compute-user</code>, passwordless privilege escalation for <code>no-infra-compute-sudoer</code>, a supported Linux host, and outbound network access for installers.</p>
     </section>
 
     <section id="complete-example">
       <h2 class="anchor-heading"><a href="#complete-example" aria-label="Link to Complete example">#</a>Complete desired-state example</h2>
       <p>Green syntax is shown; Red and Blue use the same keys in YAML. This contains only public or non-secret configuration. Replace illustrative identifiers and provide credentials exclusively through environment variables.</p>
-      <pre><code class="language-clojure">{:profile "production"
- :workdir ".once"
+      <pre><code class="language-yaml">profile: production
+workdir: .colors
 
- :deploy-pubkey "ssh-ed25519 AAAAC3... ci-deploy"
+deploy-pubkey: ssh-ed25519 AAAAC3... ci-deploy
 
- :once
- {:applications
-  [{:host "www.example.com"
-    :image "ghcr.io/example/site:latest"
-    :env {"DATABASE_URL" :site-database-url
-          "SECRET_KEY_BASE" :site-secret-key-base}
-    :auto_update true
-    :auto_backup true}
-   {:host "www.example.net"
-    :image "ghcr.io/example/another-site:latest"}]}
+once:
+  applications:
+    - host: www.example.com
+      image: ghcr.io/example/site:latest
+      env:
+        DATABASE_URL: site-database-url
+        SECRET_KEY_BASE: site-secret-key-base
+      auto_update: true
+      auto_backup: true
+    - host: www.example.net
+      image: ghcr.io/example/another-site:latest
 
- :provider-compute "digitalocean"
- :provider-smtp "resend"
- :provider-dns "cloudflare"
- :provider-backend "r2"
- :compute-prevent-destroy true
+provider-compute: digitalocean
+provider-smtp: resend
+provider-dns: cloudflare
+provider-backend: r2
+compute-prevent-destroy: true
 
- :digitalocean-name "once-production"
- :digitalocean-region "ams3"
- :digitalocean-size "s-1vcpu-1gb-35gb-intel"
- :digitalocean-image "ubuntu-24-04-x64"
- :digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
+digitalocean-name: once-production
+digitalocean-region: ams3
+digitalocean-size: s-1vcpu-1gb-35gb-intel
+digitalocean-image: ubuntu-24-04-x64
+digitalocean-ssh-keys: fingerprint-or-id-already-in-the-account
 
- :r2-bucket "once-production-tfstate"
- :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"}</code></pre>
+r2-bucket: once-production-tfstate
+r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
     </section>
 
     <section id="parameter-reference">
@@ -1191,16 +1211,16 @@ ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
         <table>
           <thead><tr><th>Key</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td><code>:profile</code></td><td>Yes</td><td>Names generated output, remote state keys, the compute resource, and the SSH host alias.</td></tr>
-            <tr><td><code>:workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.once</code>.</td></tr>
-            <tr><td><code>:compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
-            <tr><td><code>:deploy-pubkey</code></td><td>Yes</td><td>Restricted application-update SSH public key.</td></tr>
-            <tr><td><code>:once</code></td><td>Yes</td><td>Map containing a non-empty <code>:applications</code> vector.</td></tr>
-            <tr><td><code>:provider-compute</code></td><td>Yes</td><td><code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
-            <tr><td><code>:provider-smtp</code></td><td>Yes</td><td><code>resend</code> or <code>no-infra</code>.</td></tr>
-            <tr><td><code>:provider-dns</code></td><td>Yes</td><td><code>cloudflare</code> or <code>no-infra</code>.</td></tr>
-            <tr><td><code>:provider-backend</code></td><td>Yes</td><td><code>local</code>, <code>s3</code>, or <code>r2</code>.</td></tr>
-            <tr><td><code>:compute-prevent-destroy</code></td><td>Yes</td><td>Boolean destruction guard; keep <code>true</code> in committed state.</td></tr>
+            <tr><td><code>profile</code></td><td>Yes</td><td>Names generated output, remote state keys, the compute resource, and the SSH host alias.</td></tr>
+            <tr><td><code>workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.once</code>.</td></tr>
+            <tr><td><code>compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
+            <tr><td><code>deploy-pubkey</code></td><td>Yes</td><td>Restricted application-update SSH public key.</td></tr>
+            <tr><td><code>once</code></td><td>Yes</td><td>Map containing a non-empty <code>applications</code> vector.</td></tr>
+            <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
+            <tr><td><code>provider-smtp</code></td><td>Yes</td><td><code>resend</code> or <code>no-infra</code>.</td></tr>
+            <tr><td><code>provider-dns</code></td><td>Yes</td><td><code>cloudflare</code> or <code>no-infra</code>.</td></tr>
+            <tr><td><code>provider-backend</code></td><td>Yes</td><td><code>local</code>, <code>s3</code>, or <code>r2</code>.</td></tr>
+            <tr><td><code>compute-prevent-destroy</code></td><td>Yes</td><td>Boolean destruction guard; keep <code>true</code> in committed state.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1210,15 +1230,15 @@ ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
         <table>
           <thead><tr><th>Provider</th><th>Keys</th></tr></thead>
           <tbody>
-            <tr><td>DigitalOcean</td><td><code>:digitalocean-name</code>, <code>:digitalocean-region</code>, <code>:digitalocean-size</code>, <code>:digitalocean-image</code>, <code>:digitalocean-ssh-keys</code>; optional <code>:digitalocean-vpc-uuid</code></td></tr>
-            <tr><td>Hetzner</td><td><code>:hcloud-name</code>, <code>:hcloud-image</code>, <code>:hcloud-server-type</code>, <code>:hcloud-location</code>, <code>:hcloud-ssh-keys</code></td></tr>
-            <tr><td>Yandex</td><td><code>:compute-pubkey</code>, <code>:yandex-cloud-id</code>, <code>:yandex-folder-id</code>, <code>:yandex-zone</code>, <code>:yandex-image-family</code>, <code>:yandex-name</code>, <code>:yandex-subnet-cidr</code>, <code>:yandex-platform-id</code>, <code>:yandex-cores</code>, <code>:yandex-memory-gb</code>, <code>:yandex-core-fraction</code>, <code>:yandex-disk-size-gb</code></td></tr>
-            <tr><td>OCI</td><td><code>:oci-config-file-profile</code>, <code>:oci-subnet-id</code>, <code>:oci-compartment-id</code>, <code>:oci-availability-domain</code>, <code>:oci-display-name</code>, <code>:oci-shape</code>, <code>:oci-ocpus</code>, <code>:oci-memory-in-gbs</code>, <code>:oci-boot-volume-size-in-gbs</code>, <code>:oci-boot-volume-vpus-per-gb</code>, <code>:oci-ssh-authorized-keys</code></td></tr>
-            <tr><td>Existing compute</td><td><code>:no-infra-compute-ip</code>, <code>:no-infra-compute-user</code>, <code>:no-infra-compute-sudoer</code>, <code>:no-infra-compute-uid</code></td></tr>
+            <tr><td>DigitalOcean</td><td><code>digitalocean-name</code>, <code>digitalocean-region</code>, <code>digitalocean-size</code>, <code>digitalocean-image</code>, <code>digitalocean-ssh-keys</code>; optional <code>digitalocean-vpc-uuid</code></td></tr>
+            <tr><td>Hetzner</td><td><code>hcloud-name</code>, <code>hcloud-image</code>, <code>hcloud-server-type</code>, <code>hcloud-location</code>, <code>hcloud-ssh-keys</code></td></tr>
+            <tr><td>Yandex</td><td><code>compute-pubkey</code>, <code>yandex-cloud-id</code>, <code>yandex-folder-id</code>, <code>yandex-zone</code>, <code>yandex-image-family</code>, <code>yandex-name</code>, <code>yandex-subnet-cidr</code>, <code>yandex-platform-id</code>, <code>yandex-cores</code>, <code>yandex-memory-gb</code>, <code>yandex-core-fraction</code>, <code>yandex-disk-size-gb</code></td></tr>
+            <tr><td>OCI</td><td><code>oci-config-file-profile</code>, <code>oci-subnet-id</code>, <code>oci-compartment-id</code>, <code>oci-availability-domain</code>, <code>oci-display-name</code>, <code>oci-shape</code>, <code>oci-ocpus</code>, <code>oci-memory-in-gbs</code>, <code>oci-boot-volume-size-in-gbs</code>, <code>oci-boot-volume-vpus-per-gb</code>, <code>oci-ssh-authorized-keys</code></td></tr>
+            <tr><td>Existing compute</td><td><code>no-infra-compute-ip</code>, <code>no-infra-compute-user</code>, <code>no-infra-compute-sudoer</code>, <code>no-infra-compute-uid</code></td></tr>
             <tr><td>Resend</td><td>None — the relay is hard-coded</td></tr>
-            <tr><td>Existing SMTP</td><td><code>:no-infra-smtp-server</code>, <code>:no-infra-smtp-port</code>, <code>:no-infra-smtp-username</code></td></tr>
-            <tr><td>S3 backend</td><td><code>:s3-bucket</code>, <code>:s3-region</code></td></tr>
-            <tr><td>R2 backend</td><td><code>:r2-bucket</code>, <code>:r2-endpoint</code></td></tr>
+            <tr><td>Existing SMTP</td><td><code>no-infra-smtp-server</code>, <code>no-infra-smtp-port</code>, <code>no-infra-smtp-username</code></td></tr>
+            <tr><td>S3 backend</td><td><code>s3-bucket</code>, <code>s3-region</code></td></tr>
+            <tr><td>R2 backend</td><td><code>r2-bucket</code>, <code>r2-endpoint</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -1237,7 +1257,7 @@ ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
 ├── scripts/parity.sh               # byte-parity gate
 ├── README.md
 └── index.html                      # this unified manual</code></pre>
-      <p>An initialized project needs the selected launcher and desired-state file plus a precise ignore rule for <code>.once/</code>. Multiple color files may coexist when migrating between implementations.</p>
+      <p>An initialized project needs the selected launcher and one <code>colors.yml</code> plus a precise ignore rule for <code>.colors/</code>. Because every colour reads that same file, migrating between implementations changes the command and nothing else.</p>
     </section>
 
     <section id="development">

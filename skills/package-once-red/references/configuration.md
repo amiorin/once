@@ -15,12 +15,12 @@ The project manifest pins both repositories to full 40-character commits:
 Resolve and substitute both placeholders before running `bun install`; never
 leave a branch name or unpinned dependency.
 
-`red.yml` is a YAML map. Provider settings are flat; applications are the only
+`colors.yml` is a YAML map. Provider settings are flat; applications are the only
 nested collection. Quote version-like YAML values such as `3.10`.
 
 ```yaml
 profile: production
-workdir: .once
+workdir: .colors
 deploy-pubkey: ssh-ed25519 AAAA... ci-deploy
 once:
   applications:
@@ -36,8 +36,8 @@ compute-prevent-destroy: true
 ```
 
 Application `env` maps the container variable name to a flat desired-state key.
-Do not add that key's value to YAML. Supply it as `RED_PAR_APP_DATABASE_URL` or
-`ONCE_PAR_APP_DATABASE_URL`.
+Do not add that key's value to YAML. Supply it as `COLORS_PAR_APP_DATABASE_URL` or
+`COLORS_PAR_APP_DATABASE_URL`.
 
 Provider choices and required fields match the unified repository manual:
 
@@ -46,7 +46,7 @@ Provider choices and required fields match the unified repository manual:
 - DNS: `cloudflare`, `no-infra`
 - backend: `local`, `s3`, `r2`
 
-Credentials use the selected color prefix or portable `ONCE_PAR_*` alias:
+Credentials use `COLORS_PAR_*`, the one namespace every colour shares:
 `DO_TOKEN`, `HCLOUD_TOKEN`, `YANDEX_TOKEN`, `RESEND_API_KEY`,
 `RESEND_PASSWORD`, `NO_INFRA_SMTP_PASSWORD`, `CLOUDFLARE_API_TOKEN`,
 `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`. OCI uses its configured profile;

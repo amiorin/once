@@ -3,13 +3,6 @@
    [clojure.test :refer [deftest is testing]]
    [io.github.bigconfig-ai.once.utils :as sut]))
 
-(deftest portable-parameters
-  (is (= {:port 587 :compute-prevent-destroy false}
-         (sut/read-pars {:port 1 :compute-prevent-destroy true}
-                        {"GREEN_PAR_PORT" "1"
-                         "ONCE_PAR_PORT" "587"
-                         "ONCE_PAR_COMPUTE_PREVENT_DESTROY" "false"}))))
-
 (deftest registrable-domain-test
   (testing "the zone is the last two labels"
     (is (= "example.com" (sut/registrable-domain "www.example.com")))

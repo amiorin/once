@@ -14,7 +14,7 @@ wheels = [
 [[package]]
 name = "blue"
 version = "0.1.0"
-source = { git = "https://github.com/amiorin/blue.git?rev=996d442059c64167c679be37d9931046193193c0#996d442059c64167c679be37d9931046193193c0" }
+source = { git = "https://github.com/amiorin/blue.git?rev=7dd17ac920060f622f9f98b503bbe36e35d730ec#7dd17ac920060f622f9f98b503bbe36e35d730ec" }
 dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
@@ -53,7 +53,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "blue", git = "https://github.com/amiorin/blue.git?rev=996d442059c64167c679be37d9931046193193c0" }]
+requires-dist = [{ name = "blue", git = "https://github.com/amiorin/blue.git?rev=7dd17ac920060f622f9f98b503bbe36e35d730ec" }]
 
 [package.metadata.requires-dev]
 dev = [

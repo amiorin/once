@@ -7,12 +7,11 @@
   but `running`, and a missing remote `once` command, marks the step failed."
   (:require
    [cheshire.core :as json]
-   [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [green.cli :as green-cli]
    [green.process :as process]
-   [io.github.bigconfig-ai.once.tools :as tools]
-   [io.github.bigconfig-ai.once.utils :as utils]))
+   [io.github.bigconfig-ai.once.tools :as tools]))
 
 ;;; -------------------------------------------------------------- command helpers
 
@@ -489,7 +488,7 @@
              :else {:green/exit 0}))))
 
 (defn describe-file
-  "Read a desired-state file, overlay `GREEN_PAR_*`, and describe the stack it
+  "Read a desired-state file, overlay `COLORS_PAR_*`, and describe the stack it
   names. Describing reads OpenTofu state and the host rather than changing
   either, so it runs outside the workflow and needs no validation gate."
   [path]
@@ -497,8 +496,9 @@
     (let [file (io/file path)]
       (if-not (.exists file)
         {:green/exit 2 :green/err (str "desired state file not found: " file)}
-        (-> (edn/read-string (slurp file))
-            utils/read-pars
+        (-> (green-cli/read-state file (slurp file))
+            (assoc :green/state-file (.getAbsolutePath file))
+            green-cli/read-pars
             describe)))
     (catch Throwable t
       {:green/exit 2 :green/err (or (ex-message t) (str (class t)))})))

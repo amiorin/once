@@ -72,13 +72,13 @@ def state_errors(opts: dict) -> list[str]:
             errors.append(f"once applications[{index}] requires image")
         env = app.get("env")
         if env is not None and not isinstance(env, (dict, list)):
-            errors.append(f"once applications[{index}] env must map container variable names to blue.yml keys")
+            errors.append(f"once applications[{index}] env must map container variable names to colors.yml keys")
         if isinstance(env, dict):
             for name, key in env.items():
                 if not _env_re.fullmatch(str(name)):
                     errors.append(f"once applications[{index}] has an invalid container variable name {name}")
                 if placeholder(key):
-                    errors.append(f"once applications[{index}] env {name} needs a blue.yml key")
+                    errors.append(f"once applications[{index}] env {name} needs a colors.yml key")
     if not isinstance(opts.get("compute-prevent-destroy"), bool):
         errors.append("compute-prevent-destroy must be true or false")
     if not str(opts.get("deploy-pubkey") or "").startswith("ssh-"):

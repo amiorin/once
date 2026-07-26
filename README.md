@@ -4,15 +4,17 @@ A monorepo containing three byte-compatible implementations of the production
 single-server [Basecamp ONCE](https://github.com/basecamp/once) deployment
 workflow:
 
-| Package | Runtime | Desired state | Skill |
+| Package | Runtime | YAML reader | Skill |
 |---|---|---|---|
-| [Green](green/) | Clojure / Babashka | `green.edn` | `package-once-green` |
-| [Red](red/) | TypeScript / Bun | `red.yml` | `package-once-red` |
-| [Blue](blue/) | Python / uv | `blue.yml` | `package-once-blue` |
+| [Green](green/) | Clojure / Babashka | yamlstar | `package-once-green` |
+| [Red](red/) | TypeScript / Bun | `Bun.YAML` | `package-once-red` |
+| [Blue](blue/) | Python / uv | PyYAML | `package-once-blue` |
 
-All three render the same OpenTofu and Ansible files and can operate the same
-`.once/<profile>/` work directory and remote state. Switch implementations only
-between completed commands; never run two against the same state concurrently.
+All three read one `colors.yml`, render the same OpenTofu and Ansible files,
+and operate the same `.colors/<profile>/` work directory and remote state.
+Switching colours needs no change to desired state — only a different command.
+Switch between completed commands; never run two against the same state
+concurrently.
 
 ## Skills
 
@@ -43,11 +45,34 @@ local, S3, or R2 state.
 
 ## Secrets
 
-Desired-state files contain non-secret values only. Each implementation accepts
-its native prefix (`GREEN_PAR_*`, `RED_PAR_*`, or `BLUE_PAR_*`) and the portable
-`ONCE_PAR_*` alias. Generated Ansible expressions are byte-identical and check
-the portable and all native forms at play time. OCI, S3, and SSH continue to use
-their native ambient credential mechanisms.
+`colors.yml` contains non-secret values only. Credentials travel in one
+namespace, `COLORS_PAR_*`, which every colour reads — there is no per-colour
+prefix. Generated Ansible expressions are byte-identical and resolve that one
+name at play time. OCI, S3, and SSH continue to use their native ambient
+credential mechanisms.
+
+## Upgrading an existing project
+
+This release renames the desired-state file, the work directory, and the
+credential namespace. None of it migrates automatically.
+
+**Move the work directory before running anything.** On the `local` backend —
+the default when `provider-backend` is unset — OpenTofu state lives inside it,
+so a command run against the new name finds no state and a `create` will build
+a second server alongside the one you already have. `s3` and `r2` projects keep
+state remotely and are unaffected.
+
+```sh
+mv .once .colors                     # do this first
+```
+
+Then rename desired state to `colors.yml` (Green projects also convert EDN to
+YAML), set `workdir: .colors` inside it, rename every credential variable to
+`COLORS_PAR_*`, and re-install the skill so the launcher is replaced. The old
+`GREEN_PAR_*`, `RED_PAR_*`, `BLUE_PAR_*`, and `ONCE_PAR_*` names are no longer
+read; a stale one is ignored and the run stops with `required credential is not
+set`. An outdated launcher refuses to run rather than rendering from a stale
+contract.
 
 ## Development
 
@@ -58,8 +83,10 @@ cd blue && uv run python -m pytest -q
 ./scripts/parity.sh
 ```
 
-`parity.sh` builds a provider matrix through all three packages, compares every
-complete generated tree byte-for-byte, and verifies that packaged resource
-copies match Green's reference resources.
+`parity.sh` builds a provider matrix through all three packages from one
+`test/parity/colors.yml`, compares every complete generated tree byte-for-byte,
+verifies that packaged resource copies match Green's reference resources, and
+checks that the three YAML readers type every scalar in
+`test/parity/scalars.yml` identically.
 
-Generated `.once/` directories are artifacts and must not be edited as source.
+Generated `.colors/` directories are artifacts and must not be edited as source.

@@ -7,7 +7,7 @@ TypeScript/Bun implementation of the production ONCE package. Read the root
 bun install
 bun test
 bun run typecheck
-./red build -f red.yml
+./red build
 ```
 
 Source is under `src/`, packaged templates under `resources/`, tests under
@@ -20,6 +20,10 @@ Red's immutable workflow values, return new opts objects, and keep engine keys
 under `red/*`. All subprocesses use Red's runtime seam. Never mutate process
 environment around parallel branches; pass per-command environments.
 
-Never edit `.once/`. Secrets use `RED_PAR_*` or `ONCE_PAR_*`, remain out of
-state files and rendered content, and are tested only by presence. Do not put
-production logic into the copied launcher.
+Never edit `.colors/`. Secrets use `COLORS_PAR_*` — the one namespace every
+colour shares — remain out of `colors.yml` and rendered content, and are tested
+only by presence. Do not put production logic into the copied launcher.
+
+Red reads YAML with `Bun.YAML`, which follows the 1.2 core schema. Keep it that
+way: green and blue use different parsers, and `./scripts/parity.sh` asserts
+all three type every scalar identically.

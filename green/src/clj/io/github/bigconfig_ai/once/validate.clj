@@ -17,7 +17,7 @@
 
   `:required` are non-secret keys desired state must supply, because a
   template interpolates them. `:secrets` are keys that must arrive through
-  `GREEN_PAR_*` instead, and are never read from the file. `:tofu-env` is the
+  `COLORS_PAR_*` instead, and are never read from the file. `:tofu-env` is the
   subset of `:secrets` OpenTofu itself reads, mapped to the variable each
   provider looks for natively — passing them through the environment keeps
   them out of the rendered .tf files, which sit in the work directory in
@@ -124,7 +124,7 @@
       (when (placeholder? image)
         [(format ":once :applications[%d] requires :image" idx)])
       (when-not (or (nil? env) (map? env) (sequential? env))
-        [(format ":once :applications[%d] :env must map container variable names to green.edn keys"
+        [(format ":once :applications[%d] :env must map container variable names to colors.yml keys"
                  idx)])
       (when (map? env)
         (mapcat (fn [[var-name k]]
@@ -133,7 +133,7 @@
                      [(format ":once :applications[%d] has an invalid container variable name %s"
                               idx var-name)])
                    (when (placeholder? k)
-                     [(format ":once :applications[%d] :env %s needs a green.edn key"
+                     [(format ":once :applications[%d] :env %s needs a colors.yml key"
                               idx var-name)])))
                 env))))
    (map-indexed vector applications)))
@@ -176,7 +176,7 @@
         [":compute-pubkey must be an SSH public key"])))))
 
 (defn secret-errors
-  "Credentials the selected providers need that no `GREEN_PAR_*` variable
+  "Credentials the selected providers need that no `COLORS_PAR_*` variable
   supplied. Application `:env` keys join the list only on create, since
   deleting does not need to reach the applications."
   [opts]

@@ -2,17 +2,30 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from pathlib import Path
 
 from blue.cli import run_cli
 
 from .describe import describe_file
 from .workflow import once_workflow
 
-USAGE = "Usage: blue <build|create|delete|describe> [-f|--file blue.yml] [--dry-run]"
+USAGE = "Usage: blue <build|create|delete|describe> [-f|--file colors.yml] [--dry-run]"
+
+
+def _find_up(name: str, start: Path | None = None) -> str:
+    """Walking up means a colour can be run from any subdirectory of a project
+    and still find the one desired state every colour shares."""
+    directory = (start or Path.cwd()).resolve()
+    for candidate in [directory, *directory.parents]:
+        if (candidate / name).exists():
+            return str(candidate / name)
+    return name
 
 
 def default_args(args: list[str]) -> list[str]:
-    return args if any(arg in ("-f", "--file") or arg.startswith("--file=") for arg in args) else [*args, "-f", "blue.yml"]
+    if any(arg in ("-f", "--file") or arg.startswith("--file=") for arg in args):
+        return args
+    return [*args, "-f", _find_up("colors.yml")]
 
 
 def _file(args: list[str]) -> str:
@@ -20,8 +33,8 @@ def _file(args: list[str]) -> str:
         if arg.startswith("--file="):
             return arg.split("=", 1)[1]
         if arg in ("-f", "--file"):
-            return args[index + 1] if index + 1 < len(args) else "blue.yml"
-    return "blue.yml"
+            return args[index + 1] if index + 1 < len(args) else _find_up("colors.yml")
+    return _find_up("colors.yml")
 
 
 async def run(*input: str) -> dict:

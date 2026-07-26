@@ -8,7 +8,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-blue = { git = "https://github.com/amiorin/blue.git", rev = "996d442059c64167c679be37d9931046193193c0" }
+blue = { git = "https://github.com/amiorin/blue.git", rev = "7dd17ac920060f622f9f98b503bbe36e35d730ec" }
 
 [dependency-groups]
 dev = [

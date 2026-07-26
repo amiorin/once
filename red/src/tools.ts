@@ -1,3 +1,4 @@
+import { dirname, isAbsolute, join } from "node:path";
 import { ansibleStep, ansibleWithSpec } from "red/ansible";
 import { scaffold, type RenderOpts, type Spec, type Template } from "red/scaffold";
 import * as tofu from "red/tofu";
@@ -47,8 +48,16 @@ const smtpPostTemplates: Record<string, Template> = {
   "no-infra": { name: "tools/tofu-smtp-post/no-infra/main.tf", content: smtpPostNoInfra },
 };
 
+// A relative workdir is resolved against the directory holding colors.yml, not
+// the current one, so every colour shares one work directory however deep in
+// the project it was invoked from.
 export function toolDir(opts: Opts, tool: string): string {
-  return `${opts.workdir ?? ".once"}/${opts.profile ?? "default"}/${tool}`;
+  const workdir = String(opts.workdir ?? ".colors");
+  const stateFile = opts["red/state-file"];
+  const root = !isAbsolute(workdir) && typeof stateFile === "string"
+    ? join(dirname(stateFile), workdir)
+    : workdir;
+  return `${root}/${opts.profile ?? "default"}/${tool}`;
 }
 
 function templateSpec(template: Template, target: string, data: Record<string, unknown>): Spec {
@@ -258,7 +267,7 @@ function yamlLines(value: any, indent = 0): string[] {
 function yaml(value: any): string { return `${yamlLines(value).join("\n")}\n`; }
 function parLookup(key: string): string {
   const suffix = key.toUpperCase().replaceAll("-", "_");
-  return `{{ lookup('env','ONCE_PAR_${suffix}') or lookup('env','GREEN_PAR_${suffix}') or lookup('env','RED_PAR_${suffix}') or lookup('env','BLUE_PAR_${suffix}') }}`;
+  return `{{ lookup('env','COLORS_PAR_${suffix}') }}`;
 }
 
 function resolveEnv(env: any): any {

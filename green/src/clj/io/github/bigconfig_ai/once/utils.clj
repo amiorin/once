@@ -1,8 +1,7 @@
 (ns io.github.bigconfig-ai.once.utils
   "The compatibility contract, and the DNS zone derivation every stage shares."
   (:require
-   [clojure.string :as str]
-   [green.cli :as green-cli]))
+   [clojure.string :as str]))
 
 (def contract
   "Compatibility number for the launcher that consumes these namespaces and the
@@ -22,23 +21,13 @@
      launcher subcommand.
   6: the Clojure package moves under the monorepo's green/ dependency root;
      launchers must resolve that root. Portable ONCE_PAR_* aliases and the
-     shared byte-compatible Ansible lookup are also introduced."
-  6)
-
-(defn read-pars
-  "Overlay Green's native parameters, then the portable ONCE_PAR_* aliases.
-  Portable values win when both forms are present."
-  ([opts] (read-pars opts (System/getenv)))
-  ([opts env]
-   (let [portable (into {}
-                        (keep (fn [[k v]]
-                                (let [k (str k)]
-                                  (when (str/starts-with? k "ONCE_PAR_")
-                                    [(str "GREEN_PAR_" (subs k (count "ONCE_PAR_"))) v]))))
-                        env)]
-     (-> opts
-         (green-cli/read-pars env)
-         (green-cli/read-pars portable)))))
+     shared byte-compatible Ansible lookup are also introduced.
+  7: one parameter namespace, COLORS_PAR_*, replaces the portable alias and
+     every colour-native prefix; desired state is a single colors.yml found by
+     walking up from the working directory; the shared work directory is
+     .colors. A launcher pinned older reads a file that is no longer there and
+     resolves credentials under names nothing sets."
+  7)
 
 (defn registrable-domain
   "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes

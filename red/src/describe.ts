@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { runtime, type ExecResult } from "red/runtime";
 import type { Opts } from "red/workflow";
+import { readPars } from "red/cli";
 import { backendCredentialEnv, toolDir } from "./tools.ts";
-import { readOncePars } from "./utils.ts";
 
 const runTimeoutMs = 30_000;
 const sshProbeTimeoutMs = 10_000;
@@ -201,7 +202,10 @@ export async function describe(opts: Opts): Promise<Opts> {
 export async function describeFile(path: string): Promise<Opts> {
   try {
     if (!existsSync(path)) return { "red/exit": 2, "red/err": `desired state file not found: ${path}` };
-    return describe(readOncePars((Bun.YAML.parse(readFileSync(path, "utf8")) ?? {}) as Opts));
+    return describe(readPars({
+      ...((Bun.YAML.parse(readFileSync(path, "utf8")) ?? {}) as Opts),
+      "red/state-file": resolve(path),
+    }));
   } catch (error) {
     return { "red/exit": 2, "red/err": error instanceof Error ? error.message : String(error) };
   }

@@ -8,8 +8,9 @@ from typing import Any, Awaitable, Callable
 from blue.cli import load_yaml
 from blue.runtime import ExecResult, runtime
 
+from blue.cli import read_pars
+
 from .tools import backend_credential_env, tool_dir
-from .utils import read_once_pars
 
 Runner = Callable[..., Awaitable[ExecResult]]
 _PLACEHOLDER_IP = "192.168.0.1"
@@ -193,6 +194,9 @@ async def describe_file(path: str) -> dict:
         file = Path(path)
         if not file.exists():
             return {"blue/exit": 2, "blue/err": f"desired state file not found: {path}"}
-        return await describe(read_once_pars(load_yaml(file.read_text())))
+        return await describe(read_pars({
+            **load_yaml(file.read_text()),
+            "blue/state-file": str(file.resolve()),
+        }))
     except Exception as error:
         return {"blue/exit": 2, "blue/err": str(error) or type(error).__name__}

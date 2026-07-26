@@ -1,5 +1,8 @@
+# One desired state, read by green, red and blue alike. The parity script
+# builds it through all three and compares the generated trees byte for byte,
+# so any drift between the colours shows up here first.
 profile: parity
-workdir: .once
+workdir: .colors
 deploy-pubkey: ssh-ed25519 AAAAEXAMPLE ci-deploy
 once:
   applications:

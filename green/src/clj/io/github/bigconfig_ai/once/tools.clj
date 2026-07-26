@@ -20,11 +20,17 @@
                               :filter-close \}})
 
 (defn tool-dir
-  "Return the isolated working directory for `tool` in the active profile."
+  "Return the isolated working directory for `tool` in the active profile.
+
+  A relative workdir is resolved against the directory holding colors.yml, not
+  the current one, so every colour shares one work directory however deep in
+  the project it was invoked from."
   [opts tool]
-  (str (io/file (or (:workdir opts) ".once")
-                (or (:profile opts) "default")
-                tool)))
+  (let [workdir (io/file (or (:workdir opts) ".colors"))
+        state-dir (when-not (.isAbsolute workdir)
+                    (some-> (:green/state-file opts) io/file .getAbsoluteFile .getParent))
+        root (if state-dir (io/file state-dir workdir) workdir)]
+    (str (io/file root (or (:profile opts) "default") tool))))
 
 (defn- tool-template
   [tool provider file]
@@ -109,7 +115,7 @@
 
 (def ^:private resend-smtp
   "Resend's relay is the same for every account, so it is not desired state.
-  Only the password is, and it arrives as GREEN_PAR_RESEND_PASSWORD."
+  Only the password is, and it arrives as COLORS_PAR_RESEND_PASSWORD."
   {:smtp_server "smtp.resend.com"
    :smtp_port 587
    :smtp_username "resend"})
@@ -284,21 +290,17 @@
     (json/generate-string result {:pretty true})))
 
 (defn- par-lookup
-  "Jinja expression resolving a secret under the shared ONCE prefix or any
-  color-native prefix. The expression is identical in all three packages, so
-  their rendered artifacts remain byte-compatible."
+  "Jinja expression resolving a secret under the one parameter namespace every
+  colour shares. The expression is identical in all three packages, so their
+  rendered artifacts remain byte-compatible."
   [k]
   (let [suffix (-> (name k) (str/replace "-" "_") str/upper-case)]
-    (format (str "{{ lookup('env','ONCE_PAR_%s') or "
-                 "lookup('env','GREEN_PAR_%s') or "
-                 "lookup('env','RED_PAR_%s') or "
-                 "lookup('env','BLUE_PAR_%s') }}")
-            suffix suffix suffix suffix)))
+    (format "{{ lookup('env','COLORS_PAR_%s') }}" suffix)))
 
 (defn- resolve-env
   "Resolve an application `:env` map of container variable name -> flat opts key
   into the [\"KEY=VALUE\"] list the once module expects. Each value defers to
-  the key's `GREEN_PAR_*` variable, looked up when Ansible runs, so application
+  the key's `COLORS_PAR_*` variable, looked up when Ansible runs, so application
   secrets reach the host without being written into the rendered file. An unset
   variable still resolves to an empty value rather than the string \"null\".
   A list is passed through untouched."

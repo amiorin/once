@@ -1,20 +1,6 @@
 from __future__ import annotations
 
-import os
-
-from blue.cli import read_pars
-
-CONTRACT = 1
-
-
-def read_once_pars(opts: dict, env: dict[str, str] | None = None) -> dict:
-    values = dict(os.environ if env is None else env)
-    portable = {
-        "BLUE_PAR_" + name.removeprefix("ONCE_PAR_"): value
-        for name, value in values.items()
-        if name.startswith("ONCE_PAR_")
-    }
-    return read_pars(read_pars(opts, values), portable)
+CONTRACT = 2
 
 
 def registrable_domain(host: object) -> str | None:

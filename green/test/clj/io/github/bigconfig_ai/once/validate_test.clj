@@ -82,7 +82,7 @@
                                           {"not-valid" :some-key})))))
 
   (testing "the value side must name a key"
-    (is (some #(str/includes? % "needs a green.edn key")
+    (is (some #(str/includes? % "needs a colors.yml key")
               (sut/state-errors (assoc-in valid [:once :applications 0 :env]
                                           {"OK" nil})))))
 
@@ -112,9 +112,9 @@
     (let [errors (sut/secret-errors (assoc valid
                                            :provider-compute "digitalocean"
                                            :provider-dns "cloudflare"))]
-      (is (= #{"required credential is not set: GREEN_PAR_DO_TOKEN"
-               "required credential is not set: GREEN_PAR_CLOUDFLARE_API_TOKEN"
-               "required credential is not set: GREEN_PAR_NO_INFRA_SMTP_PASSWORD"}
+      (is (= #{"required credential is not set: COLORS_PAR_DO_TOKEN"
+               "required credential is not set: COLORS_PAR_CLOUDFLARE_API_TOKEN"
+               "required credential is not set: COLORS_PAR_NO_INFRA_SMTP_PASSWORD"}
              (set errors)))))
 
   (testing "a supplied credential is not reported"
@@ -124,7 +124,7 @@
                                           :resend-password "pw")))))
 
   (testing "Yandex requires its API token"
-    (is (= ["required credential is not set: GREEN_PAR_YANDEX_TOKEN"]
+    (is (= ["required credential is not set: COLORS_PAR_YANDEX_TOKEN"]
            (sut/secret-errors (assoc valid
                                      :provider-compute "yandex"
                                      :no-infra-smtp-password "pw")))))
@@ -135,8 +135,8 @@
                                           :no-infra-smtp-password "pw")))))
 
   (testing "r2 needs both halves of the AWS pair"
-    (is (= #{"required credential is not set: GREEN_PAR_R2_ACCESS_KEY_ID"
-             "required credential is not set: GREEN_PAR_R2_SECRET_ACCESS_KEY"}
+    (is (= #{"required credential is not set: COLORS_PAR_R2_ACCESS_KEY_ID"
+             "required credential is not set: COLORS_PAR_R2_SECRET_ACCESS_KEY"}
            (set (sut/secret-errors (assoc valid
                                           :provider-backend "r2"
                                           :no-infra-smtp-password "pw")))))))
@@ -146,7 +146,7 @@
                  (assoc :no-infra-smtp-password "pw")
                  (assoc-in [:once :applications 0 :env] {"DATABASE_URL" :app-database-url}))]
     (testing "create needs the value the application will run with"
-      (is (= ["required credential is not set: GREEN_PAR_APP_DATABASE_URL"]
+      (is (= ["required credential is not set: COLORS_PAR_APP_DATABASE_URL"]
              (sut/secret-errors (assoc opts :green/event :create)))))
     (testing "delete does not — it never reaches the application"
       (is (empty? (sut/secret-errors (assoc opts :green/event :delete)))))))

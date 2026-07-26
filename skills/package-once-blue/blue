@@ -5,7 +5,7 @@
 #
 # [tool.uv.sources]
 # package-once-blue = { git = "https://github.com/bigconfig-ai/once.git", rev = "4def1ad9c6f338846b0d8a24ae32661675315b56", subdirectory = "blue" }
-# blue = { git = "https://github.com/amiorin/blue.git", rev = "996d442059c64167c679be37d9931046193193c0" }
+# blue = { git = "https://github.com/amiorin/blue.git", rev = "7dd17ac920060f622f9f98b503bbe36e35d730ec" }
 # ///
 """Thin launcher for package-once-blue."""
 from package_once_blue import exec, run

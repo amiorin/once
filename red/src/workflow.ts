@@ -3,8 +3,8 @@ import * as dryRun from "red/dry-run";
 import * as progress from "red/progress";
 import * as tofu from "red/tofu";
 import { adviceAdd, workflow, type Opts, type StepFn } from "red/workflow";
+import { readPars } from "red/cli";
 import * as tools from "./tools.ts";
-import { readOncePars } from "./utils.ts";
 import { secretErrors, stateErrors } from "./validate.ts";
 
 async function stateOutput(opts: Opts, tool: string): Promise<Record<string, unknown> | undefined> {
@@ -30,7 +30,7 @@ export async function startStep(
   original: Opts,
   env: Record<string, string | undefined> = process.env,
 ): Promise<Opts> {
-  const opts = readOncePars({ "compute-prevent-destroy": true, ...original }, env);
+  const opts = readPars({ "compute-prevent-destroy": true, ...original }, env);
   const event = opts["red/event"];
   const real = !opts["red/dry-run"];
   const lifecycle = event === "create" || event === "delete";

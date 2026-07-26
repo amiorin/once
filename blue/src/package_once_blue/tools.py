@@ -27,7 +27,13 @@ _SMTP_POST = {name: _template(f"tools/tofu-smtp-post/{name}/main.tf") for name i
 
 
 def tool_dir(opts: dict, tool: str) -> str:
-    return str(Path(str(opts.get("workdir") or ".once")) / str(opts.get("profile") or "default") / tool)
+    """A relative workdir is resolved against the directory holding colors.yml,
+    not the current one, so every colour shares one work directory however deep
+    in the project it was invoked from."""
+    workdir = Path(str(opts.get("workdir") or ".colors"))
+    state_file = opts.get("blue/state-file")
+    root = Path(state_file).parent / workdir if not workdir.is_absolute() and state_file else workdir
+    return str(root / str(opts.get("profile") or "default") / tool)
 
 
 def _spec(template: dict, target: str, data: dict) -> dict:
@@ -219,7 +225,7 @@ def _yaml(value: Any) -> str:
 
 def _par_lookup(key: str) -> str:
     suffix = key.upper().replace("-", "_")
-    return "{{ lookup('env','ONCE_PAR_" + suffix + "') or lookup('env','GREEN_PAR_" + suffix + "') or lookup('env','RED_PAR_" + suffix + "') or lookup('env','BLUE_PAR_" + suffix + "') }}"
+    return "{{ lookup('env','COLORS_PAR_" + suffix + "') }}"
 
 
 def _resolve_env(env: Any) -> Any:

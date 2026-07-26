@@ -1,0 +1,39 @@
+# Scalars the three colours must agree on.
+#
+# Green reads YAML through yamlstar, red through Bun.YAML, blue through PyYAML
+# with the 1.1 boolean resolver replaced. Three parsers, one contract: the same
+# colors.yml has to mean the same desired state in every colour. YAML 1.1 —
+# which PyYAML and SnakeYAML speak by default — disagrees with the 1.2 core
+# schema on most of the lines below, so this is where that would surface.
+bare-no: no
+bare-yes: yes
+bare-on: on
+bare-off: off
+bare-y: y
+bare-n: n
+bare-true: true
+bare-false: false
+upper-true: True
+shout-false: FALSE
+quoted-no: "no"
+quoted-true: "true"
+zero-prefixed: 012
+plain-int: 587
+negative-int: -1
+zero: 0
+# Two forms are deliberately quoted because the three parsers cannot be made
+# to agree on them, and quoting is the fix rather than something to assert:
+#   0x1f  yamlstar reads a string where Bun.YAML and PyYAML read 31
+#   1.0   JavaScript has one number type, so red cannot tell it from an integer
+# Nothing in a colors.yml needs either form unquoted.
+hex-like: "0x1f"
+whole-float: "1.0"
+real-float: 1.5
+sexagesimal-like: 1:30
+tilde-null: ~
+word-null: null
+empty-value:
+version-like: 1.2.3
+dotted: ubuntu-24.04
+cidr: 10.0.0.0/24
+url: https://example.com/x

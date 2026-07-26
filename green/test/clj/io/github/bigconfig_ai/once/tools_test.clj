@@ -81,7 +81,7 @@
       (is (not (str/includes? yaml "re_a_real_secret")))
       (is (str/includes?
            yaml
-           "lookup('env','GREEN_PAR_RESEND_PASSWORD')"))
+           "lookup('env','COLORS_PAR_RESEND_PASSWORD')"))
       (testing "the non-secret fields still render as values"
         (is (str/includes? yaml "smtp_username: \"user\""))
         (is (str/includes? yaml "smtp_from: \"Info <info@notifications.example.com>\"")))))
@@ -100,7 +100,7 @@
       (is (not (str/includes? yaml "another_secret")))
       (is (str/includes?
            yaml
-           "lookup('env','GREEN_PAR_NO_INFRA_SMTP_PASSWORD')"))))
+           "lookup('env','COLORS_PAR_NO_INFRA_SMTP_PASSWORD')"))))
 
   (testing "an unset password stays absent, so the deploy flag is omitted"
     (let [yaml (tools/ansible-once (once-opts "resend" nil))]
@@ -111,7 +111,7 @@
                  (assoc-in [:once :applications 0 :env]
                            {"DATABASE_URL" :app-database-url
                             "SECRET_KEY_BASE" :app-secret-key-base})
-                 ;; the launcher has already overlaid the GREEN_PAR_* values
+                 ;; the launcher has already overlaid the COLORS_PAR_* values
                  (assoc :app-database-url "postgres://user:hunter2@db/app"
                         :app-secret-key-base "s3cret-key-base"))
         yaml (tools/ansible-once opts)]
@@ -119,10 +119,10 @@
     (is (not (str/includes? yaml "s3cret-key-base")))
     (is (str/includes?
          yaml
-         "lookup('env','GREEN_PAR_APP_DATABASE_URL')"))
+         "lookup('env','COLORS_PAR_APP_DATABASE_URL')"))
     (is (str/includes?
          yaml
-         "lookup('env','GREEN_PAR_APP_SECRET_KEY_BASE')"))
+         "lookup('env','COLORS_PAR_APP_SECRET_KEY_BASE')"))
 
     (testing "an :env list is passed through as written"
       (let [yaml (tools/ansible-once

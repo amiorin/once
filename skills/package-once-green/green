@@ -1,9 +1,10 @@
 #!/usr/bin/env bb
 ;; Green launcher for a production, single-server ONCE stack.
 ;;
-;; Desired state lives in green.edn. Secrets and tokens are never written
-;; there: every credential key is supplied at runtime through a GREEN_PAR_*
-;; environment variable, which is overlaid onto the matching flat key.
+;; Desired state lives in colors.yml, found by walking up from the working
+;; directory. Secrets and tokens are never written there: every credential key
+;; is supplied at runtime through a COLORS_PAR_* environment variable, which is
+;; overlaid onto the matching flat key.
 ;;
 ;; This file is both the skill payload and the repository entry point —
 ;; ./green in the project root is a symlink to it. It deliberately holds no
@@ -34,7 +35,7 @@
   "Minimum io.github.bigconfig-ai/once contract this launcher requires.
   Guarded at run time so a stale pin fails loudly instead of rendering
   templates from an older commit."
-  6)
+  7)
 
 ;; Managed by `bb pin` — do not edit by hand.
 (def ^:private once-sha "4def1ad9c6f338846b0d8a24ae32661675315b56")
@@ -89,16 +90,27 @@
 ;; ---------------------------------------------------------------------------
 ;; Desired-state file resolution
 
+(defn- find-up
+  "The nearest `name` at or above `dir`, or nil at the filesystem root."
+  [name dir]
+  (loop [dir (.getAbsoluteFile (io/file dir))]
+    (when dir
+      (let [candidate (io/file dir name)]
+        (if (.exists candidate)
+          (str candidate)
+          (recur (.getParentFile dir)))))))
+
 (defn- default-file
-  "green.edn beside the invocation, falling back to one beside this launcher.
-  The skill copies this file next to a project's green.edn; the repository
-  symlinks it from the root, where the canonical path is a directory deeper."
+  "The nearest colors.yml at or above the working directory, falling back to
+  one beside this launcher. Walking up means a colour can be run from any
+  subdirectory of a project and still find the one desired state; the skill
+  copies this file next to a project's colors.yml, and the repository keeps it
+  under skills/, a directory deeper."
   []
-  (let [beside-script (io/file script-dir "green.edn")]
-    (cond
-      (.exists (io/file "green.edn")) "green.edn"
-      (.exists beside-script) (str beside-script)
-      :else "green.edn")))
+  (or (find-up "colors.yml" ".")
+      (let [beside-script (io/file script-dir "colors.yml")]
+        (when (.exists beside-script) (str beside-script)))
+      "colors.yml"))
 
 (defn- file-arg?
   [arg]
@@ -122,7 +134,7 @@
 ;; CLI
 
 (def usage
-  "Usage: green <build|create|delete|describe> [-f|--file green.edn] [--dry-run]")
+  "Usage: green <build|create|delete|describe> [-f|--file colors.yml] [--dry-run]")
 
 (defn run
   "REPL-friendly entry point that returns the final opts map."

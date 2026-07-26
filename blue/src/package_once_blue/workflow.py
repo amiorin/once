@@ -6,8 +6,9 @@ from blue import dry_run, progress, tofu
 from blue.cli import par_name
 from blue.workflow import advice_add, workflow
 
+from blue.cli import read_pars
+
 from . import tools
-from .utils import read_once_pars
 from .validate import secret_errors, state_errors
 
 
@@ -25,7 +26,7 @@ async def _adopt_existing_state(opts: dict) -> dict:
 
 
 async def start_step(original: dict, env: dict[str, str] | None = None) -> dict:
-    opts = read_once_pars({"compute-prevent-destroy": True, **original}, os.environ if env is None else env)
+    opts = read_pars({"compute-prevent-destroy": True, **original}, os.environ if env is None else env)
     event, real = opts.get("blue/event"), not opts.get("blue/dry-run")
     lifecycle = event in ("create", "delete")
     errors = [*state_errors(opts), *(secret_errors(opts) if real and lifecycle else [])]
