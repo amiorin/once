@@ -36,7 +36,11 @@
   (testing "each compute provider asks only for its own keys"
     (let [errors (sut/state-errors (assoc valid :provider-compute "digitalocean"))]
       (is (some #(str/includes? % ":digitalocean-region") errors))
-      (is (not-any? #(str/includes? % ":hcloud-") errors))))
+      (is (not-any? #(str/includes? % ":hcloud-") errors)))
+    (let [errors (sut/state-errors (assoc valid :provider-compute "yandex"))]
+      (is (some #(str/includes? % ":yandex-cloud-id") errors))
+      (is (some #(str/includes? % ":compute-pubkey") errors))
+      (is (not-any? #(str/includes? % ":oci-") errors))))
 
   (testing "resend needs no non-secret keys — its relay is hard-coded"
     (is (= [] (sut/state-errors (assoc valid :provider-smtp "resend"))))))
@@ -93,7 +97,7 @@
 (deftest ssh-keys-are-checked-for-shape
   (is (some #(str/includes? % ":deploy-pubkey must be an SSH public key")
             (sut/state-errors (assoc valid :deploy-pubkey "hunter2"))))
-  (testing ":compute-pubkey is optional, but a present value must look right"
+  (testing ":compute-pubkey is optional outside Yandex, but a present value must look right"
     (is (= [] (sut/state-errors (assoc valid :compute-pubkey "ssh-rsa AAAA x"))))
     (is (= [] (sut/state-errors (assoc valid :compute-pubkey "REPLACE_ME"))))
     (is (some #(str/includes? % ":compute-pubkey must be an SSH public key")
@@ -118,6 +122,12 @@
                                           :provider-smtp "resend"
                                           :resend-api-key "re_x"
                                           :resend-password "pw")))))
+
+  (testing "Yandex requires its API token"
+    (is (= ["required credential is not set: GREEN_PAR_YANDEX_TOKEN"]
+           (sut/secret-errors (assoc valid
+                                     :provider-compute "yandex"
+                                     :no-infra-smtp-password "pw")))))
 
   (testing "oci and the local backend need no credential of their own"
     (is (empty? (sut/secret-errors (assoc valid
@@ -151,6 +161,8 @@
   (testing "the selected provider decides what tofu sees"
     (is (= {:do-token "DIGITALOCEAN_TOKEN"}
            (sut/tofu-env {:provider-compute "digitalocean"} :provider-compute)))
+    (is (= {:yandex-token "YC_TOKEN"}
+           (sut/tofu-env {:provider-compute "yandex"} :provider-compute)))
     (is (= {} (sut/tofu-env {:provider-compute "no-infra"} :provider-compute))))
 
   (testing "the resend password is a secret tofu never receives"

@@ -33,6 +33,13 @@
                          :hcloud-location :hcloud-ssh-keys]
               :secrets [:hcloud-token]
               :tofu-env {:hcloud-token "HCLOUD_TOKEN"}}
+    "yandex" {:required [:yandex-cloud-id :yandex-folder-id :yandex-zone
+                         :yandex-image-family :yandex-name :yandex-subnet-cidr
+                         :yandex-platform-id :yandex-cores :yandex-memory-gb
+                         :yandex-core-fraction :yandex-disk-size-gb
+                         :compute-pubkey]
+              :secrets [:yandex-token]
+              :tofu-env {:yandex-token "YC_TOKEN"}}
     ;; OCI authenticates from ~/.oci/config, selected by :oci-config-file-profile,
     ;; so it needs no credential of its own here.
     "oci" {:required [:oci-config-file-profile :oci-subnet-id :oci-compartment-id
@@ -161,9 +168,8 @@
         [":compute-prevent-destroy must be true or false"])
       (when-not (str/starts-with? (str (:deploy-pubkey opts)) "ssh-")
         [":deploy-pubkey must be an SSH public key"])
-      ;; :compute-pubkey is not consumed by any template — providers reference
-      ;; keys already registered with them — so it is optional, but a value
-      ;; that is present must still look like a public key.
+      ;; Yandex requires :compute-pubkey; for other providers it is optional.
+      ;; Either way, a value that is present must look like a public key.
       (when-not (or (nil? (:compute-pubkey opts))
                     (placeholder? (:compute-pubkey opts))
                     (str/starts-with? (str (:compute-pubkey opts)) "ssh-"))

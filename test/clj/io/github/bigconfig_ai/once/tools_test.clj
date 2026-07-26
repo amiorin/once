@@ -37,6 +37,44 @@
    :once {:applications [{:host "www.example.com"
                           :image "ghcr.io/example/site:latest"}]}})
 
+(deftest yandex-compute-renders-without-its-api-token
+  (let [workdir (temp-dir)
+        opts {:workdir workdir
+              :profile "test"
+              :green/event :build
+              :provider-compute "yandex"
+              :provider-backend "local"
+              :compute-prevent-destroy true
+              :compute-pubkey "ssh-ed25519 AAAATEST operator"
+              :yandex-cloud-id "cloud-id"
+              :yandex-folder-id "folder-id"
+              :yandex-zone "ru-central1-a"
+              :yandex-image-family "ubuntu-2404-lts"
+              :yandex-name "once-test"
+              :yandex-subnet-cidr "10.0.0.0/24"
+              :yandex-platform-id "standard-v3"
+              :yandex-cores 2
+              :yandex-memory-gb 2
+              :yandex-core-fraction 100
+              :yandex-disk-size-gb 20
+              :yandex-token "a-real-yandex-token"}]
+    (try
+      (let [result (tools/tofu-compute-step opts)
+            main (slurp (io/file (tools/tool-dir opts "tofu-compute") "main.tf"))]
+        (is (zero? (:green/exit result)))
+        (is (= {:ip "192.168.0.1"
+                :sudoer "ubuntu"
+                :uid "1000"
+                :name "test"
+                :user "ubuntu"}
+               (:once/compute-params result)))
+        (is (str/includes? main "cloud_id  = \"cloud-id\""))
+        (is (str/includes? main
+                           "ssh-keys = \"ubuntu:ssh-ed25519 AAAATEST operator\""))
+        (is (not (str/includes? main "a-real-yandex-token"))))
+      (finally
+        (delete-tree! workdir)))))
+
 (deftest ansible-once-never-renders-the-smtp-password
   (testing "resend defers the password to a play-time env lookup"
     (let [yaml (tools/ansible-once (once-opts "resend" "re_a_real_secret"))]

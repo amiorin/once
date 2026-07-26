@@ -839,6 +839,7 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
           <tbody>
             <tr><td>DigitalOcean</td><td><code>GREEN_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Hetzner Cloud</td><td><code>GREEN_PAR_HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Yandex Cloud</td><td><code>GREEN_PAR_YANDEX_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Oracle Cloud</td><td>None — authenticates through the <code>:oci-config-file-profile</code> entry in <code>~/.oci/config</code></td><td>—</td></tr>
             <tr><td>Resend</td><td><code>GREEN_PAR_RESEND_API_KEY</code>, <code>GREEN_PAR_RESEND_PASSWORD</code></td><td>Create and delete</td></tr>
             <tr><td>Existing SMTP</td><td><code>GREEN_PAR_NO_INFRA_SMTP_PASSWORD</code></td><td>Create and delete</td></tr>
@@ -887,6 +888,22 @@ done</code></pre>
 :hcloud-location "hel1"
 :hcloud-ssh-keys "key-name-or-id-already-in-the-project"</code></pre>
       <p>Creates an IPv4 server attached to the key named by <code>:hcloud-ssh-keys</code>, which must already exist in the project. Credential: <code>GREEN_PAR_HCLOUD_TOKEN</code>.</p>
+
+      <h3>Yandex Cloud</h3>
+      <pre><code class="language-clojure">:provider-compute "yandex"
+:compute-pubkey "ssh-ed25519 AAAA... operator"
+:yandex-cloud-id "b1g..."
+:yandex-folder-id "b1g..."
+:yandex-zone "ru-central1-a"
+:yandex-image-family "ubuntu-2404-lts"
+:yandex-name "once"
+:yandex-subnet-cidr "10.0.0.0/24"
+:yandex-platform-id "standard-v3"
+:yandex-cores 2
+:yandex-memory-gb 2
+:yandex-core-fraction 100
+:yandex-disk-size-gb 20</code></pre>
+      <p>Creates a network, subnet, NAT-enabled Ubuntu instance, and boot disk. <code>:compute-pubkey</code> is installed for the <code>ubuntu</code> user; keep the private half in <code>ssh-agent</code>. Credential: <code>GREEN_PAR_YANDEX_TOKEN</code>, passed to OpenTofu as <code>YC_TOKEN</code>.</p>
 
       <h3>Oracle Cloud Infrastructure</h3>
       <pre><code class="language-clojure">:provider-compute "oci"
@@ -971,7 +988,7 @@ done</code></pre>
         <article class="card">
           <p class="label">Operations</p>
           <h3><code>:compute-pubkey</code></h3>
-          <p>Accepted but currently unused: each compute provider references a key already registered with it (<code>:digitalocean-ssh-keys</code>, <code>:hcloud-ssh-keys</code>) or a local public-key file (<code>:oci-ssh-authorized-keys</code>). The matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
+          <p>Required by Yandex Cloud, which installs it for the <code>ubuntu</code> user through instance metadata. Other providers use a key already registered with them (<code>:digitalocean-ssh-keys</code>, <code>:hcloud-ssh-keys</code>) or a local public-key file (<code>:oci-ssh-authorized-keys</code>). The matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
         </article>
         <article class="card">
           <p class="label">Deployment</p>
@@ -1178,10 +1195,10 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
           <tbody>
             <tr><td><code>:profile</code></td><td>Yes</td><td>Names generated output, remote state keys, the compute resource, and the SSH host alias.</td></tr>
             <tr><td><code>:workdir</code></td><td>Yes</td><td>Generated root directory; recommended value is <code>.green</code>.</td></tr>
-            <tr><td><code>:compute-pubkey</code></td><td>Optional</td><td>Administrative SSH public key. Currently unused — providers reference an already-registered key.</td></tr>
+            <tr><td><code>:compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
             <tr><td><code>:deploy-pubkey</code></td><td>Yes</td><td>Restricted application-update SSH public key.</td></tr>
             <tr><td><code>:once</code></td><td>Yes</td><td>Map containing a non-empty <code>:applications</code> vector.</td></tr>
-            <tr><td><code>:provider-compute</code></td><td>Yes</td><td><code>digitalocean</code>, <code>hcloud</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
+            <tr><td><code>:provider-compute</code></td><td>Yes</td><td><code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
             <tr><td><code>:provider-smtp</code></td><td>Yes</td><td><code>resend</code> or <code>no-infra</code>.</td></tr>
             <tr><td><code>:provider-dns</code></td><td>Yes</td><td><code>cloudflare</code> or <code>no-infra</code>.</td></tr>
             <tr><td><code>:provider-backend</code></td><td>Yes</td><td><code>local</code>, <code>s3</code>, or <code>r2</code>.</td></tr>
@@ -1197,6 +1214,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
           <tbody>
             <tr><td>DigitalOcean</td><td><code>:digitalocean-name</code>, <code>:digitalocean-region</code>, <code>:digitalocean-size</code>, <code>:digitalocean-image</code>, <code>:digitalocean-ssh-keys</code>; optional <code>:digitalocean-vpc-uuid</code></td></tr>
             <tr><td>Hetzner</td><td><code>:hcloud-name</code>, <code>:hcloud-image</code>, <code>:hcloud-server-type</code>, <code>:hcloud-location</code>, <code>:hcloud-ssh-keys</code></td></tr>
+            <tr><td>Yandex</td><td><code>:compute-pubkey</code>, <code>:yandex-cloud-id</code>, <code>:yandex-folder-id</code>, <code>:yandex-zone</code>, <code>:yandex-image-family</code>, <code>:yandex-name</code>, <code>:yandex-subnet-cidr</code>, <code>:yandex-platform-id</code>, <code>:yandex-cores</code>, <code>:yandex-memory-gb</code>, <code>:yandex-core-fraction</code>, <code>:yandex-disk-size-gb</code></td></tr>
             <tr><td>OCI</td><td><code>:oci-config-file-profile</code>, <code>:oci-subnet-id</code>, <code>:oci-compartment-id</code>, <code>:oci-availability-domain</code>, <code>:oci-display-name</code>, <code>:oci-shape</code>, <code>:oci-ocpus</code>, <code>:oci-memory-in-gbs</code>, <code>:oci-boot-volume-size-in-gbs</code>, <code>:oci-boot-volume-vpus-per-gb</code>, <code>:oci-ssh-authorized-keys</code></td></tr>
             <tr><td>Existing compute</td><td><code>:no-infra-compute-ip</code>, <code>:no-infra-compute-user</code>, <code>:no-infra-compute-sudoer</code>, <code>:no-infra-compute-uid</code></td></tr>
             <tr><td>Resend</td><td>None — the relay is hard-coded</td></tr>

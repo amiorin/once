@@ -8,6 +8,7 @@
 ;; Required per provider:
 ;;   digitalocean   GREEN_PAR_DO_TOKEN
 ;;   hcloud         GREEN_PAR_HCLOUD_TOKEN
+;;   yandex         GREEN_PAR_YANDEX_TOKEN
 ;;   oci            (none — uses :oci-config-file-profile from ~/.oci/config)
 ;;   resend         GREEN_PAR_RESEND_API_KEY GREEN_PAR_RESEND_PASSWORD
 ;;   no-infra smtp  GREEN_PAR_NO_INFRA_SMTP_PASSWORD
@@ -20,6 +21,7 @@
  :workdir ".green"
 
  :deploy-pubkey "REPLACE_ME"
+ :compute-pubkey "REPLACE_ME" ; required by Yandex Cloud
 
  ;; Every application gets its own proxied A record; there is no implicit apex
  ;; or wildcard record. Hosts may span domains. Each distinct domain gets its
@@ -47,6 +49,18 @@
  :s3-region "REPLACE_ME"
  :r2-bucket "REPLACE_ME"
  :r2-endpoint "REPLACE_ME"
+
+ :yandex-cloud-id "REPLACE_ME"
+ :yandex-folder-id "REPLACE_ME"
+ :yandex-zone "ru-central1-a"
+ :yandex-image-family "ubuntu-2404-lts"
+ :yandex-name "once"
+ :yandex-subnet-cidr "10.0.0.0/24"
+ :yandex-platform-id "standard-v3"
+ :yandex-cores 2
+ :yandex-memory-gb 2
+ :yandex-core-fraction 100
+ :yandex-disk-size-gb 20
 
  :oci-config-file-profile "REPLACE_ME"
  :oci-subnet-id "REPLACE_ME"

@@ -74,7 +74,7 @@ nested `:once {:applications [...]}` collection:
                         :env {"DATABASE_URL" :app-database-url}}
                        {:host "www.example.net"
                         :image "ghcr.io/example/another-site:latest"}]}
- :provider-compute "digitalocean" ; digitalocean, hcloud, oci, no-infra
+ :provider-compute "digitalocean" ; digitalocean, hcloud, yandex, oci, no-infra
  :provider-smtp "resend"          ; resend, no-infra
  :provider-dns "cloudflare"       ; cloudflare, no-infra
  :provider-backend "r2"           ; r2, s3, local
@@ -155,8 +155,10 @@ the remaining live checks are soft failures named in the report.
 
 ## Providers and generated configuration
 
-- Compute templates: DigitalOcean, Hetzner Cloud, OCI, and an existing
-  `no-infra` host.
+- Compute templates: DigitalOcean, Hetzner Cloud, Yandex Cloud, OCI, and an
+  existing `no-infra` host. Yandex creates its own network and subnet, installs
+  `:compute-pubkey` through instance metadata, and authenticates with
+  `GREEN_PAR_YANDEX_TOKEN`.
 - SMTP templates: Resend or `no-infra` SMTP settings.
 - DNS templates: Cloudflare or `no-infra`; the per-application and Resend DNS
   records are generated as `apps.tf.json` and `smtp.tf.json` at the

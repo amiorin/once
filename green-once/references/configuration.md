@@ -37,7 +37,7 @@ There is no domain key. Application hostnames are the source of truth and may sp
 
 `:deploy-pubkey` is required. It authorizes only `sudo once update <configured-host>` through a remote ForceCommand. Private keys remain outside the project and should be loaded in `ssh-agent`.
 
-`:compute-pubkey` is accepted but currently unused: each compute provider references a key already registered with it (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file (`:oci-ssh-authorized-keys`). If present it must still look like a public key.
+`:compute-pubkey` is required by Yandex Cloud, which installs it for the `ubuntu` user through instance metadata. It is optional and unused by the other compute providers: DigitalOcean and Hetzner reference keys already registered with them, while OCI reads a local public-key file named by `:oci-ssh-authorized-keys`. If present it must look like a public key.
 
 ## Compute providers
 
@@ -68,6 +68,26 @@ Required credential: `GREEN_PAR_DO_TOKEN`.
 ```
 
 Required credential: `GREEN_PAR_HCLOUD_TOKEN`.
+
+### Yandex Cloud
+
+```clojure
+:provider-compute "yandex"
+:compute-pubkey "ssh-ed25519 AAAA... operator"
+:yandex-cloud-id "b1g..."
+:yandex-folder-id "b1g..."
+:yandex-zone "ru-central1-a"
+:yandex-image-family "ubuntu-2404-lts"
+:yandex-name "once"
+:yandex-subnet-cidr "10.0.0.0/24"
+:yandex-platform-id "standard-v3"
+:yandex-cores 2
+:yandex-memory-gb 2
+:yandex-core-fraction 100
+:yandex-disk-size-gb 20
+```
+
+Green creates a network, subnet, NAT-enabled instance, and boot disk. The public key is installed for the `ubuntu` user; keep its private half in `ssh-agent`. Required credential: `GREEN_PAR_YANDEX_TOKEN`, passed to OpenTofu as the provider-native `YC_TOKEN`.
 
 ### Oracle Cloud Infrastructure
 

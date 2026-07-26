@@ -17,7 +17,7 @@ Babashka runs the launcher. `create` and `delete` also require OpenTofu and Ansi
 - Never ask the user to paste a secret into chat.
 - Never put API tokens, passwords, private keys, access keys, or application secret values in `green.edn`, `green`, shell history, logs, or generated examples. Launcher-managed provider credentials and application secrets use a `GREEN_PAR_*` environment variable named after the key it fills. S3 uses OpenTofu's ambient AWS credential chain, OCI uses the configured profile in `~/.oci/config`, and SSH private keys remain in `ssh-agent`; never copy those credentials into project files.
 - Ask only for the **names** of application-secret environment variables and whether required variables are set. Suggest the user keep those exports in a gitignored file such as `.envrc.private`, never inline in a command their shell history records.
-- Public SSH keys are not secrets. Read only a user-approved `.pub` file; never read a private SSH key. `:oci-ssh-authorized-keys` is the exception to reading at all: it holds a *path* to a public-key file that OpenTofu reads at plan time on the machine running the launcher, so record the path and never inline the file's contents.
+- Public SSH keys are not secrets. Read only a user-approved `.pub` file; never read a private SSH key. Yandex needs that public content in `:compute-pubkey`. OCI is the exception: `:oci-ssh-authorized-keys` holds the *path* to a public-key file that OpenTofu reads at plan time, so record the path and never inline that file's contents.
 - Do not overwrite an existing `green` or `green.edn` without explicit approval. If an existing project is valid, operate it instead of regenerating it.
 - If the launcher reports a contract mismatch, its pinned commit is older than the launcher itself. Re-copy `green` from an updated skill; there is no command in the project that fixes it.
 - Default to `build` and `create --dry-run`. Run a real `create` or `delete` only after the user explicitly confirms that exact operation.
@@ -36,7 +36,7 @@ Gather these non-secret inputs conversationally:
 - one or more applications: hostname, container image, and optional mapping of container variable names to the `green.edn` keys holding their values. Hostnames may span domains; Green manages every derived DNS zone and Resend sending domain, and only the listed hostnames get application DNS records
 - compute, SMTP, DNS, and backend providers
 - the selected providers' non-secret settings
-- `:deploy-pubkey`, which is always required: the SSH public key a remote ForceCommand authorizes for `sudo once update <host>` and nothing else. `:compute-pubkey` is accepted but consumed by no template — each compute provider instead references a key already registered with it (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file path (`:oci-ssh-authorized-keys`) — so do not collect one unless the user asks for it
+- `:deploy-pubkey`, which is always required: the SSH public key a remote ForceCommand authorizes for `sudo once update <host>` and nothing else. Also collect `:compute-pubkey` when Yandex is selected; Yandex installs it for the `ubuntu` user through instance metadata. Other providers instead reference a key already registered with them (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file path (`:oci-ssh-authorized-keys`)
 
 Do not request secret values. Tell the user which `GREEN_PAR_*` names and native credential mechanisms are required for their selected providers.
 
