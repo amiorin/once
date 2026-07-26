@@ -130,8 +130,10 @@ bb green create --dry-run      # print the DAG actions, touch nothing
 bb green delete                # destroy infrastructure
 bb green delete --dry-run
 bb green describe              # providers, SSH status, apps, image updates
-bb green pin                   # stamp the launcher with this repository's HEAD
 ```
+
+Maintainers of this repository also have `bb pin`, which stamps the launcher
+with the current HEAD.
 
 Use another desired-state file with `-f` or `--file`:
 
@@ -197,14 +199,15 @@ After committing and pushing a change to the launcher, `src/clj`, or the
 templates, repin so standalone copies resolve the new sources:
 
 ```bash
-bb green pin        # stamps the launcher with the current HEAD
+bb pin              # stamps the launcher with the current HEAD
 ```
 
-`pin` refuses to run on a dirty tree or an unpushed HEAD. A launcher whose pin
-predates the sources it needs fails with a message naming `green pin` rather
-than rendering silently from an older commit; the check is the `contract`
-number in `utils.clj`, which has to be bumped whenever an older launcher could
-not survive the change.
+`pin` refuses to run on a dirty tree or an unpushed HEAD. It is a bb task
+rather than a launcher subcommand because it reads the HEAD of whatever
+checkout surrounds it, which is only this repository. A launcher whose pin
+predates the sources it needs refuses to run rather than rendering silently
+from an older commit; the check is the `contract` number in `utils.clj`, which
+has to be bumped whenever an older launcher could not survive the change.
 
 ## License
 

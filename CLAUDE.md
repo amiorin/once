@@ -13,10 +13,12 @@ The repository ships two things from one file:
 - **The launcher** `green-once/green`, a single Babashka script. `./green` in the repository root is a symlink to it.
 - **The `green-once` skill** (`green-once/SKILL.md` + `references/configuration.md`), whose payload is that same launcher, copied into a user's own project. Standing alone it resolves `once` and `green` as pinned git dependencies; inside this repository `bb.edn` supplies local roots and the bootstrap is skipped.
 
+**The launcher holds no logic of its own.** It resolves the two libraries, checks the contract, works out which desired-state file to read, and dispatches. Validation, the graph, the steps, and the report all live under `src/clj`, where the test suite reaches them — a copied payload is the one place in this project where code cannot be tested, so nothing that can live elsewhere should live there. Keep it that way when adding behaviour.
+
 ## Tech Stack
 
 - **Language**: Clojure 1.12.5 (JVM), plus Babashka for the launcher and for the two scripts that run on the remote host
-- **Workflow engine**: `io.github.amiorin/green` (`green.workflow`, `green.scaffold`, `green.tofu`, `green.ansible`, `green.cli`, `green.progress`, `green.dry-run`)
+- **Workflow engine**: `io.github.amiorin/green` (`green.workflow`, `green.scaffold`, `green.tofu`, `green.ansible`, `green.cli`, `green.progress`, `green.dry-run`, `green.process`, `green.yaml`)
 - **Infrastructure**: OpenTofu; **Config management**: Ansible
 - **Key libraries**: `cheshire` (JSON), `selmer` (templates, via `green.scaffold`)
 - **Dev environment**: Nix via `devenv` + `direnv`
@@ -26,7 +28,7 @@ The repository ships two things from one file:
 ```
 green/
 ├── green-once/
-│   ├── green                # THE launcher: bootstrap, validation, workflow, CLI, pin
+│   ├── green                # THE launcher: dependency bootstrap, contract check, CLI
 │   ├── SKILL.md             # green-once skill definition
 │   └── references/
 │       └── configuration.md # desired-state reference the skill reads before generating green.edn
@@ -35,8 +37,10 @@ green/
 ├── src/
 │   ├── clj/io/github/bigconfig_ai/once/
 │   │   ├── tools.clj        # the six step functions, template specs, generated JSON
+│   │   ├── workflow.clj     # the DAG: start, cleanup, wire-fn, backend advice
+│   │   ├── validate.clj     # the provider registry and desired-state validation
 │   │   ├── describe.clj     # post-provisioning report (providers, compute status, apps)
-│   │   └── utils.clj        # contract number, GREEN_PAR_* overlay, zone derivation, process + YAML helpers
+│   │   └── utils.clj        # contract number and DNS zone derivation
 │   └── resources/io/github/bigconfig-ai/once/
 │       ├── raw              # `<{ content|safe }>` — the template used for generated content
 │       └── tools/
@@ -46,12 +50,16 @@ green/
 │           ├── tofu-smtp-post/{resend,no-infra}/main.tf
 │           ├── ansible/            # remote host: playbook, ansible.cfg, files/deploy, library/once
 │           └── ansible-local/      # local machine: playbook, ansible.cfg, inventory.ini
+├── tasks/pin.clj            # `bb pin`, the maintainer-only launcher stamp
 ├── test/clj/io/github/bigconfig_ai/once/
 │   ├── tools_test.clj       # rendering, generated DNS records, ansible-local lifecycle
+│   ├── workflow_test.clj    # validation gates, the graph shape, backends, a whole build
+│   ├── validate_test.clj    # the provider registry and every desired-state rule
 │   ├── describe_test.clj    # report parsing and assembly
 │   ├── deploy_test.clj      # the deploy ForceCommand script
 │   ├── once_module_test.clj # the `once` Ansible module
-│   └── utils_test.clj       # zone derivation, ANSI stripping
+│   └── utils_test.clj       # zone derivation
+├── test/resources/          # classpath fixtures the tests read
 ├── index.html               # the user-facing manual for the green-once skill
 ├── deps.edn / bb.edn        # git-pinned green; bb.edn overrides with local roots
 ├── plans/                   # historical task briefs, several predating the rewrite — not authoritative
@@ -66,7 +74,7 @@ bb green create                # provision and configure
 bb green create --dry-run      # print the DAG actions, touch nothing
 bb green delete                # destroy, in reverse
 bb green describe              # providers, compute status, deployed apps, image updates
-bb green pin                   # stamp the launcher with this repository's HEAD
+bb pin                         # stamp the launcher with this repository's HEAD (maintainers)
 
 bb green build -f production.edn   # -f/--file selects a desired-state file (default: ./green.edn)
 
@@ -100,14 +108,14 @@ Load-bearing rules:
 - **No domain key.** Application hosts are the source of truth and may span domains. `utils/apps-domains` derives the sorted distinct zones from their last two labels. The SMTP stage creates `notifications.<zone>` for every zone, Cloudflare manages every zone, and each application gets the matching `info@notifications.<zone>` From address. Templates read HCL-encoded derived zone collections injected by `tools/with-zones` — nothing in desired state supplies them.
 - **No apex or wildcard DNS record.** Each application host gets its own proxied `A` record, so an unlisted host does not resolve.
 - **Resend's relay is hard-coded** (`smtp.resend.com`, 587, user `resend`) in `tools/resend-smtp`, because it is identical for every account. Only `GREEN_PAR_RESEND_API_KEY` and `GREEN_PAR_RESEND_PASSWORD` are configurable. The `no-infra` SMTP keys stay in desired state.
-- **`GREEN_PAR_*` is the only secret channel.** `utils/read-green-pars` overlays any such variable onto the matching flat key — uppercased, hyphens as underscores, so `:do-token` ← `GREEN_PAR_DO_TOKEN`. Overrides are coerced to the type of the value they replace, so `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false` stays a boolean. Any flat key can be overridden the same way. There is no `TF_VAR_*` and no second mechanism.
+- **`GREEN_PAR_*` is the only secret channel.** `green.cli/read-pars` overlays any such variable onto the matching flat key — uppercased, hyphens as underscores, so `:do-token` ← `GREEN_PAR_DO_TOKEN`. Overrides are coerced to the type of the value they replace, so `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false` stays a boolean. Any flat key can be overridden the same way. There is no `TF_VAR_*` and no second mechanism.
 - Application `:env` maps a container variable **name** to the flat key holding its value, never to the value itself.
 
 ## Architecture
 
 ### The DAG
 
-`wire-fn` in the launcher returns `[step-fn & next-steps]` per step and switches on `:green/event`. Create and build:
+`workflow/wire-fn` returns `[step-fn & next-steps]` per step and switches on `:green/event`. Create and build:
 
 ```text
 start ─┬─ tofu-compute ─┐                          ┌─ ansible-local
@@ -159,7 +167,7 @@ Note the asymmetry: the compute step's work directory is `tofu-compute` but its 
 
 `green.scaffold` maps a qualified keyword to a classpath resource (`:io.github.bigconfig-ai.once.tools.tofu.oci/main.tf` → `io/github/bigconfig-ai/once/tools/tofu/oci/main.tf`) and renders it with Selmer. `tools/template-opts` overrides the delimiters, so templates use `<{ var }>` for values and `<% if … %>` for tags, leaving `{{ … }}` and `{% … %}` for Jinja2 in the Ansible files. Providers are selected by directory, not by conditionals in one file.
 
-Content that is computed rather than templated is written through `raw-spec`, which renders the one-line `raw` template: `apps.tf.json`, `smtp.tf.json`, `inventory.json`, and `once.yml`. `tools/render-fn` builds the two DNS files, using `tofu-construct` / `deep-merge` / `sort-nested-map` so the JSON is deterministic. `backend.tf.json` is the exception — `green.tofu` writes it directly from the backend advice, outside the scaffold.
+Content that is computed rather than templated is written through `raw-spec`, which renders the one-line `raw` template: `apps.tf.json`, `smtp.tf.json`, `inventory.json`, and `once.yml`. `tools/render-fn` builds the two DNS files from `green.tofu/construct` and `constructs-json`, which merges and sorts them so the JSON is deterministic. `backend.tf.json` is the exception — `green.tofu` writes it directly from the backend advice, outside the scaffold.
 
 A `build` of the reference `green.edn` produces exactly:
 
@@ -178,16 +186,16 @@ The two generated DNS files are Cloudflare-only; `no-infra` DNS renders `main.tf
 
 ### Parameter flow
 
-1. `green.cli` reads the desired-state file and stamps `:green/event`.
-2. `start-step` overlays `GREEN_PAR_*`, then validates (`state-errors`, and `secret-errors` for real create/delete).
+1. `green.cli` reads the desired-state file, overlays `GREEN_PAR_*`, and stamps `:green/event`.
+2. `workflow/start-step` overlays `GREEN_PAR_*` again (idempotent, and it also covers the REPL and test paths), then validates (`validate/state-errors`, and `validate/secret-errors` for a real create/delete).
 3. Tofu stages parse their `params` output into `:once/compute-params` / `:once/smtp-params`; `joined-params` merges them into opts at the DNS join. Fallback maps (`fallback-compute-params`, `fallback-smtp-params`) stand in for `build` and dry-run so rendering never needs state.
-4. Delete cannot re-derive those values, so `adopt-existing-state` reads the already-applied outputs back out of Tofu state before teardown.
+4. Delete cannot re-derive those values, so `workflow/adopt-existing-state` reads the already-applied outputs back out of Tofu state before teardown.
 
 ### Secrets
 
 Three separate channels, and nothing lands in a rendered file:
 
-- **OpenTofu**: `tools/credential-env` maps flat keys to the variables each provider reads natively (`:do-token` → `DIGITALOCEAN_TOKEN`, `:cloudflare-api-token` → `CLOUDFLARE_API_TOKEN`, …) and passes them through the process environment. Unset credentials are omitted, so build and dry-run stay credential-free.
+- **OpenTofu**: `validate/providers` is the single registry — per provider, the non-secret keys its templates need (`:required`), the credentials it needs (`:secrets`), and which of those OpenTofu reads natively (`:tofu-env`, e.g. `:do-token` → `DIGITALOCEAN_TOKEN`). Validation and `tools/credential-env` both read it, so a provider cannot be checked against one set of keys and run with another. Credentials travel in the process environment; unset ones are omitted, so build and dry-run stay credential-free. A secret absent from `:tofu-env` reaches its tool another way — the SMTP passwords go through Ansible.
 - **State backends**: R2 authenticates through `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`; naming them in `backend.tf.json` would also write them to `.terraform/terraform.tfstate`.
 - **Ansible**: `tools/par-lookup` emits `{{ lookup('env','GREEN_PAR_…') }}`, so the SMTP password and application `:env` values are resolved when the play runs, not when the file is rendered. `tools_test` asserts the secrets never appear in the YAML — keep those tests passing.
 
@@ -197,21 +205,23 @@ Three separate channels, and nothing lands in a rendered file:
 
 ### Delete semantics
 
-Deleting has to render before it can destroy: `tofu-with-spec` and `ansible-local-step` scaffold with `:green/event :create`, run the tool, and only then scaffold with `:delete` to remove the rendered tree. `ansible-cleanup-step` replays `ansible-local` so the managed `~/.ssh/config` block is dropped. `:compute-prevent-destroy` defaults to `true` and renders `lifecycle { prevent_destroy = true }`; a real delete refuses to start until `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false`.
+Deleting has to render before it can destroy: `green.tofu/tofu-with-spec` and `green.ansible/ansible-with-spec` scaffold with `:green/event :create`, run the tool, and only then scaffold with `:delete` to remove the rendered tree. `workflow/ansible-cleanup-step` replays `ansible-local` so the managed `~/.ssh/config` block is dropped. `:compute-prevent-destroy` defaults to `true` and renders `lifecycle { prevent_destroy = true }`; a real delete refuses to start until `GREEN_PAR_COMPUTE_PREVENT_DESTROY=false`.
 
 ### The remote host
 
 `tools/ansible/main.yml` installs Docker, ONCE, and Babashka, then creates a `deploy` user with NOPASSWD sudo limited to `/usr/local/bin/once *`, whose authorized key is pinned to a `ForceCommand` (`tools/ansible/files/deploy`). That script rejects anything but `once update <host>` for a host ONCE already serves. Applications are reconciled by `tools/ansible/library/once`, a Babashka Ansible module that diffs the desired list against `once list` and deploys or removes the difference, redacting secrets from anything it reports.
 
-## The contract number and `green pin`
+## The contract number and `bb pin`
 
-`utils/contract` and `launcher-contract` in the launcher are a compatibility handshake. A standalone launcher refuses to run when the `once` it resolved reports a lower contract, and names `green pin` instead of silently rendering from an older commit.
+`utils/contract` and `launcher-contract` in the launcher are a compatibility handshake. A standalone launcher refuses to run when the `once` it resolved reports a lower contract — or when it cannot load the namespaces it needs at all — instead of silently rendering from an older commit.
 
-**Bump `utils/contract` (and `launcher-contract` to match) on any change a launcher pinned to an older commit could not survive** — a changed template variable, a renamed desired-state key, a new function the launcher calls. Then, after committing and pushing: `bb green pin` stamps `once-sha` (and `green-sha`, when `GREEN_LIB_ROOT` points at a green checkout) and the result is committed as `fix: re-pin bundled launcher to once <sha>`. `pin` refuses to run on a dirty tree or an unpushed HEAD, and the pins are marked *managed — do not edit by hand*.
+**Bump `utils/contract` (and `launcher-contract` to match) on any change a launcher pinned to an older commit could not survive** — a changed template variable, a renamed desired-state key, a new function the launcher calls. Then, after committing and pushing: `bb pin` stamps `once-sha` (and `green-sha`, when `GREEN_LIB_ROOT` points at a green checkout) and the result is committed as `fix: re-pin bundled launcher to once <sha>`. `pin` refuses to run on a dirty tree or an unpushed HEAD, and the pins are marked *managed — do not edit by hand*.
+
+`pin` is a bb task rather than a launcher subcommand because it reads the HEAD of whatever checkout surrounds it: in a user's project — where the launcher is a copied payload — it would stamp an unrelated SHA. Keeping it out of the payload removes the failure mode instead of documenting it.
 
 ## Code Conventions
 
-- **Namespaces**: `io.github.bigconfig-ai.once.*`. Three of them, mapping to distinct concerns — adding a fourth needs a genuinely new concern.
+- **Namespaces**: `io.github.bigconfig-ai.once.*`. Five of them, mapping to distinct concerns — `tools` (the steps), `workflow` (the graph), `validate` (the provider registry and its rules), `describe` (the report), `utils` (the contract and zone derivation). Adding a sixth needs a genuinely new concern.
 - **Keys**: plain kebab-case keywords for desired state (they match template variable names); namespaced keywords for engine state (`:green/…`, `:once/…`).
 - **Steps** take `opts` and return `opts`, and report failure through `:green/exit` / `:green/err`.
 - **`^:private`** for everything not called from the launcher or the tests. The launcher's own helpers are `defn-`; the workflow steps it exposes are not.
@@ -229,5 +239,5 @@ Stay on the `green` branch — each language has its own branch in this reposito
 - Do not edit `.green/` (or any configured `:workdir`) — it is generated output.
 - Do not put credentials, tokens, or private keys in source, in `green.edn`, or in a rendered file. `.envrc.private` is the local channel.
 - Do not give the launcher a dependency outside `green`, `once`, and Babashka's built-ins: it has to work as a lone file copied into a stranger's project.
-- Do not hand-edit `once-sha` / `green-sha`; run `bb green pin`.
+- Do not hand-edit `once-sha` / `green-sha`; run `bb pin`.
 - When desired state changes, update all five surfaces that document it: `green.edn`, `green-once/references/configuration.md`, `green-once/SKILL.md`, `index.html`, and `README.md`.

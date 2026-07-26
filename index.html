@@ -986,7 +986,7 @@ ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
 
     <section id="commands">
       <h2 class="anchor-heading"><a href="#commands" aria-label="Link to Command overview">#</a>Command overview</h2>
-      <pre><code class="language-text">Usage: ./green &lt;build|create|delete|describe|pin&gt; [-f|--file green.edn] [--dry-run]</code></pre>
+      <pre><code class="language-text">Usage: ./green &lt;build|create|delete|describe&gt; [-f|--file green.edn] [--dry-run]</code></pre>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Command</th><th>Effect</th><th>External changes</th></tr></thead>
@@ -1000,7 +1000,7 @@ ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
           </tbody>
         </table>
       </div>
-      <p><code>pin</code> also appears in the usage line. It is a maintenance command for the Green Once repository itself — it stamps the launcher with the commit its sources come from — and is not used in a normal project.</p>
+      <p>There is no <code>pin</code> command. Stamping the launcher with the commit its sources come from is a maintenance task inside the Green Once repository, not something a project ever runs.</p>
     </section>
 
     <section id="build">
