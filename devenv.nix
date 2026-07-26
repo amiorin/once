@@ -6,6 +6,8 @@
   languages.opentofu.enable = true;
   packages = [
     pkgs.babashka
+    pkgs.bun
+    pkgs.uv
     pkgs.jet
     pkgs.hcl2json
     pkgs.awscli2

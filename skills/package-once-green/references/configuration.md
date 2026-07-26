@@ -1,0 +1,194 @@
+# Configuration reference
+
+The generated `green.edn` is one root EDN map with flat provider and setting keys, except for applications nested under `:once {:applications [...]}`. Include only selected providers' non-secret settings. Never add credentials or passwords.
+
+Launcher-managed provider credentials and application secrets reach the workflow through native `GREEN_PAR_*` variables or portable `ONCE_PAR_*` aliases, which are overlaid onto matching flat keys before anything runs. A variable name is the key uppercased with hyphens as underscores, so `:do-token` is supplied by `GREEN_PAR_DO_TOKEN`; there is no `TF_VAR_*` alias. S3 is the exception: OpenTofu resolves its ambient AWS credential chain directly. OCI authenticates through the selected profile in `~/.oci/config`, and SSH private keys remain outside the project in `ssh-agent`. From there no secret is written into a rendered file: launcher-managed OpenTofu credentials are passed to each stage under the variable that provider reads natively, and Ansible receives a byte-compatible lookup expression covering `ONCE_PAR_*` and all three color prefixes when the play runs. Overrides are coerced to the type of the value they replace, so booleans and integers stay booleans and integers.
+
+## Base shape
+
+```clojure
+{:profile "production"
+ :workdir ".once"
+
+ :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
+
+ :once {:applications
+        [{:host "www.example.com"
+          :image "ghcr.io/example/site:latest"
+          :env {"DATABASE_URL" :app-database-url}}
+         {:host "www.example.net"
+          :image "ghcr.io/example/another-site:latest"}]}
+
+ :provider-compute "digitalocean"
+ :provider-smtp "resend"
+ :provider-dns "cloudflare"
+ :provider-backend "r2"
+ :compute-prevent-destroy true
+
+ ;; Add the selected providers' non-secret fields here.
+ }
+```
+
+`:profile` names the stack: it is the working-directory and state-key prefix, the `name` the compute stage reports, and the `Host` alias written into `~/.ssh/config`.
+
+There is no domain key. Application hostnames are the source of truth and may span domains. Green derives each distinct DNS zone from the hostname's last two labels, creates one Resend sending domain (`notifications.<zone>`) per zone, and gives each application a matching `info@notifications.<zone>` From address. Each application gets its own proxied `A` record — no implicit apex or wildcard record is created, so a hostname that is not listed here does not resolve.
+
+`:env` maps a container variable name to the flat key holding its value; the value itself never appears in the file, and is supplied by the `GREEN_PAR_*` variable named after that key (`:app-database-url` ← `GREEN_PAR_APP_DATABASE_URL`). Application options supported by the ONCE reconciler also include `:auto_update`, `:auto_backup`, `:backup_path`, `:disable_tls`, `:cpus`, and `:memory`.
+
+`:deploy-pubkey` is required. It authorizes only `sudo once update <configured-host>` through a remote ForceCommand. Private keys remain outside the project and should be loaded in `ssh-agent`.
+
+`:compute-pubkey` is required by Yandex Cloud, which installs it for the `ubuntu` user through instance metadata. It is optional and unused by the other compute providers: DigitalOcean and Hetzner reference keys already registered with them, while OCI reads a local public-key file named by `:oci-ssh-authorized-keys`. If present it must look like a public key.
+
+## Compute providers
+
+### DigitalOcean
+
+```clojure
+:provider-compute "digitalocean"
+:digitalocean-name "once"
+:digitalocean-region "ams3"
+:digitalocean-size "s-1vcpu-1gb-35gb-intel"
+:digitalocean-image "ubuntu-24-04-x64"
+:digitalocean-ssh-keys "fingerprint-or-id-already-in-the-account"
+;; Optional:
+:digitalocean-vpc-uuid "non-secret-vpc-uuid"
+```
+
+Required credential: `GREEN_PAR_DO_TOKEN`.
+
+### Hetzner Cloud
+
+```clojure
+:provider-compute "hcloud"
+:hcloud-name "once"
+:hcloud-image "ubuntu-24.04"
+:hcloud-server-type "cx23"
+:hcloud-location "hel1"
+:hcloud-ssh-keys "key-name-or-id-already-in-the-project"
+```
+
+Required credential: `GREEN_PAR_HCLOUD_TOKEN`.
+
+### Yandex Cloud
+
+```clojure
+:provider-compute "yandex"
+:compute-pubkey "ssh-ed25519 AAAA... operator"
+:yandex-cloud-id "b1g..."
+:yandex-folder-id "b1g..."
+:yandex-zone "ru-central1-a"
+:yandex-image-family "ubuntu-2404-lts"
+:yandex-name "once"
+:yandex-subnet-cidr "10.0.0.0/24"
+:yandex-platform-id "standard-v3"
+:yandex-cores 2
+:yandex-memory-gb 2
+:yandex-core-fraction 100
+:yandex-disk-size-gb 20
+```
+
+Green creates a network, subnet, NAT-enabled instance, and boot disk. The public key is installed for the `ubuntu` user; keep its private half in `ssh-agent`. Required credential: `GREEN_PAR_YANDEX_TOKEN`, passed to OpenTofu as the provider-native `YC_TOKEN`.
+
+### Oracle Cloud Infrastructure
+
+```clojure
+:provider-compute "oci"
+:oci-config-file-profile "DEFAULT"
+:oci-subnet-id "ocid1.subnet..."
+:oci-compartment-id "ocid1.compartment..."
+:oci-availability-domain "..."
+:oci-display-name "once"
+:oci-shape "VM.Standard.A1.Flex"
+:oci-ocpus 1
+:oci-memory-in-gbs 4
+:oci-boot-volume-size-in-gbs 50
+:oci-boot-volume-vpus-per-gb 30
+:oci-ssh-authorized-keys "/home/user/.ssh/once.pub"
+```
+
+No credential variable is required: OCI authenticates through the named profile in `~/.oci/config`. `:oci-ssh-authorized-keys` is a path to a public-key file on the machine running the launcher, read at plan time.
+
+### Existing server
+
+```clojure
+:provider-compute "no-infra"
+:no-infra-compute-ip "203.0.113.10"
+:no-infra-compute-user "root"
+:no-infra-compute-sudoer "root"
+:no-infra-compute-uid 0
+```
+
+No compute API credential is required. SSH authentication must already work through `ssh-agent`. The host is reported under `:profile`, so it needs no name of its own.
+
+## SMTP providers
+
+### Resend
+
+```clojure
+:provider-smtp "resend"
+```
+
+Resend's relay (`smtp.resend.com:587`, user `resend`) is the same for every account, so it is hard-coded rather than configured. Green registers and verifies `notifications.<zone>` for every distinct application zone. Each application sends from `info@notifications.<its-zone>`.
+
+Required credentials: `GREEN_PAR_RESEND_API_KEY` for the Resend API, and `GREEN_PAR_RESEND_PASSWORD` for the SMTP password written into the server's mail configuration.
+
+### Existing SMTP
+
+```clojure
+:provider-smtp "no-infra"
+:no-infra-smtp-server "smtp.example.net"
+:no-infra-smtp-port 587
+:no-infra-smtp-username "smtp-user"
+```
+
+Required credential: `GREEN_PAR_NO_INFRA_SMTP_PASSWORD`.
+
+## DNS providers
+
+Use `:provider-dns "cloudflare"` or `:provider-dns "no-infra"`.
+
+Cloudflare requires `GREEN_PAR_CLOUDFLARE_API_TOKEN`. The token needs permission to discover and manage every zone derived from the application hosts: one proxied `A` record per application host, plus each zone's Resend verification records. `no-infra` renders an empty DNS module and requires no credential.
+
+## State backends
+
+### Local
+
+```clojure
+:provider-backend "local"
+```
+
+Each tool keeps isolated state under `<workdir>/<profile>/<tool>/`.
+
+### Amazon S3
+
+```clojure
+:provider-backend "s3"
+:s3-bucket "once-tfstate"
+:s3-region "eu-west-1"
+```
+
+No `GREEN_PAR_*` credential: the generated backend names only the bucket, key, and region, so OpenTofu resolves credentials through its own AWS chain (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, a shared profile, or an instance role). State keys are derived as `<profile>/<tool>.tfstate`.
+
+### Cloudflare R2
+
+```clojure
+:provider-backend "r2"
+:r2-bucket "once-tfstate"
+:r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"
+```
+
+Required credentials: `GREEN_PAR_R2_ACCESS_KEY_ID` and `GREEN_PAR_R2_SECRET_ACCESS_KEY`. R2 is configured as an S3-compatible backend with `region = "auto"`. State keys are derived as `<profile>/<tool>.tfstate`.
+
+## Safe lifecycle
+
+`build` and dry-run do not require credentials; unset values simply render empty, so a build never writes a secret to disk. Real create validates all selected provider credentials and every application `:env` reference before running. Real delete validates provider credentials and refuses while `:compute-prevent-destroy` is true.
+
+To authorize an intentional delete without editing committed desired state:
+
+```sh
+export GREEN_PAR_COMPUTE_PREVENT_DESTROY=false
+./green delete --dry-run
+./green delete
+```
+
+`GREEN_PAR_*` overrides any flat key, not just secrets: strip the prefix, lowercase the name, and replace underscores with hyphens. For example, `GREEN_PAR_DIGITALOCEAN_REGION=fra1` overrides `:digitalocean-region`.

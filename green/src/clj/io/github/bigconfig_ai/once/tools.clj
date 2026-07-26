@@ -1,0 +1,410 @@
+(ns io.github.bigconfig-ai.once.tools
+  (:require
+   [cheshire.core :as json]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [clojure.walk :as walk]
+   [green.ansible :as ansible]
+   [green.scaffold :as sc]
+   [green.tofu :as tofu]
+   [green.workflow :as wf]
+   [green.yaml :as yaml]
+   [io.github.bigconfig-ai.once.utils :as utils]
+   [io.github.bigconfig-ai.once.validate :as validate]))
+
+(def ^:private template-root "io.github.bigconfig-ai.once.tools")
+(def ^:private raw-template :io.github.bigconfig-ai.once/raw)
+(def ^:private template-opts {:tag-open \<
+                              :tag-close \>
+                              :filter-open \{
+                              :filter-close \}})
+
+(defn tool-dir
+  "Return the isolated working directory for `tool` in the active profile."
+  [opts tool]
+  (str (io/file (or (:workdir opts) ".once")
+                (or (:profile opts) "default")
+                tool)))
+
+(defn- tool-template
+  [tool provider file]
+  (keyword (str template-root "." tool "." provider) file))
+
+(defn- static-template
+  [tool file]
+  (keyword (str template-root "." tool) file))
+
+(defn- template-spec
+  [template target data]
+  {:template template
+   :target target
+   :data data
+   :opts template-opts})
+
+(defn- raw-spec
+  [target content]
+  (template-spec raw-template target {:content content}))
+
+(defn- output-params
+  [opts]
+  (some-> (get-in opts [:tofu/outputs :params]) walk/keywordize-keys))
+
+(defn- credential-env
+  "Environment additions for the providers selected in `slots`, plus whatever
+  the state backend needs — every stage reads and writes state, so the backend
+  credentials belong to all of them. Unset credentials are omitted, so build
+  and dry-run stay credential-free."
+  [opts & slots]
+  (not-empty
+   (into {}
+         (keep (fn [[k env-var]]
+                 (when-let [v (not-empty (str (get opts k)))]
+                   [env-var v])))
+         (apply merge (map #(validate/tofu-env opts %)
+                           (conj (vec slots) :provider-backend))))))
+
+(defn backend-credential-env
+  "Environment additions for a process that only reads OpenTofu state, such as
+  `tofu output`. Provider credentials are left out on purpose: reading state
+  never calls a provider API."
+  [opts]
+  (credential-env opts))
+
+(defn- tofu-with-spec
+  "green.tofu/tofu-with-spec plus this project's params adoption: on a real
+  apply the stage's `params` output becomes `result-key`, and `fallback`
+  stands in for the values a build or dry-run cannot know."
+  [opts dir specs fallback result-key env]
+  (let [result (tofu/tofu-with-spec opts specs {:dir dir :env env})]
+    (cond
+      (or (nil? result-key) (wf/failed? result)) result
+      (= :build (:green/event opts)) (assoc result result-key fallback)
+      (= :delete (:green/event opts)) result
+      :else (assoc result result-key
+                   (merge fallback (or (output-params result) {}))))))
+
+(defn- fallback-compute-params
+  [{:keys [profile provider-compute] :as opts}]
+  (let [name (or profile "once")]
+    (case provider-compute
+      "oci" {:ip "192.168.0.1"
+             :sudoer "ubuntu"
+             :uid "1001"
+             :name name
+             :user "ubuntu"}
+      "yandex" {:ip "192.168.0.1"
+                :sudoer "ubuntu"
+                :uid "1000"
+                :name name
+                :user "ubuntu"}
+      "no-infra" (cond-> {:ip (or (:no-infra-compute-ip opts) "192.168.0.1")
+                          :sudoer (or (:no-infra-compute-sudoer opts) "root")
+                          :name name
+                          :user (or (:no-infra-compute-user opts) "root")}
+                   (:no-infra-compute-uid opts) (assoc :uid (:no-infra-compute-uid opts)))
+      {:ip "192.168.0.1"
+       :sudoer "root"
+       :name name
+       :user "root"})))
+
+(def ^:private resend-smtp
+  "Resend's relay is the same for every account, so it is not desired state.
+  Only the password is, and it arrives as GREEN_PAR_RESEND_PASSWORD."
+  {:smtp_server "smtp.resend.com"
+   :smtp_port 587
+   :smtp_username "resend"})
+
+(defn- fallback-smtp-params
+  [{:keys [provider-smtp] :as opts}]
+  (merge {:domains []}
+         (case provider-smtp
+           "no-infra" {:smtp_username (:no-infra-smtp-username opts)
+                       :smtp_password (:no-infra-smtp-password opts)
+                       :smtp_server (:no-infra-smtp-server opts)
+                       :smtp_port (:no-infra-smtp-port opts)}
+           "resend" (assoc resend-smtp
+                           :smtp_password (:resend-password opts)
+                           :domains (mapv (fn [zone]
+                                            {:zone zone
+                                             :id (str "domain-id-not-defined-" zone)
+                                             :records []})
+                                          (utils/apps-domains opts)))
+           {})))
+
+(defn tofu-compute-step
+  [opts]
+  (let [provider (or (:provider-compute opts) "hcloud")
+        dir (tool-dir opts "tofu-compute")
+        specs [(template-spec (tool-template "tofu" provider "main.tf")
+                              (str dir "/main.tf")
+                              opts)]]
+    (tofu-with-spec opts dir specs (fallback-compute-params opts) :once/compute-params
+                    (credential-env opts :provider-compute))))
+
+(defn- with-zones
+  "Templates receive the sorted DNS zones derived from the application hosts;
+  no domain key is carried in desired state."
+  [opts]
+  (let [zones (utils/apps-domains opts)]
+    (assoc opts
+           :zones zones
+           :zones-hcl (tofu/hcl-list zones))))
+
+(defn tofu-smtp-step
+  [opts]
+  (let [opts (with-zones opts)
+        provider (or (:provider-smtp opts) "resend")
+        dir (tool-dir opts "tofu-smtp")
+        specs [(template-spec (tool-template "tofu-smtp" provider "main.tf")
+                              (str dir "/main.tf")
+                              opts)]]
+    (tofu-with-spec opts dir specs (fallback-smtp-params opts) :once/smtp-params
+                    (credential-env opts :provider-smtp))))
+
+(defn- add-fqn-suffix
+  [fqn suffix]
+  (if-let [ns (namespace fqn)]
+    (keyword ns (str (name fqn) suffix))
+    (keyword (str (name fqn) suffix))))
+
+(defn- cloudflare-zone-id
+  [zone]
+  (format "${data.cloudflare_zone.domains[%s].id}" (pr-str zone)))
+
+(defn render-fn
+  [src {:keys [domains applications ip]}]
+  (case src
+    ;; One proxied A record per application host. There is no implicit apex or
+    ;; wildcard record: only the hosts desired state names resolve to the server.
+    :apps (tofu/constructs-json
+           (for [{:keys [host]} applications
+                 :let [zone (utils/registrable-domain host)]]
+             (tofu/construct :resource
+                             :cloudflare_dns_record
+                             (add-fqn-suffix ::app-dns (str "-" host))
+                             {:zone_id (cloudflare-zone-id zone)
+                              :name host
+                              :content ip
+                              :type "A"
+                              :proxied true
+                              :ttl 1})))
+    :smtp (tofu/constructs-json
+           (for [{:keys [zone records]} domains
+                 {:keys [name priority record type value]} records]
+             (tofu/construct :resource
+                             :cloudflare_dns_record
+                             (add-fqn-suffix ::smtp-dns
+                                             (format "-%s-%s-%s" zone record type))
+                             (cond-> {:zone_id (cloudflare-zone-id zone)
+                                      :name name
+                                      :ttl "1"
+                                      :type type
+                                      :proxied false}
+                               (= type "TXT") (merge {:content (format "\"%s\"" value)})
+                               (= type "MX") (merge {:priority priority
+                                                     :content value})))))))
+
+(defn- joined-params
+  [opts]
+  (let [branches (:green/branches opts)
+        compute (or (some :once/compute-params branches)
+                    (:once/compute-params opts)
+                    (fallback-compute-params opts))
+        smtp (or (some :once/smtp-params branches)
+                 (:once/smtp-params opts)
+                 (fallback-smtp-params opts))]
+    (-> opts
+        (merge compute smtp)
+        (assoc :once/compute-params compute
+               :once/smtp-params smtp))))
+
+(defn tofu-dns-step
+  [opts]
+  (let [opts (with-zones (if (= :delete (:green/event opts)) opts (joined-params opts)))
+        provider (or (:provider-dns opts) "cloudflare")
+        dir (tool-dir opts "tofu-dns")
+        specs (cond-> [(template-spec (tool-template "tofu-dns" provider "main.tf")
+                                      (str dir "/main.tf")
+                                      opts)]
+                (= provider "cloudflare")
+                (conj (raw-spec (str dir "/apps.tf.json")
+                                (render-fn :apps {:applications (get-in opts [:once :applications])
+                                                  :ip (:ip opts)}))
+                      (raw-spec (str dir "/smtp.tf.json")
+                                (render-fn :smtp {:domains (:domains opts)}))))]
+    (tofu-with-spec opts dir specs {} nil
+                    (credential-env opts :provider-dns))))
+
+(defn tofu-smtp-post-step
+  [opts]
+  (let [domain-ids (into (sorted-map)
+                         (map (juxt :zone :id))
+                         (:domains opts))
+        opts (assoc opts :domain-ids-hcl (tofu/hcl-map domain-ids))
+        provider (or (:provider-smtp opts) "resend")
+        dir (tool-dir opts "tofu-smtp-post")
+        specs [(template-spec (tool-template "tofu-smtp-post" provider "main.tf")
+                              (str dir "/main.tf")
+                              opts)]]
+    (tofu-with-spec opts dir specs {} nil
+                    (credential-env opts :provider-smtp))))
+
+(defn data-fn
+  ([data] (data-fn data nil))
+  ([{:keys [ip sudoer] :as data} _]
+   (let [sudoer (or sudoer "root")]
+     (merge data {:sudoer sudoer
+                  :hosts [(or ip "64.227.72.100")]
+                  :users []}))))
+
+(defn inventory
+  [{:keys [sudoer hosts users]}]
+  (let [users (->> users
+                   (filter (complement :remove))
+                   (mapcat (fn [user]
+                             (map #(assoc user :host %) hosts))))
+        admins (mapcat (fn [admin]
+                         (map #(assoc admin :host % :name sudoer) hosts))
+                       [{:ansible_user sudoer}])
+        users-hosts (reduce (fn [result {:keys [name uid host]}]
+                              (assoc result (format "%s@%s" name host)
+                                     {:ansible_host host
+                                      :ansible_user name
+                                      :uid uid}))
+                            {}
+                            users)
+        admins-hosts (reduce (fn [result {:keys [name host]}]
+                               (assoc result (format "root@%s" host)
+                                      {:ansible_host host
+                                       :ansible_user name}))
+                             {}
+                             admins)
+        result {:all {:children {:admin {:hosts admins-hosts}
+                                 :users {:hosts users-hosts}}}}]
+    (json/generate-string result {:pretty true})))
+
+(defn- par-lookup
+  "Jinja expression resolving a secret under the shared ONCE prefix or any
+  color-native prefix. The expression is identical in all three packages, so
+  their rendered artifacts remain byte-compatible."
+  [k]
+  (let [suffix (-> (name k) (str/replace "-" "_") str/upper-case)]
+    (format (str "{{ lookup('env','ONCE_PAR_%s') or "
+                 "lookup('env','GREEN_PAR_%s') or "
+                 "lookup('env','RED_PAR_%s') or "
+                 "lookup('env','BLUE_PAR_%s') }}")
+            suffix suffix suffix suffix)))
+
+(defn- resolve-env
+  "Resolve an application `:env` map of container variable name -> flat opts key
+  into the [\"KEY=VALUE\"] list the once module expects. Each value defers to
+  the key's `GREEN_PAR_*` variable, looked up when Ansible runs, so application
+  secrets reach the host without being written into the rendered file. An unset
+  variable still resolves to an empty value rather than the string \"null\".
+  A list is passed through untouched."
+  [env]
+  (if (map? env)
+    (mapv (fn [[var-name k]]
+            (str (name var-name) "=" (par-lookup (keyword k))))
+          env)
+    env))
+
+(defn- application-data
+  [smtp app]
+  (let [zone (utils/registrable-domain (:host app))
+        smtp (assoc smtp :smtp_from (format "Info <info@notifications.%s>" zone))]
+    (cond-> (merge app smtp)
+      (map? (:env app)) (assoc :env (resolve-env (:env app))))))
+
+(def ^:private smtp-password-keys
+  {"resend" :resend-password
+   "no-infra" :no-infra-smtp-password})
+
+(defn ansible-once
+  [{:keys [once provider-smtp] :as opts}]
+  (let [pw-key (smtp-password-keys (or provider-smtp "resend"))
+        smtp (select-keys opts [:smtp_server :smtp_port :smtp_username :smtp_password])
+        smtp (cond-> smtp
+               (and pw-key (:smtp_password smtp))
+               (assoc :smtp_password (par-lookup pw-key)))
+        once (update once :applications
+                     (fn [applications]
+                       (mapv #(application-data smtp %) applications)))
+        data [{:name "Reconcile ONCE applications"
+               :become true
+               :once once}]]
+    (yaml/generate-string data)))
+
+(defn render
+  [target data]
+  (case target
+    :inventory (inventory data)
+    :ansible-once (ansible-once data)))
+
+(defn- ansible-remote-specs
+  [opts]
+  (let [dir (tool-dir opts "ansible-remote")
+        data (data-fn opts)]
+    [(template-spec (static-template "ansible" "ansible.cfg")
+                    (str dir "/ansible.cfg")
+                    data)
+     (template-spec (static-template "ansible" "main.yml")
+                    (str dir "/main.yml")
+                    data)
+     (template-spec (static-template "ansible" "files/deploy")
+                    (str dir "/files/deploy")
+                    data)
+     (template-spec (static-template "ansible" "library/once")
+                    (str dir "/library/once")
+                    data)
+     (raw-spec (str dir "/inventory.json") (inventory data))
+     (raw-spec (str dir "/once.yml") (ansible-once data))]))
+
+(defn ansible-remote-step
+  [opts]
+  (let [dir (tool-dir opts "ansible-remote")
+        rendered (sc/scaffold opts (ansible-remote-specs opts))]
+    (if (or (= :build (:green/event opts))
+            (= :delete (:green/event opts)))
+      rendered
+      (ansible/ansible-step rendered {:dir dir
+                                      :inventory "inventory.json"
+                                      :playbooks {:create "main.yml"}
+                                      :host-key-checking false}))))
+
+(defn- local-host-alias
+  "The SSH alias the local playbook manages. Tofu reports it as `name`, itself
+  rendered from `profile`, so `profile` answers when state cannot be read."
+  [data]
+  (or (not-empty (str (:name data)))
+      (not-empty (str (:profile data)))
+      "once"))
+
+(defn ansible-local-step
+  [opts]
+  (let [dir (tool-dir opts "ansible-local")
+        data (data-fn opts)
+        specs [(template-spec (static-template "ansible-local" "ansible.cfg")
+                              (str dir "/ansible.cfg")
+                              data)
+               (template-spec (static-template "ansible-local" "inventory.ini")
+                              (str dir "/inventory.ini")
+                              data)
+               (template-spec (static-template "ansible-local" "main.yml")
+                              (str dir "/main.yml")
+                              data)]
+        delete? (= :delete (:green/event opts))
+        ;; The playbook's variables are Ansible's, not Selmer's, so they arrive
+        ;; as extra-vars: the local inventory targets localhost only and carries
+        ;; no host vars of its own. `name` is reserved in Ansible, hence
+        ;; host_alias. block_state drives blockinfile in both directions.
+        config {:dir dir
+                :inventory "inventory.ini"
+                :playbooks {:create "main.yml" :delete "main.yml"}
+                :extra-vars {:host_alias (local-host-alias data)
+                             :ip (:ip data)
+                             :user (:user data)
+                             :block_state (if delete? "absent" "present")}}]
+    ;; Delete renders the playbook so it can run, removes the managed block
+    ;; from ~/.ssh/config, and only then deletes the rendered tree.
+    (ansible/ansible-with-spec opts config specs)))

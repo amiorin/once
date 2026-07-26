@@ -1,0 +1,47 @@
+#!/usr/local/bin/bb
+
+(require '[babashka.process :as p]
+         '[clojure.string :as str])
+
+(defn die [msg]
+  (binding [*out* *err*]
+    (println (str "deploy: " msg)))
+  (System/exit 1))
+
+(def host-pattern #"^[A-Za-z0-9]([A-Za-z0-9.-]{0,253}[A-Za-z0-9])?$")
+
+(defn strip-ansi [s]
+  (-> s
+      (str/replace #"\x1b\]8;[^\x07]*\x07" "")
+      (str/replace #"\x1b\[[0-9;]*m" "")))
+
+(defn parse-allowed-hosts []
+  (let [{:keys [exit out err]} @(p/process ["sudo" "once" "list"]
+                                           {:out :string :err :string})]
+    (when-not (zero? exit)
+      (die (str "could not list applications: " (str/trim err))))
+    (->> (str/split-lines (strip-ansi out))
+         (keep #(re-find #"[\w][\w.-]+\.[\w]{2,}(?= \()" %))
+         set)))
+
+(defn -main [& _]
+  (let [original (System/getenv "SSH_ORIGINAL_COMMAND")]
+    (when (str/blank? original)
+      (die "interactive sessions are not allowed"))
+    (let [tokens (str/split (str/trim original) #"\s+")]
+      (when-not (= 4 (count tokens))
+        (die (str "command not allowed: " original)))
+      (let [[a b c host] tokens]
+        (when-not (and (= a "sudo") (= b "once") (= c "update"))
+          (die (str "command not allowed: " original)))
+        (when-not (re-matches host-pattern host)
+          (die (str "invalid host: " host)))
+        (let [allowed (parse-allowed-hosts)]
+          (when-not (contains? allowed host)
+            (die (str "host not allowed: " host))))
+        (let [{:keys [exit]} @(p/process ["sudo" "once" "update" host]
+                                         {:out :inherit :err :inherit})]
+          (System/exit exit))))))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply -main *command-line-args*))

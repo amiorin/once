@@ -1,0 +1,6 @@
+#!/usr/bin/env bun
+// Thin launcher for package-once-red. Domain logic lives in the installable
+// package so the copied skill payload remains testable and replaceable.
+import { exec, run } from "package-once-red";
+export { run };
+if (import.meta.main) await exec();

@@ -1,0 +1,57 @@
+{:profile "parity"
+ :workdir ".once"
+ :deploy-pubkey "ssh-ed25519 AAAAEXAMPLE ci-deploy"
+ :once {:applications [{:host "www.example.com"
+                        :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"
+                        :env {"EXAMPLE" :app-example}}
+                       {:host "www.example.net"
+                        :image "ghcr.io/bigconfig-ai/once-bigconfig:latest"}]}
+ :provider-compute "digitalocean"
+ :provider-smtp "resend"
+ :provider-dns "cloudflare"
+ :provider-backend "local"
+ :compute-prevent-destroy true
+ :digitalocean-name "once"
+ :digitalocean-region "ams3"
+ :digitalocean-size "s-1vcpu-1gb-35gb-intel"
+ :digitalocean-image "ubuntu-25-10-x64"
+ :digitalocean-ssh-keys "key-id"
+ :hcloud-name "once"
+ :hcloud-image "ubuntu-24.04"
+ :hcloud-server-type "cx23"
+ :hcloud-location "hel1"
+ :hcloud-ssh-keys "key-id"
+ :compute-pubkey "ssh-ed25519 AAAAEXAMPLE operator"
+ :yandex-cloud-id "cloud"
+ :yandex-folder-id "folder"
+ :yandex-zone "ru-central1-a"
+ :yandex-image-family "ubuntu-2404-lts"
+ :yandex-name "once"
+ :yandex-subnet-cidr "10.0.0.0/24"
+ :yandex-platform-id "standard-v3"
+ :yandex-cores 2
+ :yandex-memory-gb 2
+ :yandex-core-fraction 100
+ :yandex-disk-size-gb 20
+ :oci-config-file-profile "DEFAULT"
+ :oci-subnet-id "subnet"
+ :oci-compartment-id "compartment"
+ :oci-availability-domain "AD-1"
+ :oci-display-name "once"
+ :oci-shape "VM.Standard.A1.Flex"
+ :oci-ocpus 1
+ :oci-memory-in-gbs 4
+ :oci-boot-volume-size-in-gbs 50
+ :oci-boot-volume-vpus-per-gb 30
+ :oci-ssh-authorized-keys "/tmp/once.pub"
+ :no-infra-compute-ip "203.0.113.10"
+ :no-infra-compute-user "root"
+ :no-infra-compute-sudoer "root"
+ :no-infra-compute-uid 0
+ :no-infra-smtp-server "smtp.example.com"
+ :no-infra-smtp-port 587
+ :no-infra-smtp-username "user"
+ :s3-bucket "once-parity"
+ :s3-region "eu-west-1"
+ :r2-bucket "once-parity"
+ :r2-endpoint "https://example.r2.cloudflarestorage.com"}

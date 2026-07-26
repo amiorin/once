@@ -1,0 +1,61 @@
+(ns io.github.bigconfig-ai.once.utils
+  "The compatibility contract, and the DNS zone derivation every stage shares."
+  (:require
+   [clojure.string :as str]
+   [green.cli :as green-cli]))
+
+(def contract
+  "Compatibility number for the launcher that consumes these namespaces and the
+  templates under src/resources. Bump it on any change a launcher pinned to an
+  older commit could not survive; the launcher refuses to run against a lower
+  number and tells the user to repin.
+
+  2: tools/backend-credential-env, which the launcher calls to read Tofu state.
+  3: desired state drops :domain and :package. DNS zones are derived from the
+     application hosts, and :profile alone names the stack.
+  4: applications may span DNS zones. utils/apps-domains replaces the singular
+     apps-domain contract used by the SMTP and DNS stages.
+  5: validation and the workflow graph move out of the launcher and into this
+     library, as once.validate and once.workflow. The launcher no longer
+     defines its own steps — it calls workflow/workflow, describe/describe-file,
+     and green.cli/read-pars, and `pin` is a maintainer bb task rather than a
+     launcher subcommand.
+  6: the Clojure package moves under the monorepo's green/ dependency root;
+     launchers must resolve that root. Portable ONCE_PAR_* aliases and the
+     shared byte-compatible Ansible lookup are also introduced."
+  6)
+
+(defn read-pars
+  "Overlay Green's native parameters, then the portable ONCE_PAR_* aliases.
+  Portable values win when both forms are present."
+  ([opts] (read-pars opts (System/getenv)))
+  ([opts env]
+   (let [portable (into {}
+                        (keep (fn [[k v]]
+                                (let [k (str k)]
+                                  (when (str/starts-with? k "ONCE_PAR_")
+                                    [(str "GREEN_PAR_" (subs k (count "ONCE_PAR_"))) v]))))
+                        env)]
+     (-> opts
+         (green-cli/read-pars env)
+         (green-cli/read-pars portable)))))
+
+(defn registrable-domain
+  "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes
+  such as co.uk are not recognised — a host under one has to sit in a zone
+  Cloudflare would report by its last two labels anyway."
+  [host]
+  (let [labels (str/split (str host) #"\.")]
+    (when (<= 2 (count labels))
+      (str/join "." (take-last 2 labels)))))
+
+(defn apps-domains
+  "The sorted DNS zones used by the applications. Desired state carries no
+  :domain: each application's DNS records, Resend sending domain, and From
+  address derive from that application's host."
+  [opts]
+  (->> (get-in opts [:once :applications])
+       (keep (comp registrable-domain :host))
+       distinct
+       sort
+       vec))

@@ -1,0 +1,16 @@
+{
+  "name": "package-once-red-dev",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "red": "github:amiorin/red#e4a81c29f004686e43f888713065e0b52a55b190"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -7,6 +7,13 @@
 !.projectile
 !.nojekyll
 
+node_modules/
+__pycache__/
+*.pyc
+dist/
+target/
+.once/
+
 /.clj-kondo/*
 !/.clj-kondo
 !/.clj-kondo/config.edn

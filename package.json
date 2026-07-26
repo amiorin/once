@@ -1,0 +1,31 @@
+{
+  "name": "package-once-red",
+  "version": "0.1.0",
+  "description": "Red/TypeScript facade for the bigconfig-ai/once monorepo",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./red/src/index.ts"
+  },
+  "files": [
+    "red/src",
+    "red/resources"
+  ],
+  "peerDependencies": {
+    "red": "*"
+  },
+  "peerDependenciesMeta": {
+    "red": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "test": "cd red && bun test && bun run typecheck",
+    "typecheck": "cd red && bun run typecheck",
+    "parity": "./scripts/parity.sh"
+  }
+}

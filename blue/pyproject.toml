@@ -1,0 +1,31 @@
+[project]
+name = "package-once-blue"
+version = "0.1.0"
+description = "Blue/Python implementation of the production ONCE package"
+requires-python = ">=3.11"
+dependencies = [
+  "blue",
+]
+
+[tool.uv.sources]
+blue = { git = "https://github.com/amiorin/blue.git", rev = "996d442059c64167c679be37d9931046193193c0" }
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/package_once_blue"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

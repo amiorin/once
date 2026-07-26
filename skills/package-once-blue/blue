@@ -1,0 +1,16 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["package-once-blue", "blue"]
+#
+# [tool.uv.sources]
+# package-once-blue = { path = "." }
+# blue = { git = "https://github.com/amiorin/blue.git", rev = "996d442059c64167c679be37d9931046193193c0" }
+# ///
+"""Thin launcher for package-once-blue."""
+from package_once_blue import exec, run
+
+__all__ = ["run"]
+
+if __name__ == "__main__":
+    exec()

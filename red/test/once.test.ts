@@ -1,0 +1,106 @@
+import { expect, test } from "bun:test";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
+import { run as runWorkflow } from "red/workflow";
+import { run as runCli } from "../src/cli.ts";
+import { describeReport, imageRepositoryTag, parseOnceList } from "../src/describe.ts";
+import { ansibleOnce, renderFn } from "../src/tools.ts";
+import { appsDomains, readOncePars } from "../src/utils.ts";
+import { stateErrors } from "../src/validate.ts";
+import { onceWorkflow, startStep, wireFn } from "../src/workflow.ts";
+
+const valid = {
+  profile: "test",
+  workdir: ".once",
+  "deploy-pubkey": "ssh-ed25519 AAAA test",
+  once: { applications: [{ host: "www.example.com", image: "example/app:latest" }] },
+  "provider-compute": "digitalocean",
+  "provider-smtp": "resend",
+  "provider-dns": "cloudflare",
+  "provider-backend": "local",
+  "compute-prevent-destroy": true,
+  "digitalocean-name": "once",
+  "digitalocean-region": "ams3",
+  "digitalocean-size": "s-1vcpu-1gb",
+  "digitalocean-image": "ubuntu",
+  "digitalocean-ssh-keys": "key-id",
+};
+
+function files(root: string): string[] {
+  const result: string[] = [];
+  const visit = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) visit(path); else result.push(relative(root, path));
+    }
+  };
+  visit(root);
+  return result.sort();
+}
+
+test("unknown commands are rejected", async () => {
+  expect((await runCli("bogus"))["red/exit"]).toBe(2);
+});
+
+test("portable parameters override native values", () => {
+  expect(readOncePars({ port: 1 }, { RED_PAR_PORT: "2", ONCE_PAR_PORT: "3" }).port).toBe(3);
+});
+
+test("zones and generated application DNS records", () => {
+  expect(appsDomains({ once: { applications: [{ host: "b.example.net" }, { host: "a.example.com" }, { host: "c.example.net" }] } })).toEqual(["example.com", "example.net"]);
+  const rendered = JSON.parse(renderFn("apps", { ip: "203.0.113.10", applications: [{ host: "www.example.com" }] }));
+  const records = Object.values(rendered.resource.cloudflare_dns_record) as any[];
+  expect(records).toEqual([{ content: "203.0.113.10", name: "www.example.com", proxied: true, ttl: 1, type: "A", zone_id: '${data.cloudflare_zone.domains["example.com"].id}' }]);
+});
+
+test("Ansible rendering defers secrets and is color-portable", () => {
+  const yaml = ansibleOnce({
+    "provider-smtp": "resend",
+    "resend-password": "real-secret",
+    smtp_server: "smtp.resend.com", smtp_port: 587, smtp_username: "resend", smtp_password: "real-secret",
+    once: { applications: [{ host: "www.example.com", image: "app", env: { DATABASE_URL: "app-database-url" } }] },
+  });
+  expect(yaml).not.toContain("real-secret");
+  expect(yaml).toContain("ONCE_PAR_APP_DATABASE_URL");
+  expect(yaml).toContain("GREEN_PAR_APP_DATABASE_URL");
+  expect(yaml).toContain("RED_PAR_APP_DATABASE_URL");
+  expect(yaml).toContain("BLUE_PAR_APP_DATABASE_URL");
+});
+
+test("validation and lifecycle safety", async () => {
+  expect(stateErrors(valid)).toEqual([]);
+  expect((await startStep({ ...valid, "red/event": "build" }, {}))["red/exit"]).toBe(0);
+  const created = await startStep({ ...valid, "red/event": "create" }, {});
+  expect(created["red/exit"]).toBe(2);
+  expect(created["red/err"]).toMatch(/RED_PAR_DO_TOKEN/);
+});
+
+test("create/build and delete use inverse graphs", () => {
+  expect(wireFn("once/start", { "red/event": "build" })?.slice(1)).toEqual(["once/tofu-compute", "once/tofu-smtp"]);
+  expect(wireFn("once/start", { "red/event": "delete" })?.slice(1)).toEqual(["once/ansible-cleanup"]);
+});
+
+test("dry-run needs no credentials and touches nothing", async () => {
+  const workdir = join(tmpdir(), `once-red-dry-${Date.now()}`);
+  const result = await runWorkflow(onceWorkflow, { ...valid, workdir, "red/event": "create", "red/dry-run": true });
+  expect(result["red/exit"]).toBe(0);
+  expect(() => readdirSync(workdir)).toThrow();
+});
+
+test("a build renders the complete production tree without tools", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "once-red-"));
+  try {
+    const result = await runWorkflow(onceWorkflow, { ...valid, workdir, "red/event": "build" });
+    expect(result["red/exit"]).toBe(0);
+    expect(files(join(workdir, "test"))).toHaveLength(19);
+  } finally { rmSync(workdir, { recursive: true, force: true }); }
+});
+
+test("describe helpers remain process-free with an injected runner", async () => {
+  expect(parseOnceList("\u001b[32mwww.example.com (running)\u001b[0m")).toEqual([{ host: "www.example.com", status: "running" }]);
+  expect(imageRepositoryTag("registry:5000/acme/app")).toEqual({ repository: "registry:5000/acme/app", tag: "latest", image: "registry:5000/acme/app:latest" });
+  const runner = async () => ({ exit: 1, out: "", err: "offline" });
+  const report = await describeReport({ ...valid }, runner, false);
+  expect(report.compute.status).toBe("absent");
+});

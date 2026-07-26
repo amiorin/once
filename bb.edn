@@ -1,7 +1,0 @@
-{:paths ["tasks"]
- :deps {io.github.amiorin/green      {:local/root "/home/ubuntu/code/green"}
-        io.github.bigconfig-ai/once {:local/root "."}}
- :tasks
- {pin {:doc "Stamp green-once/green with this repository's HEAD (maintainers only)"
-       :requires ([pin])
-       :task (pin/-main)}}}

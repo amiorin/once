@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The manual for using the green-once agent skill and operating a single-server Basecamp ONCE deployment with Green, OpenTofu, and Ansible.">
-  <title>Green Once — Manual</title>
+  <meta name="description" content="The unified manual for operating a single-server Basecamp ONCE deployment with the byte-compatible Green, Red, and Blue packages.">
+  <title>Once — Green, Red, and Blue Manual</title>
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css">
 
@@ -527,7 +527,7 @@
     <div class="brand">
       <a class="brand-mark" href="#top">
         <span class="leaf" aria-hidden="true">◆</span>
-        <span>Green Once</span>
+        <span>Once</span>
       </a>
       <p>Manual</p>
     </div>
@@ -536,7 +536,7 @@
       <div class="group">Get started</div>
       <ul>
         <li><a href="#introduction">Introduction</a></li>
-        <li><a href="#green-once-and-once">green-once and once</a></li>
+        <li><a href="#implementations">Choose an implementation</a></li>
         <li><a href="#requirements">Requirements</a></li>
         <li><a href="#quick-start">Quick start</a></li>
       </ul>
@@ -589,9 +589,9 @@
 
   <main id="content">
     <header class="hero" id="top">
-      <p class="eyebrow">Green · OpenTofu · Ansible</p>
-      <h1>Green Once</h1>
-      <p class="lead">Use an AI-agent skill to create and operate a production, single-server Basecamp ONCE deployment from a small, reviewable desired-state file.</p>
+      <p class="eyebrow">Green · Red · Blue · OpenTofu · Ansible</p>
+      <h1>Once</h1>
+      <p class="lead">Choose Clojure, TypeScript, or Python to create and operate the same production, single-server Basecamp ONCE deployment from reviewable desired state.</p>
       <ul class="badges" aria-label="Project attributes">
         <li class="badge">Single server</li>
         <li class="badge">Agent guided</li>
@@ -602,7 +602,7 @@
 
     <section id="introduction">
       <h2 class="anchor-heading"><a href="#introduction" aria-label="Link to Introduction">#</a>Introduction</h2>
-      <p>Green Once provisions a server, configures DNS and outgoing email, installs Docker and <a href="https://github.com/basecamp/once" rel="noopener">Basecamp ONCE</a>, and reconciles the applications declared in <code>green.edn</code>. It combines a guided agent skill with an executable infrastructure workflow.</p>
+      <p>Once provisions a server, configures DNS and outgoing email, installs Docker and <a href="https://github.com/basecamp/once" rel="noopener">Basecamp ONCE</a>, and reconciles declared applications. Green reads <code>green.edn</code>; Red and Blue read <code>red.yml</code> and <code>blue.yml</code>. The three packages render byte-identical infrastructure artifacts and can manage the same state.</p>
       <p>You provide application hostnames and images, provider choices, non-secret settings, and public SSH keys. The hostnames decide the DNS zones and mail domains, so there is no separate domain setting and applications may span domains. Credentials and application secrets stay in your environment. The result is an isolated set of OpenTofu and Ansible files plus a repeatable lifecycle command.</p>
 
       <div class="callout success">
@@ -611,21 +611,14 @@
       </div>
     </section>
 
-    <section id="green-once-and-once">
-      <h2 class="anchor-heading"><a href="#green-once-and-once" aria-label="Link to green-once and once">#</a>green-once and once</h2>
+    <section id="implementations">
+      <h2 class="anchor-heading"><a href="#implementations" aria-label="Link to Choose an implementation">#</a>Choose an implementation</h2>
       <div class="cards">
-        <article class="card">
-          <p class="label">Agent interface</p>
-          <h3><code>green-once</code></h3>
-          <p>An agent skill that gathers non-secret inputs, creates <code>green</code> and <code>green.edn</code>, protects the work directory with <code>.gitignore</code>, and performs safe build and dry-run checks.</p>
-        </article>
-        <article class="card">
-          <p class="label">Executable workflow</p>
-          <h3><code>once</code></h3>
-          <p>The underlying Green DAG that renders and runs OpenTofu and Ansible stages. It owns provider configuration, state, server setup, application reconciliation, description, and teardown.</p>
-        </article>
+        <article class="card"><p class="label">Clojure / Babashka</p><h3><code>package-once-green</code></h3><p>Uses <code>./green</code>, <code>green.edn</code>, and <code>GREEN_PAR_*</code>.</p></article>
+        <article class="card"><p class="label">TypeScript / Bun</p><h3><code>package-once-red</code></h3><p>Uses <code>./red</code>, <code>red.yml</code>, and <code>RED_PAR_*</code>.</p></article>
+        <article class="card"><p class="label">Python / uv</p><h3><code>package-once-blue</code></h3><p>Uses <code>./blue</code>, <code>blue.yml</code>, and <code>BLUE_PAR_*</code>.</p></article>
       </div>
-      <p>The skill is the guided setup and safety layer; the generated <code>green</code> launcher is the durable operational interface. After initialization, the project can be operated directly without Node or the skill.</p>
+      <p>Each skill gathers non-secret inputs, creates its launcher and desired-state file, protects <code>.once/</code>, and runs build plus dry-run checks. The portable <code>ONCE_PAR_*</code> prefix works across implementations. Switch only between completed commands; never run implementations concurrently against the same state.</p>
     </section>
 
     <section id="requirements">
@@ -635,7 +628,9 @@
           <thead><tr><th>Tool</th><th>Needed for</th><th>Notes</th></tr></thead>
           <tbody>
             <tr><td><code>Node.js</code> / <code>npx</code></td><td>Loading the skill</td><td>Only needed to run the Skills CLI.</td></tr>
-            <tr><td><code>Babashka</code></td><td>All launcher commands</td><td>Runs the generated <code>green</code> script.</td></tr>
+            <tr><td><code>Babashka</code></td><td>Green launcher commands</td><td>Runs <code>./green</code>.</td></tr>
+            <tr><td><code>Bun</code></td><td>Red launcher commands</td><td>Runs <code>./red</code>.</td></tr>
+            <tr><td><code>uv</code> and Python 3.11+</td><td>Blue launcher commands</td><td>Runs <code>./blue</code> from PEP 723 metadata.</td></tr>
             <tr><td><code>OpenTofu</code></td><td>Real create, delete, and state-backed describe</td><td>Manages compute, SMTP, DNS, and verification state.</td></tr>
             <tr><td><code>Ansible</code></td><td>Real create and delete</td><td>Configures the remote host and ONCE applications; delete replays the local play to drop the managed SSH block.</td></tr>
             <tr><td><code>OpenSSH</code></td><td>Create and describe</td><td>Private compute key should already be available through <code>ssh-agent</code>.</td></tr>
@@ -643,7 +638,7 @@
           </tbody>
         </table>
       </div>
-      <p>Provider credentials are required only for a real create or delete and only for the providers selected in <code>green.edn</code>. Build and dry-run still validate the non-secret desired-state structure.</p>
+      <p>Install only the runtime for your chosen implementation. Provider credentials are required only for a real create or delete and only for selected providers. Build and dry-run validate non-secret desired state without checking credentials.</p>
     </section>
 
     <section id="quick-start">
@@ -651,16 +646,17 @@
 
       <ol class="steps">
         <li>
-          <h3>Use the skill</h3>
-          <p>Load <code>green-once</code> for a one-off agent session without installing it:</p>
-          <pre><code class="language-bash">npx skills use bigconfig-ai/once@green-once</code></pre>
-          <p>To install it into an agent permanently instead:</p>
-          <pre><code class="language-bash">npx skills add bigconfig-ai/once --skill green-once</code></pre>
+          <h3>Choose and use a skill</h3>
+          <p>Load one implementation for a one-off agent session:</p>
+          <pre><code class="language-bash">npx skills use bigconfig-ai/once@package-once-green
+npx skills use bigconfig-ai/once@package-once-red
+npx skills use bigconfig-ai/once@package-once-blue</code></pre>
+          <p>Use the same names with <code>npx skills add bigconfig-ai/once --skill …</code> for permanent installation.</p>
         </li>
         <li>
           <h3>Describe the deployment</h3>
           <p>Tell the agent the profile name, the application hostnames and images, provider choices, and public-key file paths. Hostnames may span domains; each hostname determines its DNS zone and matching mail domain. Give the agent only the <em>names</em> of environment variables that hold application secrets—never secret values.</p>
-          <pre><code class="language-text">Create a Green Once project.
+          <pre><code class="language-text">Create an ONCE project using Green, Red, or Blue.
 Deploy ghcr.io/example/site:latest at www.example.com.
 Deploy ghcr.io/example/another-site:latest at www.example.net.
 Use DigitalOcean, Resend, Cloudflare, and R2.
@@ -668,19 +664,19 @@ Map DATABASE_URL to the key :site-database-url.</code></pre>
         </li>
         <li>
           <h3>Review generated project files</h3>
-          <p>The skill writes an executable <code>green</code> launcher and a flat <code>green.edn</code> desired-state file. It does not put credentials or application secret values in either file.</p>
+          <p>The skill writes the selected launcher and desired-state file. Green uses EDN; Red and Blue use equivalent YAML. No credential or application secret value belongs in either.</p>
         </li>
         <li>
           <h3>Run safe checks</h3>
           <p>The skill builds generated configuration and prints the execution graph without provisioning anything:</p>
-          <pre><code class="language-bash">./green build -f ./green.edn
-./green create -f ./green.edn --dry-run</code></pre>
+          <pre><code class="language-bash">./green build -f green.edn       # or: ./red build -f red.yml
+./green create --dry-run          # or the equivalent ./blue command</code></pre>
         </li>
         <li>
           <h3>Provision explicitly</h3>
           <p>Set the required environment variables through your private shell or secret manager, review the dry-run, and explicitly approve the real operation:</p>
-          <pre><code class="language-bash">./green create -f ./green.edn
-./green describe -f ./green.edn</code></pre>
+          <pre><code class="language-bash">./green create -f green.edn       # substitute red/blue as selected
+./green describe -f green.edn</code></pre>
         </li>
       </ol>
 
@@ -692,7 +688,7 @@ Map DATABASE_URL to the key :site-database-url.</code></pre>
 
     <section id="workflow-architecture">
       <h2 class="anchor-heading"><a href="#workflow-architecture" aria-label="Link to Workflow architecture">#</a>Workflow architecture</h2>
-      <p>Green executes the lifecycle as a directed acyclic graph. Independent work runs concurrently; downstream steps receive outputs from their upstream branches.</p>
+      <p>Each implementation executes the same directed acyclic graph. Independent work runs concurrently; downstream steps receive outputs from their upstream branches.</p>
 
       <h3>Create and build</h3>
       <pre class="diagram"><code>                    ┌─ tofu-compute ─┐                             ┌─ ansible-local
@@ -715,10 +711,11 @@ start + validation ─┤                ├─ tofu-dns ─ tofu-smtp-post ─�
 
     <section id="desired-state">
       <h2 class="anchor-heading"><a href="#desired-state" aria-label="Link to Desired state">#</a>Desired state</h2>
-      <p><code>green.edn</code> is a single flat EDN map, except for the nested <code>:once</code> application collection. Keep provider selection and non-secret settings in this file; keep all credentials, passwords, private keys, and application secret values out.</p>
+      <p><code>green.edn</code> is a flat EDN map except for applications. <code>red.yml</code> and <code>blue.yml</code> carry the same kebab-case keys in YAML, without the leading EDN colons. Keep credentials, passwords, private keys, and application secret values out of every form.</p>
+      <div class="callout info"><span class="callout-title">Interchangeable state</span>Use the same <code>profile</code>, <code>workdir: .once</code>, providers, and settings when switching colors. Generated paths, resource addresses, and bytes are identical.</div>
 
       <pre><code class="language-clojure">{:profile "production"
- :workdir ".green"
+ :workdir ".once"
 
  :deploy-pubkey "ssh-ed25519 AAAA... ci-deploy"
 
@@ -745,7 +742,7 @@ start + validation ─┤                ├─ tofu-dns ─ tofu-smtp-post ─�
  :r2-endpoint "https://ACCOUNT_ID.r2.cloudflarestorage.com"}</code></pre>
 
       <h3>Non-secret overrides</h3>
-      <p>A <code>GREEN_PAR_*</code> environment variable overrides a flat key. The launcher strips the prefix, lowercases the name, and changes underscores to hyphens. Existing boolean and integer values retain their types.</p>
+      <p>A native color variable or portable <code>ONCE_PAR_*</code> variable overrides a flat key. The launcher strips the prefix, lowercases the name, and changes underscores to hyphens. Existing boolean and integer values retain their types.</p>
       <pre><code class="language-bash">GREEN_PAR_DIGITALOCEAN_REGION=fra1 ./green build
 GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
       <p>Use this mechanism for temporary deployment settings, for the destruction guard, and for every credential — the same overlay carries secrets, as listed under <a href="#secrets">Secrets and environment</a>.</p>
@@ -754,7 +751,7 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
     <section id="generated-files">
       <h2 class="anchor-heading"><a href="#generated-files" aria-label="Link to Generated files">#</a>Generated files</h2>
       <p>Every tool gets an isolated directory under <code>&lt;workdir&gt;/&lt;profile&gt;/</code>. With the recommended defaults, a build resembles:</p>
-      <pre><code class="language-text">.green/
+      <pre><code class="language-text">.once/
 └── production/
     ├── tofu-compute/
     │   ├── backend.tf.json
@@ -830,28 +827,28 @@ GREEN_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
       <h2 class="anchor-heading"><a href="#secrets" aria-label="Link to Secrets and environment">#</a>Secrets and environment</h2>
       <div class="callout danger">
         <span class="callout-title">Never put secret values in project files or chat</span>
-        Do not place API tokens, passwords, private keys, access keys, or application secrets in <code>green.edn</code>, the <code>green</code> launcher, prompts, generated examples, logs, or shell history. Use a private environment loader or secret manager.
+        Do not place API tokens, passwords, private keys, access keys, or application secrets in any desired-state file, launcher, prompt, generated example, log, or shell history. Use a private environment loader or secret manager.
       </div>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>Selection</th><th>Required environment variables</th><th>When</th></tr></thead>
           <tbody>
-            <tr><td>DigitalOcean</td><td><code>GREEN_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
-            <tr><td>Hetzner Cloud</td><td><code>GREEN_PAR_HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
-            <tr><td>Yandex Cloud</td><td><code>GREEN_PAR_YANDEX_TOKEN</code></td><td>Create and delete</td></tr>
-            <tr><td>Oracle Cloud</td><td>None — authenticates through the <code>:oci-config-file-profile</code> entry in <code>~/.oci/config</code></td><td>—</td></tr>
-            <tr><td>Resend</td><td><code>GREEN_PAR_RESEND_API_KEY</code>, <code>GREEN_PAR_RESEND_PASSWORD</code></td><td>Create and delete</td></tr>
-            <tr><td>Existing SMTP</td><td><code>GREEN_PAR_NO_INFRA_SMTP_PASSWORD</code></td><td>Create and delete</td></tr>
-            <tr><td>Cloudflare DNS</td><td><code>GREEN_PAR_CLOUDFLARE_API_TOKEN</code></td><td>Create and delete</td></tr>
-            <tr><td>R2 backend</td><td><code>GREEN_PAR_R2_ACCESS_KEY_ID</code>, <code>GREEN_PAR_R2_SECRET_ACCESS_KEY</code></td><td>Create and delete</td></tr>
-            <tr><td>S3 backend</td><td>None — OpenTofu resolves its own AWS credential chain</td><td>Create and delete</td></tr>
-            <tr><td>Application <code>:env</code></td><td>One <code>GREEN_PAR_*</code> per key named by the application map</td><td>Create</td></tr>
+            <tr><td>DigitalOcean</td><td><code>COLOR_PAR_DO_TOKEN</code> or <code>ONCE_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Hetzner Cloud</td><td><code>COLOR_PAR_HCLOUD_TOKEN</code> or portable alias</td><td>Create and delete</td></tr>
+            <tr><td>Yandex Cloud</td><td><code>COLOR_PAR_YANDEX_TOKEN</code> or portable alias</td><td>Create and delete</td></tr>
+            <tr><td>Oracle Cloud</td><td>None — authenticates through the configured OCI profile</td><td>—</td></tr>
+            <tr><td>Resend</td><td><code>COLOR_PAR_RESEND_API_KEY</code> and <code>COLOR_PAR_RESEND_PASSWORD</code>, or portable aliases</td><td>Create and delete</td></tr>
+            <tr><td>Existing SMTP</td><td><code>COLOR_PAR_NO_INFRA_SMTP_PASSWORD</code> or portable alias</td><td>Create and delete</td></tr>
+            <tr><td>Cloudflare DNS</td><td><code>COLOR_PAR_CLOUDFLARE_API_TOKEN</code> or portable alias</td><td>Create and delete</td></tr>
+            <tr><td>R2 backend</td><td><code>COLOR_PAR_R2_ACCESS_KEY_ID</code> and <code>COLOR_PAR_R2_SECRET_ACCESS_KEY</code>, or portable aliases</td><td>Create and delete</td></tr>
+            <tr><td>S3 backend</td><td>None — OpenTofu resolves its AWS credential chain</td><td>Create and delete</td></tr>
+            <tr><td>Application environment</td><td>One native color or <code>ONCE_PAR_*</code> variable per mapped key</td><td>Create</td></tr>
           </tbody>
         </table>
       </div>
-      <p>Every credential travels the same path into Green Once: a <code>GREEN_PAR_*</code> variable overlaid onto the matching flat key. <code>GREEN_PAR_*</code> is the only name you set — there is no <code>TF_VAR_*</code> and no second mechanism.</p>
-      <p>From there nothing is written into a rendered file. OpenTofu credentials are handed to each stage through the process environment under the variable that provider reads natively (<code>DIGITALOCEAN_TOKEN</code>, <code>CLOUDFLARE_API_TOKEN</code>, and so on), and R2 authenticates through <code>AWS_ACCESS_KEY_ID</code> / <code>AWS_SECRET_ACCESS_KEY</code>. Ansible receives <code>{{ lookup('env','GREEN_PAR_…') }}</code> expressions instead of values, so the SMTP password and application secrets are resolved when the play runs. Build and dry-run do not require these variables — unset credentials are simply omitted, so a build never writes a secret to disk.</p>
+      <p>Use the selected implementation's native prefix or portable <code>ONCE_PAR_*</code>. For example, <code>GREEN_PAR_DO_TOKEN</code>, <code>RED_PAR_DO_TOKEN</code>, <code>BLUE_PAR_DO_TOKEN</code>, and <code>ONCE_PAR_DO_TOKEN</code> fill the same key. There is no <code>TF_VAR_*</code> alias.</p>
+      <p>Nothing is written into a rendered file. OpenTofu credentials are passed through the process environment under provider-native names. The byte-identical Ansible expression checks <code>ONCE_PAR_*</code> and all three native prefixes at play time. Build and dry-run require none of them.</p>
 
       <h3>Check presence without printing values</h3>
       <pre><code class="language-bash">for name in GREEN_PAR_DO_TOKEN GREEN_PAR_RESEND_API_KEY \
@@ -955,7 +952,7 @@ done</code></pre>
         <article class="card">
           <p class="label">External</p>
           <h3><code>no-infra</code></h3>
-          <p>Creates no DNS resources and requires no DNS credential. You are responsible for application and SMTP records outside Green Once.</p>
+          <p>Creates no DNS resources and requires no DNS credential. You are responsible for application and SMTP records outside Once.</p>
         </article>
       </div>
       <pre><code class="language-clojure">:provider-dns "cloudflare"  ; or "no-infra"</code></pre>
@@ -1003,27 +1000,28 @@ ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
 
     <section id="commands">
       <h2 class="anchor-heading"><a href="#commands" aria-label="Link to Command overview">#</a>Command overview</h2>
-      <pre><code class="language-text">Usage: ./green &lt;build|create|delete|describe&gt; [-f|--file green.edn] [--dry-run]</code></pre>
+      <pre><code class="language-text">Usage: ./&lt;color&gt; &lt;build|create|delete|describe&gt; [-f|--file &lt;color-state&gt;] [--dry-run]
+Colors: green / red / blue</code></pre>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Command</th><th>Effect</th><th>External changes</th></tr></thead>
           <tbody>
-            <tr><td><code>./green build</code></td><td>Validate and render all stage files.</td><td>Writes only the local work directory.</td></tr>
-            <tr><td><code>./green create --dry-run</code></td><td>Validate and print the create DAG.</td><td>None.</td></tr>
-            <tr><td><code>./green create</code></td><td>Provision infrastructure and reconcile the server.</td><td>Yes.</td></tr>
-            <tr><td><code>./green describe</code></td><td>Read state, probe SSH, and list ONCE applications.</td><td>Read-only.</td></tr>
-            <tr><td><code>./green delete --dry-run</code></td><td>Validate and print the delete DAG.</td><td>None.</td></tr>
-            <tr><td><code>./green delete</code></td><td>Destroy managed infrastructure in reverse order.</td><td>Destructive.</td></tr>
+            <tr><td><code>./COLOR build</code></td><td>Validate and render all stage files.</td><td>Writes only the local work directory.</td></tr>
+            <tr><td><code>./COLOR create --dry-run</code></td><td>Validate and print the create DAG.</td><td>None.</td></tr>
+            <tr><td><code>./COLOR create</code></td><td>Provision infrastructure and reconcile the server.</td><td>Yes.</td></tr>
+            <tr><td><code>./COLOR describe</code></td><td>Read state, probe SSH, and list ONCE applications.</td><td>Read-only.</td></tr>
+            <tr><td><code>./COLOR delete --dry-run</code></td><td>Validate and print the delete DAG.</td><td>None.</td></tr>
+            <tr><td><code>./COLOR delete</code></td><td>Destroy managed infrastructure in reverse order.</td><td>Destructive.</td></tr>
           </tbody>
         </table>
       </div>
-      <p>There is no <code>pin</code> command. Stamping the launcher with the commit its sources come from is a maintenance task inside the Green Once repository, not something a project ever runs.</p>
+      <p>There is no <code>pin</code> command. Stamping the launcher with the commit its sources come from is a maintenance task inside the Once repository, not something a project ever runs.</p>
     </section>
 
     <section id="build">
       <h2 class="anchor-heading"><a href="#build" aria-label="Link to Build">#</a>Build</h2>
       <pre><code class="language-bash">./green build</code></pre>
-      <p>Build validates the selected providers and required non-secret values, then renders all OpenTofu and Ansible files. It does not invoke OpenTofu, Ansible, SSH, or provider APIs. Use it to review exactly what Green Once would generate.</p>
+      <p>Build validates the selected providers and required non-secret values, then renders all OpenTofu and Ansible files. It does not invoke OpenTofu, Ansible, SSH, or provider APIs. Use it to review exactly what any implementation would generate.</p>
     </section>
 
     <section id="create">
@@ -1060,7 +1058,7 @@ ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
     <section id="delete">
       <h2 class="anchor-heading"><a href="#delete" aria-label="Link to Delete and dry-run">#</a>Delete and dry-run</h2>
       <pre><code class="language-bash">./green delete --dry-run
-GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
+ONCE_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <p>Dry-run prints teardown order and changes nothing. A real delete is refused while <code>:compute-prevent-destroy</code> is <code>true</code>, which is the required default. Deliberately override it only for the exact delete you have approved.</p>
       <div class="callout danger">
         <span class="callout-title">Destructive operation</span>
@@ -1074,7 +1072,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <pre><code class="language-bash">./green build -f ./production.edn
 ./green create --file ./production.edn --dry-run
 ./green describe -f ./production.edn</code></pre>
-      <p>Keep profiles and work directories distinct to prevent state or generated files from overlapping.</p>
+      <p>Use distinct profiles for independent stacks. Use the same profile and <code>.once</code> workdir when changing only the implementation color.</p>
     </section>
 
     <section id="safe-lifecycle">
@@ -1109,8 +1107,8 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
     <section id="troubleshooting">
       <h2 class="anchor-heading"><a href="#troubleshooting" aria-label="Link to Troubleshooting">#</a>Troubleshooting</h2>
 
-      <h3><code>npx skills</code> cannot find <code>green-once</code></h3>
-      <p>Confirm internet access and use the full package and skill name: <code>npx skills use bigconfig-ai/once@green-once</code>.</p>
+      <h3><code>npx skills</code> cannot find a package</h3>
+      <p>Use a full skill name: <code>package-once-green</code>, <code>package-once-red</code>, or <code>package-once-blue</code>. The former <code>green-once</code> name was intentionally removed.</p>
 
       <h3>A desired-state key is required</h3>
       <p>Add the missing non-secret field for the selected provider. Remove unused providers' fields rather than filling them with credentials or passwords.</p>
@@ -1151,10 +1149,10 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
     </section>
 
     <section id="complete-example">
-      <h2 class="anchor-heading"><a href="#complete-example" aria-label="Link to Complete example">#</a>Complete <code>green.edn</code> example</h2>
-      <p>This example contains only public or non-secret configuration. Replace illustrative identifiers with your own, but provide credentials and passwords exclusively through environment variables.</p>
+      <h2 class="anchor-heading"><a href="#complete-example" aria-label="Link to Complete example">#</a>Complete desired-state example</h2>
+      <p>Green syntax is shown; Red and Blue use the same keys in YAML. This contains only public or non-secret configuration. Replace illustrative identifiers and provide credentials exclusively through environment variables.</p>
       <pre><code class="language-clojure">{:profile "production"
- :workdir ".green"
+ :workdir ".once"
 
  :deploy-pubkey "ssh-ed25519 AAAAC3... ci-deploy"
 
@@ -1194,7 +1192,7 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
           <thead><tr><th>Key</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><code>:profile</code></td><td>Yes</td><td>Names generated output, remote state keys, the compute resource, and the SSH host alias.</td></tr>
-            <tr><td><code>:workdir</code></td><td>Yes</td><td>Generated root directory; recommended value is <code>.green</code>.</td></tr>
+            <tr><td><code>:workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.once</code>.</td></tr>
             <tr><td><code>:compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
             <tr><td><code>:deploy-pubkey</code></td><td>Yes</td><td>Restricted application-update SSH public key.</td></tr>
             <tr><td><code>:once</code></td><td>Yes</td><td>Map containing a non-empty <code>:applications</code> vector.</td></tr>
@@ -1229,27 +1227,27 @@ GREEN_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
     <section id="repository-layout">
       <h2 class="anchor-heading"><a href="#repository-layout" aria-label="Link to Repository layout">#</a>Repository layout</h2>
       <pre><code class="language-text">once/
-├── green-once/
-│   ├── SKILL.md                    # agent instructions and safety policy
-│   ├── green                       # bundled self-contained launcher
-│   └── references/
-│       └── configuration.md        # skill configuration reference
-├── green                           # symlink to green-once/green
-├── green.edn                       # repository example desired state
-├── src/                            # Clojure implementation and resources
-├── test/                           # Clojure tests
+├── green/                          # Clojure/Babashka package
+├── red/                            # TypeScript/Bun package
+├── blue/                           # Python/uv package
+├── skills/
+│   ├── package-once-green/
+│   ├── package-once-red/
+│   └── package-once-blue/
+├── scripts/parity.sh               # byte-parity gate
 ├── README.md
-└── index.html                      # this manual</code></pre>
-      <p>An initialized user project normally needs only the copied <code>green</code> launcher, <code>green.edn</code>, and a precise ignore rule for its configured work directory.</p>
+└── index.html                      # this unified manual</code></pre>
+      <p>An initialized project needs the selected launcher and desired-state file plus a precise ignore rule for <code>.once/</code>. Multiple color files may coexist when migrating between implementations.</p>
     </section>
 
     <section id="development">
       <h2 class="anchor-heading"><a href="#development" aria-label="Link to Development">#</a>Development and testing</h2>
-      <p>Run repository checks from the Green Once project root:</p>
-      <pre><code class="language-bash">clojure -M:test
-clojure-lsp clean-ns
-clojure-lsp format</code></pre>
-      <p>The production skill copies <code>green-once/green</code> into initialized projects. Test changes with build and dry-run before attempting live provider operations. Generated work directories are artifacts and must not be edited as source.</p>
+      <p>Run every implementation suite and the cross-language parity gate:</p>
+      <pre><code class="language-bash">cd green &amp;&amp; clojure -M:test
+cd red &amp;&amp; bun test &amp;&amp; bun run typecheck
+cd blue &amp;&amp; uv run python -m pytest -q
+./scripts/parity.sh</code></pre>
+      <p>The parity gate compares complete build trees and all separately packaged resources. Generated work directories are artifacts and must not be edited as source.</p>
     </section>
 
     <section id="license">
@@ -1258,7 +1256,7 @@ clojure-lsp format</code></pre>
     </section>
 
     <footer>
-      <p>Green Once manual · <a href="https://github.com/bigconfig-ai/once" rel="noopener">github.com/bigconfig-ai/once</a></p>
+      <p>Once manual · Green, Red, and Blue · <a href="https://github.com/bigconfig-ai/once" rel="noopener">github.com/bigconfig-ai/once</a></p>
     </footer>
   </main>
 </div>

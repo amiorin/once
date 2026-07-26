@@ -1,9 +1,8 @@
-name: Test and Tag
+name: Test, Parity, and Tag
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,24 +10,23 @@ permissions:
 
 jobs:
   test:
-    runs-on:
-      - self-hosted
-      - Linux
-      - ARM64
+    runs-on: [self-hosted, Linux, ARM64]
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Runs tests
-        id: run_tests
-        run: devenv shell clojure -X:test
+      - name: Green tests
+        run: devenv shell bash -lc 'cd green && clojure -X:test'
+      - name: Red tests and typecheck
+        run: devenv shell bash -lc 'cd red && bun install && bun test && bun run typecheck'
+      - name: Blue tests
+        run: devenv shell bash -lc 'cd blue && uv sync && uv run python -m pytest -q'
+      - name: Byte parity
+        run: devenv shell ./scripts/parity.sh
 
   tag:
     needs: test
-    runs-on:
-      - self-hosted
-      - Linux
-      - ARM64
+    runs-on: [self-hosted, Linux, ARM64]
     steps:
       - uses: actions/checkout@v5
         with:
