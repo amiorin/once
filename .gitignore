@@ -5,6 +5,7 @@
 !.envrc.private.example
 !.dir-locals.el
 !.projectile
+!.nojekyll
 
 /.clj-kondo/*
 !/.clj-kondo
