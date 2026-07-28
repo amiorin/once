@@ -21,3 +21,8 @@ target/
 /.lsp/*
 !/.lsp
 !/.lsp/config.edn
+
+# Real desired state carries infrastructure identifiers (tenancy OCIDs, the
+# account id inside an R2 endpoint). This repository is public, and a commit is
+# not undoable — keep it local. colors.yml, the example, stays tracked.
+colors-*.yml
