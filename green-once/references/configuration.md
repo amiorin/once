@@ -89,6 +89,8 @@ Required credential: `GREEN_PAR_HCLOUD_TOKEN`.
 
 Green creates a network, subnet, NAT-enabled instance, and boot disk. The public key is installed for the `ubuntu` user; keep its private half in `ssh-agent`. Required credential: `GREEN_PAR_YANDEX_TOKEN`, passed to OpenTofu as the provider-native `YC_TOKEN`.
 
+`:yandex-image-id` pins the boot image. Without it the image comes from `:yandex-image-family`, which resolves to whatever Yandex published most recently — and because a boot disk's image is immutable, an upstream release plans a replacement of the whole server. With `:compute-prevent-destroy` set (the default) that plan *fails* rather than warns, blocking unrelated deploys, so the family path ignores later changes to the image id. Pin the id to state which image the server actually runs; moving the pin then plans a replacement deliberately.
+
 ### Oracle Cloud Infrastructure
 
 ```clojure

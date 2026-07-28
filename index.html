@@ -902,8 +902,12 @@ done</code></pre>
 :yandex-cores 2
 :yandex-memory-gb 2
 :yandex-core-fraction 100
-:yandex-disk-size-gb 20</code></pre>
+:yandex-disk-size-gb 20
+;; Optional:
+:yandex-image-id "fd8..."</code></pre>
       <p>Creates a network, subnet, NAT-enabled Ubuntu instance, and boot disk. <code>:compute-pubkey</code> is installed for the <code>ubuntu</code> user; keep the private half in <code>ssh-agent</code>. Credential: <code>GREEN_PAR_YANDEX_TOKEN</code>, passed to OpenTofu as <code>YC_TOKEN</code>.</p>
+
+      <p><code>:yandex-image-id</code> pins the boot image. Without it the image is resolved from <code>:yandex-image-family</code>, which follows whatever Yandex published most recently; since a boot disk's image is immutable, an upstream release plans a replacement of the server — and with <code>:compute-prevent-destroy</code> set that plan fails rather than warns. The family path therefore ignores later image-id changes. Pin the id to state which image the server runs; moving the pin plans a replacement deliberately.</p>
 
       <h3>Oracle Cloud Infrastructure</h3>
       <pre><code class="language-clojure">:provider-compute "oci"

@@ -61,6 +61,9 @@
  :yandex-memory-gb 2
  :yandex-core-fraction 100
  :yandex-disk-size-gb 20
+ ;; Optional: pin the boot image so an upstream release cannot plan a
+ ;; replacement of the server. Unset means follow :yandex-image-family.
+ :yandex-image-id "REPLACE_ME"
 
  :oci-config-file-profile "REPLACE_ME"
  :oci-subnet-id "REPLACE_ME"
