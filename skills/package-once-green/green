@@ -38,7 +38,7 @@
   7)
 
 ;; Managed by `bb pin` — do not edit by hand.
-(def ^:private once-sha "d7e986e79bcec942ef7d8659061a31f8667742fc")
+(def ^:private once-sha "731ca7cbc1796986f41704ef4a3a8f9fb492d2d9")
 (def ^:private green-sha "1c1fb81563287c98aa1bcd0e12cd755296e6d98e")
 
 (def ^:private once-git-url "https://github.com/bigconfig-ai/once.git")
