@@ -35,7 +35,7 @@
   "Minimum io.github.bigconfig-ai/once contract this launcher requires.
   Guarded at run time so a stale pin fails loudly instead of rendering
   templates from an older commit."
-  7)
+  9)
 
 ;; Managed by `bb pin` — do not edit by hand.
 (def ^:private once-sha "0e75076ed6137aec252ca5ea580f98de24e067d8")

@@ -31,8 +31,12 @@
      supplied as :deploy-pubkey, and an application may name a GitHub repository
      whose environment receives the connection details. A launcher pinned older
      still expects :deploy-pubkey in desired state and would ignore :github
-     silently, publishing nothing."
-  8)
+     silently, publishing nothing.
+  9: :oci-image-id pins the compute image. A launcher pinned older renders the
+     image data source regardless and takes whatever Canonical published most
+     recently, so the pin is ignored without a word and a plan proposes
+     replacing the instance."
+  9)
 
 (defn registrable-domain
   "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes

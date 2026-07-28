@@ -34,6 +34,11 @@ build_variant digitalocean-vpc COLORS_PAR_DIGITALOCEAN_VPC_UUID=vpc-123
 build_variant hcloud COLORS_PAR_PROVIDER_COMPUTE=hcloud
 build_variant yandex COLORS_PAR_PROVIDER_COMPUTE=yandex
 build_variant oci COLORS_PAR_PROVIDER_COMPUTE=oci
+# Both sides of the oci-image-id branch. The unpinned side renders a data
+# source and the pinned side renders none, so a colour whose template engine
+# handles <% else %> differently diverges here rather than in production.
+build_variant oci-pinned COLORS_PAR_PROVIDER_COMPUTE=oci \
+  COLORS_PAR_OCI_IMAGE_ID=ocid1.image.oc1.eu-frankfurt-1.aaaaaaaaexample
 build_variant no-infra-compute COLORS_PAR_PROVIDER_COMPUTE=no-infra
 build_variant no-infra-smtp COLORS_PAR_PROVIDER_SMTP=no-infra
 build_variant no-infra-dns COLORS_PAR_PROVIDER_DNS=no-infra

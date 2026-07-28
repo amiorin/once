@@ -115,6 +115,7 @@ oci-compartment-id: ocid1.compartment...
 oci-availability-domain: ...
 oci-display-name: once
 oci-shape: VM.Standard.A1.Flex
+oci-image-id: ocid1.image...   # optional; pins the boot image
 oci-ocpus: 1
 oci-memory-in-gbs: 4
 oci-boot-volume-size-in-gbs: 50
@@ -123,6 +124,14 @@ oci-ssh-authorized-keys: /home/user/.ssh/once.pub
 ```
 
 No credential variable is required: OCI authenticates through the named profile in `~/.oci/config`. `:oci-ssh-authorized-keys` is a path to a public-key file on the machine running the launcher, read at plan time.
+
+`:oci-image-id` is optional and pins the boot image. Unset, ONCE takes the
+newest Canonical Ubuntu 24.04 image compatible with `:oci-shape` — right for a
+first `create`, a moving target after that, because the image id forces
+replacement and Canonical keeps publishing. Set it once the stack is real;
+`tofu state show oci_core_instance.ampere_vm` reports the running image as
+`source_id`. Changing it destroys and recreates the server, which
+`:compute-prevent-destroy` (true by default) turns into a refused apply.
 
 ### Existing server
 

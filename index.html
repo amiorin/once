@@ -913,12 +913,18 @@ oci-compartment-id: ocid1.compartment...
 oci-availability-domain: ...
 oci-display-name: once
 oci-shape: VM.Standard.A1.Flex
+oci-image-id: ocid1.image...   # optional; pins the boot image
 oci-ocpus: 1
 oci-memory-in-gbs: 4
 oci-boot-volume-size-in-gbs: 50
 oci-boot-volume-vpus-per-gb: 30
 oci-ssh-authorized-keys: /home/user/.ssh/once.pub</code></pre>
       <p>The current default shape is ARM-based. <code>oci-ssh-authorized-keys</code> is a path to a public-key file on the machine running the launcher; its contents are written into instance metadata at plan time. OCI authenticates through the named profile in <code>~/.oci/config</code>, so no credential variable is required.</p>
+      <p><code>oci-image-id</code> is optional and pins the boot image. Left unset, ONCE looks up the newest Canonical Ubuntu 24.04 image compatible with <code>oci-shape</code> — the right behaviour for a first <code>create</code>, and a moving target afterwards. The image id forces replacement on the instance, so once Canonical publishes a newer one, a routine apply proposes destroying the server. Pin it once the stack is real; <code>tofu state show oci_core_instance.ampere_vm</code> reports the running image as <code>source_id</code>. With it set, no image lookup happens at all.</p>
+      <div class="callout warning">
+        <span class="callout-title">Changing <code>oci-image-id</code> replaces the server</span>
+        The boot image is not something an existing instance can be moved to in place. A changed value destroys and recreates the VM, taking any data not held elsewhere with it. <code>compute-prevent-destroy: true</code> — the default — turns that into a refused apply rather than a silent rebuild.
+      </div>
 
       <h3>Existing server</h3>
       <pre><code class="language-yaml">provider-compute: no-infra

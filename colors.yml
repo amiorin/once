@@ -88,6 +88,13 @@ oci-compartment-id: REPLACE_ME
 oci-availability-domain: REPLACE_ME
 oci-display-name: once
 oci-shape: VM.Standard.A1.Flex
+# Optional. Pins the boot image. Left unset, the newest Canonical Ubuntu 24.04
+# image compatible with oci-shape is used — convenient for a first create, and
+# a moving target afterwards: the image id forces replacement, so an apply
+# months later can propose destroying the instance because Canonical published
+# a new one. Set it to the image you are actually running once the stack is
+# real. `tofu state show oci_core_instance.ampere_vm` reports it as source_id.
+# oci-image-id: ocid1.image.oc1...
 oci-ocpus: 1
 oci-memory-in-gbs: 4
 oci-boot-volume-size-in-gbs: 50
