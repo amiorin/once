@@ -10,8 +10,12 @@ once:
       github: bigconfig-ai/once-bigconfig
       env:
         EXAMPLE: app-example
+    # Same image, same repository, second host. Deploy keys are per repository,
+    # so this and www.example.com share one key whose ForceCommand names both —
+    # the case that has to render identically in all three colours.
     - host: www.example.net
       image: ghcr.io/bigconfig-ai/once-bigconfig:latest
+      github: bigconfig-ai/once-bigconfig
 provider-compute: digitalocean
 provider-smtp: resend
 provider-dns: cloudflare

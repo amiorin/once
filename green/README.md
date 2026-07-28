@@ -79,7 +79,8 @@ once:
       env:
         DATABASE_URL: app-database-url
     - host: www.example.net
-      image: ghcr.io/example/another-site:latest
+      image: ghcr.io/example/site:latest
+      github: acme/site      # same repository as www.example.com: one key, both hosts
 provider-compute: digitalocean  # digitalocean, hcloud, yandex, oci, no-infra
 provider-smtp: resend           # resend, no-infra
 provider-dns: cloudflare        # cloudflare, no-infra
@@ -177,8 +178,9 @@ the remaining live checks are soft failures named in the report.
 - `ansible-local` runs a playbook that writes the managed `Host <profile>`
   block into `~/.ssh/config`, and removes it again on delete.
 - `ansible-remote` installs Docker, ONCE, and Babashka, creates the restricted
-  `deploy` user whose key is pinned to a `ForceCommand`, and reconciles the
-  declared applications with the `once` Ansible module.
+  `deploy` user whose keys are each pinned to a `ForceCommand` naming the hosts
+  one repository serves, and reconciles the declared applications with the
+  `once` Ansible module.
 
 A build of the example desired state produces:
 

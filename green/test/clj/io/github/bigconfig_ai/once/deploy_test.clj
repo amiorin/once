@@ -17,103 +17,117 @@
 (defn- make-shim!
   "Create a temp dir with `sudo` and `once` shims. The `once` shim logs every
   invocation to calls.log, returns `list-output` for `once list`, and exits 0
-  for `once update`."
-  [list-output]
-  (let [dir       (make-temp-dir!)
-        sudo      (io/file dir "sudo")
-        once      (io/file dir "once")
-        log       (io/file dir "calls.log")
-        list-file (io/file dir "list.output")]
-    (spit list-file list-output)
-    (spit sudo "#!/bin/sh\nexec \"$@\"\n")
-    (.setExecutable sudo true false)
-    (spit once (str "#!/bin/sh\n"
-                    "echo \"$@\" >> " (.getAbsolutePath log) "\n"
-                    "case \"$1\" in\n"
-                    "  list)   cat " (.getAbsolutePath list-file) " ;;\n"
-                    "  update) exit 0 ;;\n"
-                    "  *)      exit 2 ;;\n"
-                    "esac\n"))
-    (.setExecutable once true false)
-    {:dir (.getAbsolutePath dir)
-     :log (.getAbsolutePath log)}))
+  for `once update` unless the host is `fail-host`."
+  ([list-output] (make-shim! list-output nil))
+  ([list-output fail-host]
+   (let [dir       (make-temp-dir!)
+         sudo      (io/file dir "sudo")
+         once      (io/file dir "once")
+         log       (io/file dir "calls.log")
+         list-file (io/file dir "list.output")]
+     (spit list-file list-output)
+     (spit sudo "#!/bin/sh\nexec \"$@\"\n")
+     (.setExecutable sudo true false)
+     (spit once (str "#!/bin/sh\n"
+                     "echo \"$@\" >> " (.getAbsolutePath log) "\n"
+                     "case \"$1\" in\n"
+                     "  list)   cat " (.getAbsolutePath list-file) " ;;\n"
+                     "  update) [ \"$2\" = \"" (or fail-host "\\0") "\" ] && exit 1 ; exit 0 ;;\n"
+                     "  *)      exit 2 ;;\n"
+                     "esac\n"))
+     (.setExecutable once true false)
+     {:dir (.getAbsolutePath dir)
+      :log (.getAbsolutePath log)})))
 
-(def ^:private default-permitted "bigconfig.website")
+(def ^:private default-permitted ["bigconfig.website"])
 
 (defn- run-deploy
-  "The permitted host arrives as an argument, the way the ForceCommand in
-  authorized_keys supplies it — one key, one application."
+  "The permitted hosts arrive as arguments, the way the ForceCommand in
+  authorized_keys supplies them — one key, one repository, every host that
+  repository serves."
   ([ssh-original-command] (run-deploy ssh-original-command nil default-permitted))
   ([ssh-original-command shim] (run-deploy ssh-original-command shim default-permitted))
   ([ssh-original-command shim permitted]
    (let [env (cond-> {"SSH_ORIGINAL_COMMAND" (or ssh-original-command "")}
                shim (assoc "PATH" (str (:dir shim) ":" (System/getenv "PATH"))))]
-     (process/run (cond-> ["bb" deploy-script]
-                    permitted (conj permitted))
+     (process/run (into ["bb" deploy-script] permitted)
                   {:extra-env env}))))
 
-(deftest rejects-empty-ssh-command
-  (let [{:keys [exit err]} (run-deploy "")]
-    (is (= 1 exit))
-    (is (str/includes? err "interactive sessions"))))
-
-(deftest rejects-unrelated-command
-  (let [{:keys [exit err]} (run-deploy "rm -rf /")]
-    (is (= 1 exit))
-    (is (str/includes? err "command not allowed"))))
-
-(deftest rejects-wrong-once-subcommand
-  (let [{:keys [exit err]} (run-deploy "sudo once list")]
-    (is (= 1 exit))
-    (is (str/includes? err "command not allowed"))))
-
-(deftest rejects-too-many-tokens
-  (let [{:keys [exit err]} (run-deploy "sudo once update foo bar")]
-    (is (= 1 exit))
-    (is (str/includes? err "command not allowed"))))
-
-(deftest rejects-chained-command
-  (let [{:keys [exit err]} (run-deploy "sudo once update foo.com; rm -rf /")]
-    (is (= 1 exit))
-    (is (str/includes? err "command not allowed"))))
-
-(deftest rejects-shell-metacharacters-in-host
-  (let [{:keys [exit err]} (run-deploy "sudo once update foo;bar")]
-    (is (= 1 exit))
-    (is (str/includes? err "invalid host"))))
-
-(deftest rejects-host-not-in-once-list
-  (let [shim (make-shim! "bigconfig.website (running)\n")
-        {:keys [exit err]} (run-deploy "sudo once update bogus.example.com" shim
-                                       "bogus.example.com")]
-    (is (= 1 exit))
-    (is (str/includes? err "host not allowed"))))
-
-(deftest rejects-host-this-key-is-not-for
-  (testing "a key issued for one application cannot redeploy another"
+(deftest a-ping-updates-the-permitted-host
+  (testing "the client sends nothing; the entry already names what to update"
     (let [shim (make-shim! "bigconfig.website (running)\nother.example.com (running)\n")
-          {:keys [exit err]} (run-deploy "sudo once update other.example.com" shim
-                                         "bigconfig.website")]
-      (is (= 1 exit))
-      (is (str/includes? err "host not permitted for this key")))))
+          {:keys [exit]} (run-deploy "" shim)
+          log (slurp (:log shim))]
+      (is (= 0 exit))
+      (is (str/includes? log "update bigconfig.website"))
+      (is (not (str/includes? log "update other.example.com"))
+          "a ping updates this key's hosts, not every host on the box"))))
 
-(deftest rejects-a-key-with-no-permitted-host
-  (testing "an entry missing its ForceCommand argument grants nothing"
-    (let [{:keys [exit err]} (run-deploy "sudo once update bigconfig.website" nil nil)]
-      (is (= 1 exit))
-      (is (str/includes? err "no permitted host configured")))))
+(deftest a-ping-updates-every-host-in-the-entry
+  (testing "one repository serving several hosts updates all of them"
+    (let [shim (make-shim! "a.example.com (running)\nb.example.com (running)\nc.example.com (running)\n")
+          {:keys [exit]} (run-deploy "" shim ["a.example.com" "b.example.com"])
+          log (slurp (:log shim))]
+      (is (= 0 exit))
+      (is (str/includes? log "update a.example.com"))
+      (is (str/includes? log "update b.example.com"))
+      (is (not (str/includes? log "update c.example.com"))))))
 
-(deftest runs-update-for-allowed-host
-  (let [shim (make-shim! "bigconfig.website (running)\nforms.bigconfig.website (running)\n")
-        {:keys [exit]} (run-deploy "sudo once update bigconfig.website" shim)
+(deftest a-requested-command-is-ignored-not-obeyed
+  (testing "an old workflow still sending `sudo once update <host>` keeps working"
+    (let [shim (make-shim! "bigconfig.website (running)\nother.example.com (running)\n")
+          {:keys [exit err]} (run-deploy "sudo once update other.example.com" shim)
+          log (slurp (:log shim))]
+      (is (= 0 exit))
+      (is (str/includes? err "ignoring the requested command"))
+      (is (str/includes? log "update bigconfig.website"))
+      (is (not (str/includes? log "update other.example.com"))
+          "the requested host is not what the key is for, so it is not updated"))))
+
+(deftest an-arbitrary-command-selects-nothing
+  (testing "restrict plus the forced command mean the string was never a lever"
+    (let [shim (make-shim! "bigconfig.website (running)\n")
+          {:keys [exit]} (run-deploy "rm -rf /" shim)
+          log (slurp (:log shim))]
+      (is (= 0 exit))
+      (is (str/includes? log "update bigconfig.website"))
+      (is (not (str/includes? log "rm"))))))
+
+(deftest rejects-a-key-with-no-permitted-hosts
+  (testing "an entry missing its ForceCommand arguments grants nothing"
+    (let [{:keys [exit err]} (run-deploy "" nil [])]
+      (is (= 1 exit))
+      (is (str/includes? err "no permitted hosts configured")))))
+
+(deftest rejects-shell-metacharacters-in-a-permitted-host
+  (testing "a corrupted entry fails closed rather than reaching a shell"
+    (let [{:keys [exit err]} (run-deploy "" nil ["foo;bar"])]
+      (is (= 1 exit))
+      (is (str/includes? err "invalid permitted host")))))
+
+(deftest a-host-once-does-not-serve-fails-without-stopping-the-rest
+  (let [shim (make-shim! "a.example.com (running)\n")
+        {:keys [exit err]} (run-deploy "" shim ["a.example.com" "bogus.example.com"])
         log (slurp (:log shim))]
-    (is (= 0 exit))
-    (is (str/includes? log "update bigconfig.website"))))
+    (is (= 1 exit))
+    (is (str/includes? err "host not served by once: bogus.example.com"))
+    (is (str/includes? err "failed: bogus.example.com"))
+    (is (str/includes? log "update a.example.com")
+        "one missing application does not block the rest of the repository")))
+
+(deftest a-failed-update-fails-the-run
+  (testing "the exit code is the deploy result for every host this key owns"
+    (let [shim (make-shim! "a.example.com (running)\nb.example.com (running)\n" "b.example.com")
+          {:keys [exit err]} (run-deploy "" shim ["a.example.com" "b.example.com"])
+          log (slurp (:log shim))]
+      (is (= 1 exit))
+      (is (str/includes? err "once update failed for b.example.com"))
+      (is (str/includes? err "failed: b.example.com"))
+      (is (str/includes? log "update a.example.com")))))
 
 (deftest parses-host-list-with-ansi-escapes
   (let [shim (make-shim! (slurp (io/resource "ansi.output")))
-        {:keys [exit]} (run-deploy "sudo once update foo.bigconfig.space" shim
-                                   "foo.bigconfig.space")
+        {:keys [exit]} (run-deploy "" shim ["foo.bigconfig.space"])
         log (slurp (:log shim))]
     (is (= 0 exit))
     (is (str/includes? log "update foo.bigconfig.space"))))

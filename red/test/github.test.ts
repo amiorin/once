@@ -11,6 +11,10 @@ import {
 } from "../src/github.ts";
 import { deployKeysContent } from "../src/tools.ts";
 
+// Two applications share one repository — the same image answering for two
+// hosts — and a third names none. That is the shape per-application keys got
+// wrong: both published into `acme/site`'s environment and the second
+// overwrote the first.
 const opts = {
   profile: "prod",
   ip: "203.0.113.10",
@@ -18,7 +22,8 @@ const opts = {
   once: {
     applications: [
       { host: "www.example.com", github: "acme/site" },
-      { host: "www.example.net" },
+      { host: "www.example.net", github: "acme/site" },
+      { host: "app.example.com" },
     ],
   },
 };
@@ -35,13 +40,15 @@ function recorder(exit = 0) {
 }
 
 const key: DeployKey = {
-  host: "www.example.com",
+  hosts: ["www.example.com", "www.example.net"],
   github: "acme/site",
   public: "ssh-ed25519 AAAA one",
   privateFile: "/tmp/once/key-0",
 };
 
-test("only applications naming a repository are published", () => {
+test("a repository is published once however many hosts it serves", () => {
+  // Keyed per application this issued two publishes into one environment, and
+  // the second overwrote the first's key.
   expect(commands({ ...opts, "red/event": "create", "once/deploy-keys": [key] })).toHaveLength(5);
 });
 
@@ -112,17 +119,20 @@ test("a failed revoke does not", async () => {
   const { calls, runFn } = recorder(1);
   const result = await githubStep({ ...opts, "red/event": "delete" }, runFn);
   expect(result["red/exit"]).toBe(0);
+  // And a repository named by two applications is revoked once, not twice.
   expect(calls).toHaveLength(4);
 });
 
-test("each key is pinned to its own host", () => {
+test("each key is pinned to the hosts its repository serves", () => {
+  // The entry names every host, so the client never has to — and a key still
+  // cannot reach an application belonging to another repository.
   const keys = [
-    { host: "www.example.com", public: "ssh-ed25519 AAAA one" },
-    { host: "www.example.net", public: "ssh-ed25519 BBBB two" },
+    { hosts: ["www.example.com", "www.example.net"], public: "ssh-ed25519 AAAA one" },
+    { hosts: ["app.example.com"], public: "ssh-ed25519 BBBB two" },
   ];
   expect(deployKeysContent({ ...opts, "once/deploy-keys": keys })).toBe(
-    'restrict,command="/usr/local/bin/deploy www.example.com" ssh-ed25519 AAAA one\n' +
-      'restrict,command="/usr/local/bin/deploy www.example.net" ssh-ed25519 BBBB two\n',
+    'restrict,command="/usr/local/bin/deploy www.example.com www.example.net" ssh-ed25519 AAAA one\n' +
+      'restrict,command="/usr/local/bin/deploy app.example.com" ssh-ed25519 BBBB two\n',
   );
 });
 
@@ -131,12 +141,20 @@ test("a build renders a fixed placeholder", () => {
   // byte parity between the colours.
   const a = placeholderKeys(opts);
   expect(a).toEqual(placeholderKeys(opts));
+  // One key per repository, not per application.
   expect(a).toHaveLength(1);
-  expect(a[0]!.public.endsWith("once-deploy-prod-www.example.com")).toBe(true);
+  expect(a[0]!.hosts).toEqual(["www.example.com", "www.example.net"]);
+  expect(a[0]!.public.endsWith("once-deploy-prod-acme-site")).toBe(true);
 });
 
 test("the key comment carries no clock reading", () => {
-  expect(keyComment(opts, "www.example.com")).toBe("once-deploy-prod-www.example.com");
+  // And slugs the slash, because it sits in an authorized_keys comment.
+  expect(keyComment(opts, "acme/site")).toBe("once-deploy-prod-acme-site");
+});
+
+test("an application without a repository gets no key at all", () => {
+  // Not a key on the box and nothing else — nothing.
+  expect(placeholderKeys(opts).some((k) => k.hosts.includes("app.example.com"))).toBe(false);
 });
 
 test("a host key becomes a known_hosts line", () => {

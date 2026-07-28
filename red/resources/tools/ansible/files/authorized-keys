@@ -7,8 +7,9 @@
 ;; remember what it issued. Installing a new key therefore invalidates the old
 ;; one the moment this runs, and if the subsequent publication to GitHub fails,
 ;; the repository is left holding a key the box no longer accepts. Retaining
-;; one previous generation per host closes that window — the old key keeps
-;; working until the new one has been published, and the next create prunes it.
+;; one previous generation per repository closes that window — the old key
+;; keeps working until the new one has been published, and the next create
+;; prunes it.
 ;;
 ;; Two generations is the whole benefit. Anything more only extends how long a
 ;; leaked key stays usable.
@@ -20,18 +21,41 @@
 (require '[clojure.java.io :as io]
          '[clojure.string :as str])
 
-;; No trailing space: an entry written before deploy keys carried their own host
-;; reads `command="/usr/local/bin/deploy"`, and it has to be recognised as ours
-;; so that it is pruned. Left unmatched it would be mistaken for a foreign key
-;; and preserved forever — inert, because the current script refuses to run
-;; without a permitted host, but still sitting in the file.
+;; No trailing space: an entry written before deploy keys carried their own
+;; hosts reads `command="/usr/local/bin/deploy"`, and it has to be recognised
+;; as ours so that it is pruned. Left unmatched it would be mistaken for a
+;; foreign key and preserved forever — inert, because the current script
+;; refuses to run without a permitted host, but still sitting in the file.
 (def managed-marker "command=\"/usr/local/bin/deploy")
 
 (defn managed? [line]
   (str/includes? line managed-marker))
 
-(defn host-of [line]
-  (second (re-find #"command=\"/usr/local/bin/deploy ([^\"]+)\"" line)))
+(defn comment-of
+  "The key comment, which identifies the repository an entry belongs to.
+
+  Not the ForceCommand: a key now carries every host its repository serves, so
+  adding a host rewrites that argument and the previously installed line would
+  match nothing in the current generation — pruned as departed at exactly the
+  moment desired state is changing. The comment carries no timestamp by design,
+  so both generations of a repository's key have byte-identical comments and
+  this is a string equality rather than a parse. That also sidesteps an
+  ambiguity: a profile, owner, or repository containing a dash makes splitting
+  `once-deploy-<profile>-<owner>-<repo>` back apart impossible, and comparing
+  whole strings never has to.
+
+  Read as the remainder after the algorithm and the key body. Generated
+  comments hold no spaces, so the last token would agree — taking the remainder
+  just keeps that from being load-bearing.
+
+  An entry carrying no comment at all falls back to its own algorithm and body.
+  Returning nil for those would group every one of them together, and the first
+  would be retained as the `previous` generation of an unrelated key."
+  [line]
+  (when-let [after (second (str/split line #"\"\s+" 2))]
+    (let [tokens (str/split (str/trim after) #"\s+")
+          comment (str/join " " (drop 2 tokens))]
+      (if (str/blank? comment) after comment))))
 
 (defn read-lines [path]
   (let [f (io/file path)]
@@ -40,18 +64,18 @@
       [])))
 
 (defn reconcile
-  "Foreign lines pass through untouched. For every host in `current`, keep the
-  most recent previously installed key — the last matching line, since new keys
-  are appended — followed by the new one. Hosts that left desired state, and
-  generations older than one, are dropped."
+  "Foreign lines pass through untouched. For every repository in `current`,
+  keep the most recent previously installed key — the last matching line, since
+  new keys are appended — followed by the new one. Repositories that left
+  desired state, and generations older than one, are dropped."
   [current existing]
   (let [foreign (vec (remove managed? existing))
         managed (filter managed? existing)]
     (into foreign
           (mapcat (fn [line]
-                    (let [host (host-of line)
+                    (let [key-comment (comment-of line)
                           previous (->> managed
-                                        (filter #(= host (host-of %)))
+                                        (filter #(= key-comment (comment-of %)))
                                         (remove #(= % line))
                                         last)]
                       (if previous [previous line] [line])))

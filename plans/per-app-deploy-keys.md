@@ -1,6 +1,12 @@
 # Per-application ephemeral deploy keys
 
-Status: implemented and verified against production on 2026-07-28.
+Status: **superseded by `per-repo-deploy-keys.md`.** Keys are now per
+repository, and a deploy is a ping rather than a command. Kept for the
+reasoning that still holds — why the key can be ephemeral, why two generations
+are retained, why generation shells out to `ssh-keygen`, and why the
+environment is created with an idempotent PUT.
+
+Implemented and verified against production on 2026-07-28.
 
 ## Goal
 
@@ -59,7 +65,9 @@ once:
         EXAMPLE: app-example
 ```
 
-- `github` is optional. Absent, the application gets a key and no publication.
+- `github` is optional. Absent, the application gets no key at all. (This line
+  originally read "gets a key and no publication", which the code never did —
+  the filter excludes it before anything is generated.)
 - `deploy-pubkey` is **removed** from desired state. It is generated now.
 - `github-token` joins the flat keys, supplied as `COLORS_PAR_GITHUB_TOKEN`.
 

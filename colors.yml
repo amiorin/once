@@ -33,12 +33,17 @@ compute-pubkey: REPLACE_ME # required by Yandex Cloud
 # env maps a container variable name to the flat key holding its value, so the
 # value arrives as COLORS_PAR_APP_EXAMPLE instead of living in this file.
 #
-# github is optional. An application that names a repository gets its own deploy
-# keypair, generated fresh on every create and never stored: the public half is
-# installed on the server restricted to that one host, and the private half is
-# published to a GitHub Actions environment named after the profile, alongside
-# the server address, the deploy user, and the server's own SSH host key so CI
-# can pin it. Deploy keys are never written here.
+# github is optional. Deploy keys are per repository, not per application: every
+# repository named here gets one keypair, generated fresh on every create and
+# never stored. The public half is installed on the server behind a ForceCommand
+# naming every host that repository serves, and the private half is published to
+# a GitHub Actions environment named after the profile, alongside the server
+# address, the deploy user, and the server's own SSH host key so CI can pin it.
+# Deploy keys are never written here.
+#
+# Two applications may name the same repository — one image answering for
+# several hosts. They share one key, and a ping from that repository's workflow
+# updates all of them.
 once:
   applications:
     - host: www.example.com
@@ -48,6 +53,7 @@ once:
         EXAMPLE: app-example
     - host: www.example.net
       image: ghcr.io/bigconfig-ai/once-bigconfig:latest
+      github: bigconfig-ai/once-bigconfig
 
 provider-compute: digitalocean
 provider-smtp: resend

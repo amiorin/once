@@ -34,10 +34,12 @@ compute-prevent-destroy: true
 ```
 
 Application `github` is optional, as `owner/repo`. Deploy keys are never
-configured here: an application naming a repository gets its own keypair,
-generated fresh on every `create` and never stored. The public half is installed
-on the server behind a ForceCommand restricted to that one host, so a key leaked
-from one repository cannot redeploy another's application. The private half is
+configured here, and they are per repository rather than per application: every
+repository named gets one keypair, generated fresh on every `create` and never
+stored. The public half is installed on the server behind a ForceCommand naming
+every host that repository serves, so a key leaked from one repository cannot
+redeploy another's application, while two applications sharing a repository —
+one image answering for several hosts — share one key that updates both. The private half is
 published to a GitHub Actions environment named after the profile, alongside
 `SERVER_IP`, `SERVER_USER`, and `SSH_KNOWN_HOSTS` — the server's own host key,
 so a workflow can pin it instead of running `ssh-keyscan` and trusting whatever

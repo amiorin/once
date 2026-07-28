@@ -89,8 +89,36 @@ const repoRe = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
 // Applications naming a GitHub repository. These are the ones whose generated
 // deploy key is published; the rest get a key on the box and nothing else.
-export function githubApplications(opts: Opts): any[] {
-  return (applications(opts) ?? []).filter((app: any) => !placeholder(app.github));
+export interface DeployGroup {
+  github: string;
+  hosts: string[];
+}
+
+// One entry per distinct GitHub repository named in desired state, carrying
+// every host that repository serves.
+//
+// The repository, not the application, is the unit a deploy key belongs to. It
+// is where the key is stored — a GitHub environment — and what triggers its
+// use. Grouping here is what lets one image answer for several hosts: those
+// hosts are one repository, one pipeline, one push. Keyed per application
+// instead, two applications naming the same repository publish into the same
+// environment and the second silently overwrites the first's key.
+//
+// Applications without `github` produce no group, and so no key at all.
+//
+// Order is first appearance in `applications`, and hosts within a group keep
+// their desired-state order, so the rendered artifact stays a pure function of
+// the file all three colours read.
+export function deployGroups(opts: Opts): DeployGroup[] {
+  const apps = (applications(opts) ?? []).filter((app: any) => !placeholder(app.github));
+  const groups = new Map<string, DeployGroup>();
+  for (const app of apps) {
+    const repo = String(app.github);
+    const group = groups.get(repo) ?? { github: repo, hosts: [] };
+    group.hosts.push(String(app.host));
+    groups.set(repo, group);
+  }
+  return [...groups.values()];
 }
 
 export function stateErrors(opts: Opts): string[] {
@@ -134,7 +162,7 @@ export function secretErrors(opts: Opts): string[] {
   // revoke what create published.
   const keys = [
     ...slotKeys(opts, "secrets"),
-    ...(githubApplications(opts).length ? ["github-token"] : []),
+    ...(deployGroups(opts).length ? ["github-token"] : []),
     ...(opts["red/event"] === "create" ? appSecretKeys(apps) : []),
   ];
   return [...new Set(keys)]

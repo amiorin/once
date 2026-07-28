@@ -299,16 +299,17 @@ export function ansibleOnce(opts: Opts): string {
   return yaml([{ name: "Reconcile ONCE applications", become: true, once: configured }]);
 }
 
-// The authorized_keys lines for the current generation, one per application
-// naming a repository.
+// The authorized_keys lines for the current generation, one per repository
+// named in desired state.
 //
-// Each key carries its own host inside the ForceCommand, so a key leaked from
-// one repository cannot redeploy another repository's application. Pure and
+// Each key carries every host its repository serves inside the ForceCommand, so
+// a key leaked from one repository cannot redeploy another repository's
+// application, and the client never has to name a host at all. Pure and
 // deterministic: this is rendered into the artifact the colours compare byte
 // for byte, which is also why the key comment holds no timestamp.
 export function deployKeysContent(opts: Opts): string {
   const lines = publicKeys(opts).map(
-    ({ host, public: pub }) => `restrict,command="/usr/local/bin/deploy ${host}" ${pub}`,
+    ({ hosts, public: pub }) => `restrict,command="/usr/local/bin/deploy ${hosts.join(" ")}" ${pub}`,
   );
   return lines.length ? `${lines.join("\n")}\n` : "";
 }

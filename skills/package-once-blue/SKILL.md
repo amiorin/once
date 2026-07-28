@@ -24,7 +24,10 @@ changing desired state and before a real create or delete.
 ## Initialize
 
 Gather profile, applications, providers, selected providers' non-secret
-settings, and the deploy public key. Never gather secret values.
+settings. Deploy keys are not among them: ONCE generates one per repository
+named under `github` on every create and publishes it to a GitHub environment
+named after the profile, so ask only for `COLORS_PAR_GITHUB_TOKEN`. Never
+gather secret values.
 
 After confirmation:
 

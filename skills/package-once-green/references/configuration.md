@@ -36,12 +36,14 @@ There is no domain key. Application hostnames are the source of truth and may sp
 
 `:env` maps a container variable name to the flat key holding its value; the value itself never appears in the file, and is supplied by the `COLORS_PAR_*` variable named after that key (`:app-database-url` ← `COLORS_PAR_APP_DATABASE_URL`). Application options supported by the ONCE reconciler also include `:auto_update`, `:auto_backup`, `:backup_path`, `:disable_tls`, `:cpus`, and `:memory`.
 
-Deploy keys are not configured here. An application naming a repository under
-`github` gets its own keypair, generated fresh on every `create` and never
-stored: the public half is installed on the server behind a ForceCommand
-restricted to that one host, and the private half is published, with the server
-address, user, and host key, to a GitHub Actions environment named after the
-profile. The
+Deploy keys are not configured here, and they are per repository rather than
+per application. Every repository named under `github` gets one keypair,
+generated fresh on every `create` and never stored: the public half is installed
+on the server behind a ForceCommand naming every host that repository serves,
+and the private half is published, with the server address, user, and host key,
+to a GitHub Actions environment named after the profile. Two applications may
+name the same repository — one image answering for several hosts — and share
+one key that updates both. The
 previous generation is kept alongside the current one so a publication that
 fails leaves the old key working until the next `create` heals it.
 The host key is read from the server itself and published as

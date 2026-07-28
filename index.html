@@ -993,12 +993,12 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
         <article class="card">
           <p class="label">Deployment</p>
           <h3><code>github</code></h3>
-          <p>Optional, per application, as <code>owner/repo</code>. ONCE generates that application its own deploy keypair on every <code>create</code> and publishes the private half — with <code>SERVER_IP</code>, <code>SERVER_USER</code>, and <code>SSH_KNOWN_HOSTS</code> — to a GitHub Actions environment named after the <code>profile</code>. Pinning the host key lets a workflow drop <code>ssh-keyscan</code>, which otherwise trusts whatever answers on that address on every deploy. Requires <code>COLORS_PAR_GITHUB_TOKEN</code>. Deploy keys are never written into <code>colors.yml</code>.</p>
+          <p>Optional, per application, as <code>owner/repo</code>. Keys are per <em>repository</em>: ONCE generates one keypair for every repository named in desired state on each <code>create</code> and publishes the private half — with <code>SERVER_IP</code>, <code>SERVER_USER</code>, and <code>SSH_KNOWN_HOSTS</code> — to a GitHub Actions environment named after the <code>profile</code>. Two applications may name the same repository, one image answering for several hosts; they share one key whose forced command names every host it serves. Pinning the host key lets a workflow drop <code>ssh-keyscan</code>, which otherwise trusts whatever answers on that address on every deploy. Requires <code>COLORS_PAR_GITHUB_TOKEN</code>. Deploy keys are never written into <code>colors.yml</code>.</p>
         </article>
       </div>
       <p>Public keys are not secrets, but private key files are. The skill may read only a public <code>.pub</code> file that you approve; it must never inspect a private SSH key.</p>
       <pre><code class="language-bash">ssh-add -l
-ssh deploy@203.0.113.10 sudo once update www.example.com</code></pre>
+ssh -T deploy@203.0.113.10 &lt; /dev/null</code></pre>
     </section>
 
     <section id="commands">
@@ -1097,13 +1097,13 @@ COLORS_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
 
     <section id="deploy-updates">
       <h2 class="anchor-heading"><a href="#deploy-updates" aria-label="Link to Application updates">#</a>Application updates</h2>
-      <p>The remote server gets a restricted <code>deploy</code> account intended for CI or controlled update jobs. Its forced command rejects interactive sessions, malformed commands, and hosts not already known to ONCE.</p>
-      <pre><code class="language-bash">ssh deploy@SERVER_IP sudo once update www.example.com</code></pre>
-      <p>Each application gets its own key, so a key issued for one repository cannot redeploy another's application. Keys are ephemeral — regenerated on every <code>create</code> and never stored — and the previous generation stays authorized until the new one has been published, so a failed publication leaves deploys working. You can also set <code>auto_update true</code> on an application when ONCE should handle updates automatically.</p>
+      <p>The remote server gets a restricted <code>deploy</code> account intended for CI or controlled update jobs. A deploy is a <em>ping</em>: the client sends no command at all, and the forced command updates the hosts named in that key's own <code>authorized_keys</code> entry. Anything the client does send is ignored — <code>restrict</code> plus the forced command mean it was never able to select anything.</p>
+      <pre><code class="language-bash">ssh -T deploy@SERVER_IP &lt; /dev/null</code></pre>
+      <p>Each repository gets its own key, so a key issued for one repository cannot redeploy another's application, and one repository serving several hosts updates all of them from a single ping. The exit status is the deploy result for every host that key owns. Keys are ephemeral — regenerated on every <code>create</code> and never stored — and the previous generation stays authorized until the new one has been published, so a failed publication leaves deploys working. You can also set <code>auto_update true</code> on an application when ONCE should handle updates automatically.</p>
       <p>Running <code>./green create</code> again is appropriate when infrastructure or declared application membership changes: the remote module reconciles by hostname, deploying hosts that are missing and removing hosts no longer present in desired state.</p>
       <div class="callout warning">
         <span class="callout-title">Reconciliation is by hostname</span>
-        Changing the <code>image</code>, <code>env</code>, or resource settings of an application that is <em>already deployed</em> does not redeploy it — the host is still present, so there is nothing to reconcile. Pull a new image with <code>once update &lt;host&gt;</code>, or change the settings on the server itself.
+        Changing the <code>image</code>, <code>env</code>, or resource settings of an application that is <em>already deployed</em> does not redeploy it — the host is still present, so there is nothing to reconcile. Pull a new image by pinging the server from that repository's workflow, or change the settings on the server itself.
       </div>
     </section>
 

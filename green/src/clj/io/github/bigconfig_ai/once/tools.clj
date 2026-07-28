@@ -349,17 +349,18 @@
     :ansible-once (ansible-once data)))
 
 (defn deploy-keys-content
-  "The authorized_keys lines for the current generation, one per application
-  naming a repository.
+  "The authorized_keys lines for the current generation, one per repository
+  named in desired state.
 
-  Each key carries its own host inside the ForceCommand, so a key leaked from
-  one repository cannot redeploy another repository's application. Pure and
+  Each key carries every host its repository serves inside the ForceCommand, so
+  a key leaked from one repository cannot redeploy another repository's
+  application, and the client never has to name a host at all. Pure and
   deterministic: this is rendered into the artifact the colours compare byte
   for byte, which is also why the key comment holds no timestamp."
   [opts]
-  (let [lines (map (fn [{:keys [host public]}]
+  (let [lines (map (fn [{:keys [hosts public]}]
                      (format "restrict,command=\"/usr/local/bin/deploy %s\" %s"
-                             host public))
+                             (str/join " " hosts) public))
                    (github/public-keys opts))]
     (if (seq lines) (str (str/join "\n" lines) "\n") "")))
 

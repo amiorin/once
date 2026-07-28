@@ -13,6 +13,10 @@ from package_once_blue.github import (
 )
 from package_once_blue.tools import deploy_keys_content
 
+# Two applications share one repository — the same image answering for two
+# hosts — and a third names none. That is the shape per-application keys got
+# wrong: both published into acme/site's environment and the second overwrote
+# the first.
 opts = {
     "profile": "prod",
     "ip": "203.0.113.10",
@@ -20,13 +24,14 @@ opts = {
     "once": {
         "applications": [
             {"host": "www.example.com", "github": "acme/site"},
-            {"host": "www.example.net"},
+            {"host": "www.example.net", "github": "acme/site"},
+            {"host": "app.example.com"},
         ]
     },
 }
 
 key = {
-    "host": "www.example.com",
+    "hosts": ["www.example.com", "www.example.net"],
     "github": "acme/site",
     "public": "ssh-ed25519 AAAA one",
     "private-file": "/tmp/once/key-0",
@@ -48,7 +53,9 @@ def recorder(exit_code: int = 0):
     return calls, run_fn
 
 
-def test_only_applications_naming_a_repository_are_published():
+def test_a_repository_is_published_once_however_many_hosts_it_serves():
+    # Keyed per application this issued two publishes into one environment, and
+    # the second overwrote the first's key.
     assert len(commands({**opts, "blue/event": "create", "once/deploy-keys": [key]})) == 5
 
 
@@ -119,17 +126,20 @@ async def test_a_failed_revoke_does_not():
     calls, run_fn = recorder(1)
     result = await github_step({**opts, "blue/event": "delete"}, run_fn)
     assert result["blue/exit"] == 0
+    # And a repository named by two applications is revoked once, not twice.
     assert len(calls) == 4
 
 
-def test_each_key_is_pinned_to_its_own_host():
+def test_each_key_is_pinned_to_the_hosts_its_repository_serves():
+    # The entry names every host, so the client never has to — and a key still
+    # cannot reach an application belonging to another repository.
     keys = [
-        {"host": "www.example.com", "public": "ssh-ed25519 AAAA one"},
-        {"host": "www.example.net", "public": "ssh-ed25519 BBBB two"},
+        {"hosts": ["www.example.com", "www.example.net"], "public": "ssh-ed25519 AAAA one"},
+        {"hosts": ["app.example.com"], "public": "ssh-ed25519 BBBB two"},
     ]
     assert deploy_keys_content({**opts, "once/deploy-keys": keys}) == (
-        'restrict,command="/usr/local/bin/deploy www.example.com" ssh-ed25519 AAAA one\n'
-        'restrict,command="/usr/local/bin/deploy www.example.net" ssh-ed25519 BBBB two\n'
+        'restrict,command="/usr/local/bin/deploy www.example.com www.example.net" ssh-ed25519 AAAA one\n'
+        'restrict,command="/usr/local/bin/deploy app.example.com" ssh-ed25519 BBBB two\n'
     )
 
 
@@ -138,12 +148,20 @@ def test_a_build_renders_a_fixed_placeholder():
     # byte parity between the colours.
     first = placeholder_keys(opts)
     assert first == placeholder_keys(opts)
+    # One key per repository, not per application.
     assert len(first) == 1
-    assert first[0]["public"].endswith("once-deploy-prod-www.example.com")
+    assert first[0]["hosts"] == ["www.example.com", "www.example.net"]
+    assert first[0]["public"].endswith("once-deploy-prod-acme-site")
 
 
 def test_the_key_comment_carries_no_clock_reading():
-    assert key_comment(opts, "www.example.com") == "once-deploy-prod-www.example.com"
+    # And slugs the slash, because it sits in an authorized_keys comment.
+    assert key_comment(opts, "acme/site") == "once-deploy-prod-acme-site"
+
+
+def test_an_application_without_a_repository_gets_no_key_at_all():
+    # Not a key on the box and nothing else — nothing.
+    assert not any("app.example.com" in k["hosts"] for k in placeholder_keys(opts))
 
 
 def test_a_host_key_becomes_a_known_hosts_line():

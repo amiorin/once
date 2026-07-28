@@ -254,14 +254,15 @@ def ansible_once(opts: dict) -> str:
 def deploy_keys_content(opts: dict) -> str:
     """The authorized_keys lines for the current generation.
 
-    One per application naming a repository. Each key carries its own host inside
-    the ForceCommand, so a key leaked from one repository cannot redeploy another
-    repository's application. Pure and deterministic: this is rendered into the
-    artifact the colours compare byte for byte, which is also why the key comment
-    holds no timestamp.
+    One per repository named in desired state. Each key carries every host its
+    repository serves inside the ForceCommand, so a key leaked from one
+    repository cannot redeploy another repository's application, and the client
+    never has to name a host at all. Pure and deterministic: this is rendered
+    into the artifact the colours compare byte for byte, which is also why the
+    key comment holds no timestamp.
     """
     lines = [
-        f'restrict,command="/usr/local/bin/deploy {key["host"]}" {key["public"]}'
+        f'restrict,command="/usr/local/bin/deploy {" ".join(key["hosts"])}" {key["public"]}'
         for key in public_keys(opts)
     ]
     return "".join(f"{line}\n" for line in lines)

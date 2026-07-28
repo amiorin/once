@@ -2,9 +2,14 @@
 
 ;; The ForceCommand behind every deploy key. It is what makes an ephemeral,
 ;; unattended deploy key safe to hand to CI: a leaked key can trigger `once
-;; update` for the single host named in its own authorized_keys entry and
-;; nothing else. Loosening this widens the blast radius of every key on the
-;; box at once, so change it deliberately — deploy_test.clj guards the rules.
+;; update` for the hosts named in its own authorized_keys entry and nothing
+;; else. Loosening this widens the blast radius of every key on the box at
+;; once, so change it deliberately — deploy_test.clj guards the rules.
+;;
+;; Keys are per repository, so the entry carries every host that repository
+;; serves. The client sends nothing at all: everything this needs it already
+;; has from the entry, which is what lets one key cover several hosts without
+;; the caller enumerating them.
 
 (require '[babashka.process :as p]
          '[clojure.string :as str])
@@ -13,6 +18,10 @@
   (binding [*out* *err*]
     (println (str "deploy: " msg)))
   (System/exit 1))
+
+(defn warn [msg]
+  (binding [*out* *err*]
+    (println (str "deploy: " msg))))
 
 (def host-pattern #"^[A-Za-z0-9]([A-Za-z0-9.-]{0,253}[A-Za-z0-9])?$")
 
@@ -30,32 +39,45 @@
          (keep #(re-find #"[\w][\w.-]+\.[\w]{2,}(?= \()" %))
          set)))
 
+(defn update-host
+  "Update one host. Returns true on success. A host in this key's entry that
+  ONCE does not serve is a failure for that host and not for the others: the
+  run reports it and carries on, so one missing application cannot stop the
+  rest of the repository from deploying."
+  [allowed host]
+  (if-not (contains? allowed host)
+    (do (warn (str "host not served by once: " host)) false)
+    (let [{:keys [exit]} @(p/process ["sudo" "once" "update" host]
+                                     {:out :inherit :err :inherit})]
+      (when-not (zero? exit)
+        (warn (str "once update failed for " host)))
+      (zero? exit))))
+
 (defn -main [& args]
-  ;; The permitted host arrives from the authorized_keys entry, not from the
+  ;; The permitted hosts arrive from the authorized_keys entry, not from the
   ;; client, so one repository's key cannot update another's application.
-  (let [permitted (first args)]
-    (when (or (str/blank? (str permitted))
-              (not (re-matches host-pattern (str permitted))))
-      (die "no permitted host configured for this key"))
-    (let [original (System/getenv "SSH_ORIGINAL_COMMAND")]
-      (when (str/blank? original)
-        (die "interactive sessions are not allowed"))
-      (let [tokens (str/split (str/trim original) #"\s+")]
-        (when-not (= 4 (count tokens))
-          (die (str "command not allowed: " original)))
-        (let [[a b c host] tokens]
-          (when-not (and (= a "sudo") (= b "once") (= c "update"))
-            (die (str "command not allowed: " original)))
-          (when-not (re-matches host-pattern host)
-            (die (str "invalid host: " host)))
-          (when-not (= host permitted)
-            (die (str "host not permitted for this key: " host)))
-          (let [allowed (parse-allowed-hosts)]
-            (when-not (contains? allowed host)
-              (die (str "host not allowed: " host))))
-          (let [{:keys [exit]} @(p/process ["sudo" "once" "update" host]
-                                           {:out :inherit :err :inherit})]
-            (System/exit exit)))))))
+  (let [permitted (->> args (map str) (map str/trim) (remove str/blank?) distinct vec)]
+    (when (empty? permitted)
+      (die "no permitted hosts configured for this key"))
+    (doseq [host permitted]
+      (when-not (re-matches host-pattern host)
+        (die (str "invalid permitted host: " host))))
+    ;; Ignored rather than rejected. Rejecting would break every workflow still
+    ;; sending the old `sudo once update <host>` the moment this script lands,
+    ;; before those repositories have been updated. Nothing is given up by
+    ;; accepting it: `restrict` plus this forced command mean the client's
+    ;; string could never select anything in the first place.
+    (when-not (str/blank? (str (System/getenv "SSH_ORIGINAL_COMMAND")))
+      (warn "ignoring the requested command; this key updates its own hosts"))
+    ;; mapv, not remove: these calls have side effects and must all run, in
+    ;; order, before anything looks at the results.
+    (let [allowed (parse-allowed-hosts)
+          results (mapv (fn [host] [host (update-host allowed host)]) permitted)
+          failed (mapv first (remove second results))]
+      (when (seq failed)
+        (die (str "failed: " (str/join " " failed))))
+      (println (str "deploy: updated " (str/join " " permitted)))
+      (System/exit 0))))
 
 (when (= *file* (System/getProperty "babashka.file"))
   (apply -main *command-line-args*))

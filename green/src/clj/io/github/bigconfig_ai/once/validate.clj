@@ -178,13 +178,28 @@
                     (str/starts-with? (str (:compute-pubkey opts)) "ssh-"))
         [":compute-pubkey must be an SSH public key"])))))
 
-(defn github-applications
-  "Applications naming a GitHub repository. These are the ones whose generated
-  deploy key is published; the rest get a key on the box and nothing else."
+(defn deploy-groups
+  "One entry per distinct GitHub repository named in desired state, carrying
+  every host that repository serves: `{:github \"owner/repo\" :hosts [...]}`.
+
+  The repository, not the application, is the unit a deploy key belongs to. It
+  is where the key is stored — a GitHub environment — and what triggers its
+  use. Grouping here is what lets one image answer for several hosts: those
+  hosts are one repository, one pipeline, one push. Keyed per application
+  instead, two applications naming the same repository publish into the same
+  environment and the second silently overwrites the first's key.
+
+  Applications without `:github` produce no group, and so no key at all.
+
+  Order is first appearance in `:applications`, and hosts within a group keep
+  their desired-state order, so the rendered artifact stays a pure function of
+  the file all three colours read."
   [opts]
-  (->> (get-in opts [:once :applications])
-       (filter #(not (placeholder? (:github %))))
-       vec))
+  (let [apps (remove #(placeholder? (:github %))
+                     (get-in opts [:once :applications]))
+        by-repo (group-by #(str (:github %)) apps)]
+    (mapv (fn [repo] {:github repo :hosts (mapv #(str (:host %)) (by-repo repo))})
+          (distinct (map #(str (:github %)) apps)))))
 
 (defn secret-errors
   "Credentials the selected providers need that no `COLORS_PAR_*` variable
@@ -194,7 +209,7 @@
   [opts]
   (let [applications (get-in opts [:once :applications])
         ks (cond-> (slot-keys opts :secrets)
-             (seq (github-applications opts))
+             (seq (deploy-groups opts))
              (conj :github-token)
 
              (= :create (:green/event opts))

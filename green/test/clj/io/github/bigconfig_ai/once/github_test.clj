@@ -8,12 +8,18 @@
    [io.github.bigconfig-ai.once.tools :as tools]))
 
 (def ^:private opts
+  "Two applications share one repository — the same image answering for two
+  hosts — and a third names none. That is the shape per-application keys got
+  wrong: both published into `acme/site`'s environment and the second
+  overwrote the first."
   {:profile "prod"
    :ip "203.0.113.10"
    :github-token "gh_token"
    :once {:applications [{:host "www.example.com"
                           :github "acme/site"}
-                         {:host "www.example.net"}]}})
+                         {:host "www.example.net"
+                          :github "acme/site"}
+                         {:host "app.example.com"}]}})
 
 (defn- recorder
   "A fake runner in place of green.process/run-with-timeout. Records every
@@ -28,11 +34,14 @@
 
 ;;; ------------------------------------------------------------- the gh commands
 
-(deftest only-applications-naming-a-repository-are-published
-  (let [keys [{:host "www.example.com" :github "acme/site" :private-file "/tmp/k"}]
-        cmds (sut/commands (assoc opts :green/event :create :once/deploy-keys keys))]
-    (is (= 5 (count cmds)))
-    (is (every? #(str/includes? (:label %) "acme/site") cmds))))
+(deftest a-repository-is-published-once-however-many-hosts-it-serves
+  (testing "keyed per application this issued two publishes into one
+            environment, and the second overwrote the first's key"
+    (let [keys [{:hosts ["www.example.com" "www.example.net"]
+                 :github "acme/site" :private-file "/tmp/k"}]
+          cmds (sut/commands (assoc opts :green/event :create :once/deploy-keys keys))]
+      (is (= 5 (count cmds)))
+      (is (every? #(str/includes? (:label %) "acme/site") cmds)))))
 
 (deftest publish-sends-the-address-as-a-variable-and-the-key-as-a-secret
   (let [[environment ip user known-hosts secret] (sut/publish-commands
@@ -110,7 +119,9 @@
     (let [{:keys [calls run-fn]} (recorder 1)
           result (sut/github-step (assoc opts :green/event :delete) run-fn)]
       (is (= 0 (:green/exit result)))
-      (is (= 4 (count @calls)) "every revoke is attempted, not just the first"))))
+      (is (= 4 (count @calls))
+          "every revoke is attempted, not just the first — and a repository
+           named by two applications is revoked once, not twice"))))
 
 (deftest a-host-key-becomes-a-known-hosts-line
   (testing "the trailing comment is the server's own hostname at key generation
@@ -124,13 +135,15 @@
 
 ;;; ------------------------------------------------------- the rendered key lines
 
-(deftest each-key-is-pinned-to-its-own-host
-  (let [keys [{:host "www.example.com" :public "ssh-ed25519 AAAA one"}
-              {:host "www.example.net" :public "ssh-ed25519 BBBB two"}]
-        content (tools/deploy-keys-content (assoc opts :once/deploy-keys keys))]
-    (is (= (str "restrict,command=\"/usr/local/bin/deploy www.example.com\" ssh-ed25519 AAAA one\n"
-                "restrict,command=\"/usr/local/bin/deploy www.example.net\" ssh-ed25519 BBBB two\n")
-           content))))
+(deftest each-key-is-pinned-to-the-hosts-its-repository-serves
+  (testing "the entry names every host, so the client never has to — and a key
+            still cannot reach an application belonging to another repository"
+    (let [keys [{:hosts ["www.example.com" "www.example.net"] :public "ssh-ed25519 AAAA one"}
+                {:hosts ["app.example.com"] :public "ssh-ed25519 BBBB two"}]
+          content (tools/deploy-keys-content (assoc opts :once/deploy-keys keys))]
+      (is (= (str "restrict,command=\"/usr/local/bin/deploy www.example.com www.example.net\" ssh-ed25519 AAAA one\n"
+                  "restrict,command=\"/usr/local/bin/deploy app.example.com\" ssh-ed25519 BBBB two\n")
+             content)))))
 
 (deftest a-build-renders-a-fixed-placeholder
   (testing "a fresh key per build would make the artifact nondeterministic and
@@ -138,12 +151,19 @@
     (let [a (sut/placeholder-keys opts)
           b (sut/placeholder-keys opts)]
       (is (= a b))
-      (is (= 1 (count a)) "only applications naming a repository get a key")
-      (is (str/ends-with? (:public (first a)) "once-deploy-prod-www.example.com")))))
+      (is (= 1 (count a)) "one key per repository, not per application")
+      (is (= ["www.example.com" "www.example.net"] (:hosts (first a))))
+      (is (str/ends-with? (:public (first a)) "once-deploy-prod-acme-site")))))
 
 (deftest the-key-comment-carries-no-clock-reading
-  (is (= "once-deploy-prod-www.example.com"
-         (sut/key-comment opts "www.example.com"))))
+  (testing "and slugs the slash, because it sits in an authorized_keys comment"
+    (is (= "once-deploy-prod-acme-site"
+           (sut/key-comment opts "acme/site")))))
+
+(deftest an-application-without-a-repository-gets-no-key-at-all
+  (testing "not a key on the box and nothing else — nothing"
+    (is (not-any? #(some #{"app.example.com"} (:hosts %))
+                  (sut/placeholder-keys opts)))))
 
 ;;; ------------------------------------------------------------- the reconciler
 
@@ -151,8 +171,13 @@
   (.getAbsolutePath
    (io/file "src/resources/io/github/bigconfig-ai/once/tools/ansible/files/authorized-keys")))
 
-(defn- line [host key-body]
-  (format "restrict,command=\"/usr/local/bin/deploy %s\" %s" host key-body))
+(defn- line
+  "An entry as ONCE renders it: every host the repository serves inside the
+  ForceCommand, and a comment naming the repository — which is what retention
+  groups generations on."
+  [repo hosts key-body]
+  (format "restrict,command=\"/usr/local/bin/deploy %s\" ssh-ed25519 %s once-deploy-prod-%s"
+          (str/join " " hosts) key-body (str/replace repo "/" "-")))
 
 (defn- reconcile!
   [current existing]
@@ -172,59 +197,87 @@
                 (vec (remove str/blank? (str/split-lines (slurp target)))))})))
 
 (deftest a-first-install-writes-just-the-current-key
-  (let [{:keys [exit lines status]} (reconcile! [(line "a.example.com" "KEY1")] nil)]
+  (let [{:keys [exit lines status]} (reconcile! [(line "acme/a" ["a.example.com"] "KEY1")] nil)]
     (is (= 0 exit))
     (is (= "changed" status))
-    (is (= [(line "a.example.com" "KEY1")] lines))))
+    (is (= [(line "acme/a" ["a.example.com"] "KEY1")] lines))))
 
 (deftest the-previous-generation-survives-one-round
   (testing "the old key keeps working until the new one has been published,
             which is what makes a failed publish harmless"
-    (let [{:keys [lines]} (reconcile! [(line "a.example.com" "KEY2")]
-                                      [(line "a.example.com" "KEY1")])]
-      (is (= [(line "a.example.com" "KEY1")
-              (line "a.example.com" "KEY2")]
+    (let [{:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com"] "KEY2")]
+                                      [(line "acme/a" ["a.example.com"] "KEY1")])]
+      (is (= [(line "acme/a" ["a.example.com"] "KEY1")
+              (line "acme/a" ["a.example.com"] "KEY2")]
              lines)))))
 
 (deftest only-one-previous-generation-survives
   (testing "anything more only extends how long a leaked key stays usable"
-    (let [{:keys [lines]} (reconcile! [(line "a.example.com" "KEY3")]
-                                      [(line "a.example.com" "KEY1")
-                                       (line "a.example.com" "KEY2")])]
-      (is (= [(line "a.example.com" "KEY2")
-              (line "a.example.com" "KEY3")]
+    (let [{:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com"] "KEY3")]
+                                      [(line "acme/a" ["a.example.com"] "KEY1")
+                                       (line "acme/a" ["a.example.com"] "KEY2")])]
+      (is (= [(line "acme/a" ["a.example.com"] "KEY2")
+              (line "acme/a" ["a.example.com"] "KEY3")]
              lines)))))
 
-(deftest keys-are-retained-per-host
-  (let [{:keys [lines]} (reconcile! [(line "a.example.com" "A2")
-                                     (line "b.example.com" "B2")]
-                                    [(line "a.example.com" "A1")
-                                     (line "b.example.com" "B1")])]
-    (is (= [(line "a.example.com" "A1") (line "a.example.com" "A2")
-            (line "b.example.com" "B1") (line "b.example.com" "B2")]
+(deftest keys-are-retained-per-repository
+  (let [{:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com"] "A2")
+                                     (line "acme/b" ["b.example.com"] "B2")]
+                                    [(line "acme/a" ["a.example.com"] "A1")
+                                     (line "acme/b" ["b.example.com"] "B1")])]
+    (is (= [(line "acme/a" ["a.example.com"] "A1") (line "acme/a" ["a.example.com"] "A2")
+            (line "acme/b" ["b.example.com"] "B1") (line "acme/b" ["b.example.com"] "B2")]
            lines))))
 
-(deftest a-host-that-left-desired-state-loses-its-keys
-  (let [{:keys [lines]} (reconcile! [(line "a.example.com" "A2")]
-                                    [(line "a.example.com" "A1")
-                                     (line "gone.example.com" "G1")])]
-    (is (= [(line "a.example.com" "A1") (line "a.example.com" "A2")] lines))))
+(deftest adding-a-host-to-a-repository-keeps-the-previous-generation
+  (testing "grouped by the ForceCommand this was the failure: the argument
+            string changes, the installed line matches nothing current, and the
+            retention window vanishes exactly when desired state is changing"
+    (let [{:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com" "new.example.com"] "A2")]
+                                      [(line "acme/a" ["a.example.com"] "A1")])]
+      (is (= [(line "acme/a" ["a.example.com"] "A1")
+              (line "acme/a" ["a.example.com" "new.example.com"] "A2")]
+             lines)))))
+
+(deftest a-repository-that-left-desired-state-loses-its-keys
+  (let [{:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com"] "A2")]
+                                    [(line "acme/a" ["a.example.com"] "A1")
+                                     (line "acme/gone" ["gone.example.com"] "G1")])]
+    (is (= [(line "acme/a" ["a.example.com"] "A1")
+            (line "acme/a" ["a.example.com"] "A2")]
+           lines))))
 
 (deftest a-key-from-before-per-application-keys-is-pruned
   (testing "an entry written when one key served every host is ours, not a
             stranger's, and upgrading has to remove it rather than preserve it"
     (let [legacy "restrict,command=\"/usr/local/bin/deploy\" ssh-ed25519 OLDKEY ci-deploy"
-          {:keys [lines]} (reconcile! [(line "a.example.com" "A1")] [legacy])]
-      (is (= [(line "a.example.com" "A1")] lines)))))
+          {:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com"] "A1")] [legacy])]
+      (is (= [(line "acme/a" ["a.example.com"] "A1")] lines)))))
+
+(deftest a-per-application-era-key-is-pruned
+  (testing "its comment names a host rather than a repository, so it groups
+            with nothing current and is dropped as superseded"
+    (let [old "restrict,command=\"/usr/local/bin/deploy a.example.com\" ssh-ed25519 OLDKEY once-deploy-prod-a.example.com"
+          {:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com"] "A1")] [old])]
+      (is (= [(line "acme/a" ["a.example.com"] "A1")] lines)))))
+
+(deftest entries-without-comments-do-not-group-together
+  (testing "returning nil for those would retain the first as the previous
+            generation of an unrelated key"
+    (let [x "restrict,command=\"/usr/local/bin/deploy x.example.com\" ssh-ed25519 XKEY"
+          y "restrict,command=\"/usr/local/bin/deploy y.example.com\" ssh-ed25519 YKEY"
+          {:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com"] "A1")] [x y])]
+      (is (= [(line "acme/a" ["a.example.com"] "A1")] lines)))))
 
 (deftest foreign-keys-are-left-alone
-  (let [{:keys [lines]} (reconcile! [(line "a.example.com" "A1")]
+  (let [{:keys [lines]} (reconcile! [(line "acme/a" ["a.example.com"] "A1")]
                                     ["ssh-ed25519 SOMEONEELSE operator"])]
-    (is (= ["ssh-ed25519 SOMEONEELSE operator" (line "a.example.com" "A1")] lines))))
+    (is (= ["ssh-ed25519 SOMEONEELSE operator" (line "acme/a" ["a.example.com"] "A1")]
+           lines))))
 
 (deftest running-twice-changes-nothing
   (testing "the playbook reports changed only when the file actually moved"
-    (let [existing [(line "a.example.com" "A1")]
-          first-run (reconcile! [(line "a.example.com" "A1")] existing)]
+    (let [existing [(line "acme/a" ["a.example.com"] "A1")]
+          first-run (reconcile! [(line "acme/a" ["a.example.com"] "A1")] existing)]
       (is (= "unchanged" (:status first-run)))
       (is (= existing (:lines first-run))))))

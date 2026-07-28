@@ -57,13 +57,32 @@ def _applications(opts: dict) -> list | None:
 _repo_re = re.compile(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+")
 
 
-def github_applications(opts: dict) -> list[dict]:
-    """Applications naming a GitHub repository.
+def deploy_groups(opts: dict) -> list[dict]:
+    """One entry per distinct GitHub repository named in desired state.
 
-    These are the ones whose generated deploy key is published; the rest get a
-    key on the box and nothing else.
+    Each carries every host that repository serves:
+    ``{"github": "owner/repo", "hosts": [...]}``.
+
+    The repository, not the application, is the unit a deploy key belongs to. It
+    is where the key is stored — a GitHub environment — and what triggers its
+    use. Grouping here is what lets one image answer for several hosts: those
+    hosts are one repository, one pipeline, one push. Keyed per application
+    instead, two applications naming the same repository publish into the same
+    environment and the second silently overwrites the first's key.
+
+    Applications without ``github`` produce no group, and so no key at all.
+
+    Order is first appearance in ``applications``, and hosts within a group keep
+    their desired-state order, so the rendered artifact stays a pure function of
+    the file all three colours read.
     """
-    return [app for app in (_applications(opts) or []) if not placeholder(app.get("github"))]
+    groups: dict[str, dict] = {}
+    for app in _applications(opts) or []:
+        if placeholder(app.get("github")):
+            continue
+        repo = str(app.get("github"))
+        groups.setdefault(repo, {"github": repo, "hosts": []})["hosts"].append(str(app.get("host")))
+    return list(groups.values())
 
 
 def state_errors(opts: dict) -> list[str]:
@@ -112,6 +131,6 @@ def secret_errors(opts: dict) -> list[str]:
     )
     # A GitHub token is needed for both create and delete, because delete has to
     # revoke what create published.
-    github_keys = ["github-token"] if github_applications(opts) else []
+    github_keys = ["github-token"] if deploy_groups(opts) else []
     keys = list(dict.fromkeys([*_slot_keys(opts, "secrets"), *github_keys, *app_keys]))
     return [f"required credential is not set: {par_name(key)}" for key in keys if placeholder(opts.get(key))]
