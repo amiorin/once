@@ -13,7 +13,6 @@ from package_once_blue.workflow import once_workflow, start_step, wire_fn
 valid = {
     "profile": "test",
     "workdir": ".once",
-    "deploy-pubkey": "ssh-ed25519 AAAA test",
     "once": {"applications": [{"host": "www.example.com", "image": "example/app:latest"}]},
     "provider-compute": "digitalocean",
     "provider-smtp": "resend",
@@ -78,7 +77,11 @@ async def test_validation_and_lifecycle_safety():
 
 def test_create_build_and_delete_use_inverse_graphs():
     assert wire_fn("once/start", {"blue/event": "build"})[1:] == ("once/tofu-compute", "once/tofu-smtp")
-    assert wire_fn("once/start", {"blue/event": "delete"})[1:] == ("once/ansible-cleanup",)
+    # Credentials are withdrawn before anything is destroyed, and publishing
+    # follows the configured host rather than the workstation.
+    assert wire_fn("once/start", {"blue/event": "delete"})[1:] == ("once/github",)
+    assert wire_fn("once/github", {"blue/event": "delete"})[1:] == ("once/ansible-cleanup",)
+    assert wire_fn("once/ansible-remote", {"blue/event": "create"})[1:] == ("once/github",)
 
 
 async def test_dry_run_needs_no_credentials_and_touches_nothing(tmp_path):
@@ -94,7 +97,7 @@ async def test_dry_run_needs_no_credentials_and_touches_nothing(tmp_path):
 async def test_a_build_renders_the_complete_production_tree_without_tools(tmp_path):
     result = await run(once_workflow, {**valid, "workdir": str(tmp_path), "blue/event": "build"})
     assert result["blue/exit"] == 0
-    assert len([path for path in (tmp_path / "test").rglob("*") if path.is_file()]) == 19
+    assert len([path for path in (tmp_path / "test").rglob("*") if path.is_file()]) == 21
 
 
 async def test_describe_helpers_are_process_free_with_an_injected_runner():

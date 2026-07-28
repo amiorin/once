@@ -54,9 +54,21 @@ def _applications(opts: dict) -> list | None:
     return value if isinstance(value, list) else None
 
 
+_repo_re = re.compile(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+")
+
+
+def github_applications(opts: dict) -> list[dict]:
+    """Applications naming a GitHub repository.
+
+    These are the ones whose generated deploy key is published; the rest get a
+    key on the box and nothing else.
+    """
+    return [app for app in (_applications(opts) or []) if not placeholder(app.get("github"))]
+
+
 def state_errors(opts: dict) -> list[str]:
     errors: list[str] = []
-    for key in ["profile", "workdir", "deploy-pubkey", *_slot_keys(opts, "required")]:
+    for key in ["profile", "workdir", *_slot_keys(opts, "required")]:
         if placeholder(opts.get(key)):
             errors.append(f"{key} is required")
     for slot in _slots:
@@ -70,6 +82,10 @@ def state_errors(opts: dict) -> list[str]:
             errors.append(f"once applications[{index}] has an invalid host")
         if placeholder(app.get("image")):
             errors.append(f"once applications[{index}] requires image")
+        # github is optional; a value that is present has to name a repository,
+        # because it is interpolated straight into a gh invocation.
+        if app.get("github") is not None and not _repo_re.fullmatch(str(app.get("github"))):
+            errors.append(f"once applications[{index}] github must be owner/repo")
         env = app.get("env")
         if env is not None and not isinstance(env, (dict, list)):
             errors.append(f"once applications[{index}] env must map container variable names to colors.yml keys")
@@ -81,8 +97,6 @@ def state_errors(opts: dict) -> list[str]:
                     errors.append(f"once applications[{index}] env {name} needs a colors.yml key")
     if not isinstance(opts.get("compute-prevent-destroy"), bool):
         errors.append("compute-prevent-destroy must be true or false")
-    if not str(opts.get("deploy-pubkey") or "").startswith("ssh-"):
-        errors.append("deploy-pubkey must be an SSH public key")
     key = opts.get("compute-pubkey")
     if not placeholder(key) and not str(key).startswith("ssh-"):
         errors.append("compute-pubkey must be an SSH public key")
@@ -96,5 +110,8 @@ def secret_errors(opts: dict) -> list[str]:
         if opts.get("blue/event") == "create"
         else []
     )
-    keys = list(dict.fromkeys([*_slot_keys(opts, "secrets"), *app_keys]))
+    # A GitHub token is needed for both create and delete, because delete has to
+    # revoke what create published.
+    github_keys = ["github-token"] if github_applications(opts) else []
+    keys = list(dict.fromkeys([*_slot_keys(opts, "secrets"), *github_keys, *app_keys]))
     return [f"required credential is not set: {par_name(key)}" for key in keys if placeholder(opts.get(key))]

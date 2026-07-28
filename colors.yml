@@ -17,13 +17,13 @@
 #   resend         COLORS_PAR_RESEND_API_KEY COLORS_PAR_RESEND_PASSWORD
 #   no-infra smtp  COLORS_PAR_NO_INFRA_SMTP_PASSWORD
 #   cloudflare     COLORS_PAR_CLOUDFLARE_API_TOKEN
+#   github         COLORS_PAR_GITHUB_TOKEN (only when an application names a repo)
 #   r2 backend     COLORS_PAR_R2_ACCESS_KEY_ID COLORS_PAR_R2_SECRET_ACCESS_KEY
 #   s3 backend     (none — OpenTofu uses the ambient AWS credential chain)
 # Plus one variable per application env entry, named after the key it maps to.
 profile: default
 workdir: .colors
 
-deploy-pubkey: REPLACE_ME
 compute-pubkey: REPLACE_ME # required by Yandex Cloud
 
 # Every application gets its own proxied A record; there is no implicit apex
@@ -32,10 +32,18 @@ compute-pubkey: REPLACE_ME # required by Yandex Cloud
 #
 # env maps a container variable name to the flat key holding its value, so the
 # value arrives as COLORS_PAR_APP_EXAMPLE instead of living in this file.
+#
+# github is optional. An application that names a repository gets its own deploy
+# keypair, generated fresh on every create and never stored: the public half is
+# installed on the server restricted to that one host, and the private half is
+# published to a GitHub Actions environment named after the profile, alongside
+# the server address, the deploy user, and the server's own SSH host key so CI
+# can pin it. Deploy keys are never written here.
 once:
   applications:
     - host: www.example.com
       image: ghcr.io/bigconfig-ai/once-bigconfig:latest
+      github: bigconfig-ai/once-bigconfig
       env:
         EXAMPLE: app-example
     - host: www.example.net

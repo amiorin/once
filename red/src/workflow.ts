@@ -4,6 +4,8 @@ import * as progress from "red/progress";
 import * as tofu from "red/tofu";
 import { adviceAdd, workflow, type Opts, type StepFn } from "red/workflow";
 import { readPars } from "red/cli";
+import { dirname } from "node:path";
+import * as github from "./github.ts";
 import * as tools from "./tools.ts";
 import { secretErrors, stateErrors } from "./validate.ts";
 
@@ -26,6 +28,25 @@ async function adoptExistingState(opts: Opts): Promise<Opts> {
   };
 }
 
+// Attach the keys ansible-remote installs and the github step publishes.
+//
+// Generating them is a create-time side effect, so a build or a dry-run takes
+// fixed placeholders instead: a fresh key rendered into the artifact would make
+// the build nondeterministic and break byte parity between the colours.
+async function withDeployKeys(opts: Opts, real: boolean): Promise<Opts> {
+  if (real && opts["red/event"] === "create") {
+    const [keys, err] = await github.generateKeys(opts);
+    if (err) return { ...opts, "red/exit": 1, "red/err": err };
+    return {
+      ...opts,
+      "red/exit": 0,
+      "once/deploy-keys": keys,
+      ...(keys.length ? { "once/key-dir": dirname(String(keys[0]!.privateFile)) } : {}),
+    };
+  }
+  return { ...opts, "red/exit": 0, "once/deploy-keys": github.placeholderKeys(opts) };
+}
+
 export async function startStep(
   original: Opts,
   env: Record<string, string | undefined> = process.env,
@@ -43,7 +64,7 @@ export async function startStep(
   ];
   if (errors.length) return { ...opts, "red/exit": 2, "red/err": errors.join("\n") };
   if (real && event === "delete") return { ...(await adoptExistingState(opts)), "red/exit": 0 };
-  return { ...opts, "red/exit": 0 };
+  return withDeployKeys(opts, real);
 }
 
 export async function ansibleCleanupStep(opts: Opts): Promise<Opts> {
@@ -51,12 +72,17 @@ export async function ansibleCleanupStep(opts: Opts): Promise<Opts> {
 }
 
 export const tofuSteps = ["once/tofu-compute", "once/tofu-smtp", "once/tofu-dns", "once/tofu-smtp-post"];
-export const sideEffectingSteps = [...tofuSteps, "once/ansible-local", "once/ansible-remote", "once/ansible-cleanup"];
+export const sideEffectingSteps = [...tofuSteps, "once/ansible-local", "once/ansible-remote", "once/ansible-cleanup", "once/github"];
 
 export function wireFn(step: string, runOpts: Opts) {
   if (runOpts["red/event"] === "delete") {
     switch (step) {
-      case "once/start": return [startStep, "once/ansible-cleanup"] as const;
+      // Revoking runs before anything is destroyed: a withdrawn credential
+      // against a live host is a loud, recoverable broken deploy, while a live
+      // credential against a destroyed host is silent. It needs no key
+      // material, so it also works when the box is already gone.
+      case "once/start": return [startStep, "once/github"] as const;
+      case "once/github": return [github.githubStep, "once/ansible-cleanup"] as const;
       case "once/ansible-cleanup": return [ansibleCleanupStep, "once/tofu-smtp-post"] as const;
       case "once/tofu-smtp-post": return [tools.tofuSmtpPostStep, "once/tofu-dns"] as const;
       case "once/tofu-dns": return [tools.tofuDnsStep, "once/tofu-smtp", "once/tofu-compute"] as const;
@@ -71,7 +97,11 @@ export function wireFn(step: string, runOpts: Opts) {
       case "once/tofu-dns": return [tools.tofuDnsStep, "once/tofu-smtp-post"] as const;
       case "once/tofu-smtp-post": return [tools.tofuSmtpPostStep, "once/ansible-local", "once/ansible-remote"] as const;
       case "once/ansible-local": return [tools.ansibleLocalStep] as const;
-      case "once/ansible-remote": return [tools.ansibleRemoteStep] as const;
+      // Publishing follows the remote stage, not the local one: the credentials
+      // describe a configured host, and a workstation-side failure should not
+      // gate them.
+      case "once/ansible-remote": return [tools.ansibleRemoteStep, "once/github"] as const;
+      case "once/github": return [github.githubStep] as const;
     }
   }
 }

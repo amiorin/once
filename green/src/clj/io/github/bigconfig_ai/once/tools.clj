@@ -9,6 +9,7 @@
    [green.tofu :as tofu]
    [green.workflow :as wf]
    [green.yaml :as yaml]
+   [io.github.bigconfig-ai.once.github :as github]
    [io.github.bigconfig-ai.once.utils :as utils]
    [io.github.bigconfig-ai.once.validate :as validate]))
 
@@ -315,7 +316,11 @@
   [smtp app]
   (let [zone (utils/registrable-domain (:host app))
         smtp (assoc smtp :smtp_from (format "Info <info@notifications.%s>" zone))]
-    (cond-> (merge app smtp)
+    ;; :github never reaches the host. It says where the deploy credentials are
+    ;; published, which is no business of the module reconciling containers, and
+    ;; a ninth key here also tips a Clojure map out of insertion order and away
+    ;; from the byte parity the other colours hold to.
+    (cond-> (merge (dissoc app :github) smtp)
       (map? (:env app)) (assoc :env (resolve-env (:env app))))))
 
 (def ^:private smtp-password-keys
@@ -343,6 +348,21 @@
     :inventory (inventory data)
     :ansible-once (ansible-once data)))
 
+(defn deploy-keys-content
+  "The authorized_keys lines for the current generation, one per application
+  naming a repository.
+
+  Each key carries its own host inside the ForceCommand, so a key leaked from
+  one repository cannot redeploy another repository's application. Pure and
+  deterministic: this is rendered into the artifact the colours compare byte
+  for byte, which is also why the key comment holds no timestamp."
+  [opts]
+  (let [lines (map (fn [{:keys [host public]}]
+                     (format "restrict,command=\"/usr/local/bin/deploy %s\" %s"
+                             host public))
+                   (github/public-keys opts))]
+    (if (seq lines) (str (str/join "\n" lines) "\n") "")))
+
 (defn- ansible-remote-specs
   [opts]
   (let [dir (tool-dir opts "ansible-remote")
@@ -350,6 +370,10 @@
     [(template-spec (static-template "ansible" "ansible.cfg")
                     (str dir "/ansible.cfg")
                     data)
+     (template-spec (static-template "ansible" "files/authorized-keys")
+                    (str dir "/files/authorized-keys")
+                    data)
+     (raw-spec (str dir "/deploy_keys") (deploy-keys-content opts))
      (template-spec (static-template "ansible" "main.yml")
                     (str dir "/main.yml")
                     data)

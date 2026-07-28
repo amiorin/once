@@ -10,6 +10,7 @@
   Delete runs the same stages in reverse, dropping the managed SSH config
   before anything is destroyed."
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.walk :as walk]
    [green.cli :as green-cli]
@@ -17,6 +18,7 @@
    [green.progress :as progress]
    [green.tofu :as tofu]
    [green.workflow :as wf]
+   [io.github.bigconfig-ai.once.github :as github]
    [io.github.bigconfig-ai.once.tools :as tools]
    [io.github.bigconfig-ai.once.utils :as utils]
    [io.github.bigconfig-ai.once.validate :as validate]))
@@ -44,6 +46,23 @@
       compute (-> (merge compute) (assoc :once/compute-params compute))
       smtp (-> (merge smtp) (assoc :once/smtp-params smtp)))))
 
+(defn- with-deploy-keys
+  "Attach the keys `ansible-remote` installs and the `github` step publishes.
+
+  Generating them is a create-time side effect, so a build or a dry-run takes
+  fixed placeholders instead: a fresh key rendered into the artifact would make
+  the build nondeterministic and break byte parity between the colours."
+  [opts real?]
+  (if (and real? (= :create (:green/event opts)))
+    (let [[keys err] (github/generate-keys opts)]
+      (if err
+        (assoc opts :green/exit 1 :green/err err)
+        (assoc opts
+               :green/exit 0
+               :once/deploy-keys keys
+               :once/key-dir (some-> (first keys) :private-file io/file .getParent))))
+    (assoc opts :green/exit 0 :once/deploy-keys (github/placeholder-keys opts))))
+
 (defn start-step
   "Overlay `COLORS_PAR_*`, validate, and — for a real delete — read back what
   the earlier stages left in OpenTofu state.
@@ -70,7 +89,7 @@
      (cond
        (seq errors) (assoc opts :green/exit 2 :green/err (str/join "\n" errors))
        (and real? (= :delete event)) (assoc (adopt-existing-state opts) :green/exit 0)
-       :else (assoc opts :green/exit 0)))))
+       :else (with-deploy-keys opts real?)))))
 
 (defn ansible-cleanup-step
   "Undo what the Ansible stages applied, then remove their rendered trees.
@@ -88,13 +107,18 @@
 
 (def side-effecting-steps
   (into tofu-steps [:once/ansible-local :once/ansible-remote
-                    :once/ansible-cleanup]))
+                    :once/ansible-cleanup :once/github]))
 
 (defn wire-fn
   [step run-opts]
   (if (= :delete (:green/event run-opts))
     (case step
-      :once/start           [start-step :once/ansible-cleanup]
+      ;; Revoking runs before anything is destroyed: a withdrawn credential
+      ;; against a live host is a loud, recoverable broken deploy, while a live
+      ;; credential against a destroyed host is silent. It needs no key
+      ;; material, so it also works when the box is already gone.
+      :once/start           [start-step :once/github]
+      :once/github          [github/github-step :once/ansible-cleanup]
       :once/ansible-cleanup [ansible-cleanup-step :once/tofu-smtp-post]
       :once/tofu-smtp-post  [tools/tofu-smtp-post-step :once/tofu-dns]
       :once/tofu-dns        [tools/tofu-dns-step :once/tofu-smtp :once/tofu-compute]
@@ -107,7 +131,11 @@
       :once/tofu-dns        [tools/tofu-dns-step :once/tofu-smtp-post]
       :once/tofu-smtp-post  [tools/tofu-smtp-post-step :once/ansible-local :once/ansible-remote]
       :once/ansible-local   [tools/ansible-local-step]
-      :once/ansible-remote  [tools/ansible-remote-step])))
+      ;; Publishing follows the remote stage, not the local one: the
+      ;; credentials describe a configured host, and a workstation-side failure
+      ;; should not gate them.
+      :once/ansible-remote  [tools/ansible-remote-step :once/github]
+      :once/github          [github/github-step])))
 
 ;; ---------------------------------------------------------------------------
 ;; backends

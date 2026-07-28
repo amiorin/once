@@ -37,7 +37,7 @@ Gather these non-secret inputs conversationally:
 - one or more applications: hostname, container image, and optional mapping of container variable names to the `colors.yml` keys holding their values. Hostnames may span domains; Green manages every derived DNS zone and Resend sending domain, and only the listed hostnames get application DNS records
 - compute, SMTP, DNS, and backend providers
 - the selected providers' non-secret settings
-- `:deploy-pubkey`, which is always required: the SSH public key a remote ForceCommand authorizes for `sudo once update <host>` and nothing else. Also collect `:compute-pubkey` when Yandex is selected; Yandex installs it for the `ubuntu` user through instance metadata. Other providers instead reference a key already registered with them (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file path (`:oci-ssh-authorized-keys`)
+- `:github` on any application whose deploy credentials ONCE should publish, as `owner/repo`. Deploy keys themselves are never collected: ONCE generates one per application on every create and publishes it to a GitHub environment named after the profile, so ask only for `COLORS_PAR_GITHUB_TOKEN`. Also collect `:compute-pubkey` when Yandex is selected; Yandex installs it for the `ubuntu` user through instance metadata. Other providers instead reference a key already registered with them (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file path (`:oci-ssh-authorized-keys`)
 
 Do not request secret values. Tell the user which `COLORS_PAR_*` names and native credential mechanisms are required for their selected providers.
 

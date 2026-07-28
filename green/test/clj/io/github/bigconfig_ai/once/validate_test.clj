@@ -7,7 +7,6 @@
 (def ^:private valid
   {:profile "test"
    :workdir ".green"
-   :deploy-pubkey "ssh-ed25519 AAAATEST ci-deploy"
    :once {:applications [{:host "www.example.com"
                           :image "ghcr.io/example/site:latest"}]}
    :provider-compute "no-infra"
@@ -95,8 +94,6 @@
               (sut/state-errors (assoc-in valid [:once :applications 0 :env] "A=1"))))))
 
 (deftest ssh-keys-are-checked-for-shape
-  (is (some #(str/includes? % ":deploy-pubkey must be an SSH public key")
-            (sut/state-errors (assoc valid :deploy-pubkey "hunter2"))))
   (testing ":compute-pubkey is optional outside Yandex, but a present value must look right"
     (is (= [] (sut/state-errors (assoc valid :compute-pubkey "ssh-rsa AAAA x"))))
     (is (= [] (sut/state-errors (assoc valid :compute-pubkey "REPLACE_ME"))))

@@ -1,6 +1,13 @@
 import type { Opts } from "red/workflow";
 
-export const contract = 2;
+// Bump on any change a launcher pinned to an older commit could not survive.
+//
+// 3: deploy keys are generated per application on every create instead of being
+//    supplied as deploy-pubkey, and an application may name a GitHub repository
+//    whose environment receives the connection details. A launcher pinned older
+//    still expects deploy-pubkey in desired state and would ignore github
+//    silently, publishing nothing.
+export const contract = 3;
 
 export function registrableDomain(host: unknown): string | undefined {
   const labels = String(host ?? "").split(".");

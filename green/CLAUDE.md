@@ -90,11 +90,11 @@ keywords too and reach templates through `name`.
 ```yaml
 profile: production      # names the workdir, the state keys, the compute
 workdir: .colors         # resource, and the ~/.ssh/config Host alias
-deploy-pubkey: ssh-ed25519 AAAA... ci-deploy
 once:
   applications:
     - host: www.example.com
       image: ghcr.io/example/site:latest
+      github: acme/site
       env:
         DATABASE_URL: app-database-url
 provider-compute: digitalocean  # digitalocean | hcloud | oci | no-infra
@@ -120,14 +120,14 @@ Load-bearing rules:
 
 ```text
 start ─┬─ tofu-compute ─┐                          ┌─ ansible-local
-       └─ tofu-smtp ────┴─ tofu-dns ─ smtp-post ───┴─ ansible-remote
+       └─ tofu-smtp ────┴─ tofu-dns ─ smtp-post ───┴─ ansible-remote ─ github
 ```
 
 Delete:
 
 ```text
-start ─ ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
-                                                     └─ tofu-compute
+start ─ github ─ ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
+                                                              └─ tofu-compute
 ```
 
 Compute and SMTP run concurrently; `tofu-dns` is a join, and the engine hands it the fork-point opts plus `:green/branches` (a vector of branch results) — `tools/joined-params` reads the branch results out of it. The two Ansible stages then run concurrently.
@@ -180,7 +180,8 @@ A `build` of the reference `colors.yml` produces exactly:
 ├── tofu-smtp-post/   backend.tf.json  main.tf
 ├── ansible-local/    ansible.cfg  inventory.ini  main.yml
 └── ansible-remote/   ansible.cfg  main.yml  inventory.json  once.yml
-                      files/deploy  library/once
+                      deploy_keys  files/deploy  files/authorized-keys
+                      library/once
 ```
 
 The two generated DNS files are Cloudflare-only; `no-infra` DNS renders `main.tf` alone.
@@ -210,7 +211,9 @@ Deleting has to render before it can destroy: `green.tofu/tofu-with-spec` and `g
 
 ### The remote host
 
-`tools/ansible/main.yml` installs Docker, ONCE, and Babashka, then creates a `deploy` user with NOPASSWD sudo limited to `/usr/local/bin/once *`, whose authorized key is pinned to a `ForceCommand` (`tools/ansible/files/deploy`). That script rejects anything but `once update <host>` for a host ONCE already serves. Applications are reconciled by `tools/ansible/library/once`, a Babashka Ansible module that diffs the desired list against `once list` and deploys or removes the difference, redacting secrets from anything it reports.
+`tools/ansible/main.yml` installs Docker, ONCE, and Babashka, then creates a `deploy` user with NOPASSWD sudo limited to `/usr/local/bin/once *`, whose authorized keys are each pinned to a `ForceCommand` (`tools/ansible/files/deploy`). That script takes the one host its key is for as an argument and rejects anything but `once update` for exactly that host, which ONCE must already serve — so one repository's key cannot redeploy another's application.
+
+Keys are per application and ephemeral: `github/generate-keys` shells `ssh-keygen` on every create, nothing is stored, and `tools/deploy-keys-content` renders only the current generation. `tools/ansible/files/authorized-keys` merges that against what is installed, keeping one previous generation per host so a publication that fails leaves the old key working. Two generations is the whole benefit; more only extends how long a leaked key stays usable. The threat model depends on `files/deploy` staying tight — `deploy_test.clj` guards it. Applications are reconciled by `tools/ansible/library/once`, a Babashka Ansible module that diffs the desired list against `once list` and deploys or removes the difference, redacting secrets from anything it reports.
 
 ## The contract number and `bb pin`
 
@@ -222,7 +225,7 @@ Deleting has to render before it can destroy: `green.tofu/tofu-with-spec` and `g
 
 ## Code Conventions
 
-- **Namespaces**: `io.github.bigconfig-ai.once.*`. Five of them, mapping to distinct concerns — `tools` (the steps), `workflow` (the graph), `validate` (the provider registry and its rules), `describe` (the report), `utils` (the contract and zone derivation). Adding a sixth needs a genuinely new concern.
+- **Namespaces**: `io.github.bigconfig-ai.once.*`. Six of them, mapping to distinct concerns — `tools` (the steps), `workflow` (the graph), `validate` (the provider registry and its rules), `describe` (the report), `github` (deploy keys and the environment they are published to), `utils` (the contract and zone derivation). Adding a seventh needs a genuinely new concern.
 - **Keys**: plain kebab-case keywords for desired state (they match template variable names); namespaced keywords for engine state (`:green/…`, `:once/…`).
 - **Steps** take `opts` and return `opts`, and report failure through `:green/exit` / `:green/err`.
 - **`^:private`** for everything not called from the launcher or the tests. The launcher's own helpers are `defn-`; the workflow steps it exposes are not.

@@ -14,7 +14,6 @@ import { onceWorkflow, startStep, wireFn } from "../src/workflow.ts";
 const valid = {
   profile: "test",
   workdir: ".once",
-  "deploy-pubkey": "ssh-ed25519 AAAA test",
   once: { applications: [{ host: "www.example.com", image: "example/app:latest" }] },
   "provider-compute": "digitalocean",
   "provider-smtp": "resend",
@@ -79,7 +78,11 @@ test("validation and lifecycle safety", async () => {
 
 test("create/build and delete use inverse graphs", () => {
   expect(wireFn("once/start", { "red/event": "build" })?.slice(1)).toEqual(["once/tofu-compute", "once/tofu-smtp"]);
-  expect(wireFn("once/start", { "red/event": "delete" })?.slice(1)).toEqual(["once/ansible-cleanup"]);
+  // Credentials are withdrawn before anything is destroyed, and publishing
+  // follows the configured host rather than the workstation.
+  expect(wireFn("once/start", { "red/event": "delete" })?.slice(1)).toEqual(["once/github"]);
+  expect(wireFn("once/github", { "red/event": "delete" })?.slice(1)).toEqual(["once/ansible-cleanup"]);
+  expect(wireFn("once/ansible-remote", { "red/event": "create" })?.slice(1)).toEqual(["once/github"]);
 });
 
 test("dry-run needs no credentials and touches nothing", async () => {
@@ -94,7 +97,7 @@ test("a build renders the complete production tree without tools", async () => {
   try {
     const result = await runWorkflow(onceWorkflow, { ...valid, workdir, "red/event": "build" });
     expect(result["red/exit"]).toBe(0);
-    expect(files(join(workdir, "test"))).toHaveLength(19);
+    expect(files(join(workdir, "test"))).toHaveLength(21);
   } finally { rmSync(workdir, { recursive: true, force: true }); }
 });
 

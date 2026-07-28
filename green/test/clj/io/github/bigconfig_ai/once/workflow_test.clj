@@ -24,7 +24,6 @@
 (def ^:private valid
   {:profile "test"
    :workdir ".green"
-   :deploy-pubkey "ssh-ed25519 AAAATEST ci-deploy"
    :once {:applications [{:host "www.example.com"
                           :image "ghcr.io/example/site:latest"}]}
    :provider-compute "no-infra"
@@ -120,13 +119,17 @@
     (is (= [:once/tofu-smtp-post] (:once/tofu-dns g)))
     (is (= [:once/ansible-local :once/ansible-remote] (:once/tofu-smtp-post g)))
     (is (= [] (:once/ansible-local g)))
-    (is (= [] (:once/ansible-remote g)))
+    (is (= [:once/github] (:once/ansible-remote g))
+        "publishing follows the configured host, not the workstation")
+    (is (= [] (:once/github g)))
     (testing "cleanup belongs to delete only"
       (is (nil? (:once/ansible-cleanup g))))))
 
 (deftest delete-runs-the-stages-in-reverse
   (let [g (graph :delete)]
-    (is (= [:once/ansible-cleanup] (:once/start g))
+    (is (= [:once/github] (:once/start g))
+        "credentials are withdrawn before anything is destroyed")
+    (is (= [:once/ansible-cleanup] (:once/github g))
         "the managed SSH config goes before anything is destroyed")
     (is (= [:once/tofu-smtp-post] (:once/ansible-cleanup g)))
     (is (= [:once/tofu-dns] (:once/tofu-smtp-post g)))
@@ -201,7 +204,8 @@
     "ansible-local/ansible.cfg" "ansible-local/inventory.ini" "ansible-local/main.yml"
     "ansible-remote/ansible.cfg" "ansible-remote/main.yml"
     "ansible-remote/inventory.json" "ansible-remote/once.yml"
-    "ansible-remote/files/deploy" "ansible-remote/library/once"})
+    "ansible-remote/files/deploy" "ansible-remote/files/authorized-keys"
+    "ansible-remote/deploy_keys" "ansible-remote/library/once"})
 
 (deftest a-build-renders-the-whole-tree-and-runs-no-tool
   (let [workdir (temp-dir)]

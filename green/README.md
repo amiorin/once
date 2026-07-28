@@ -71,11 +71,11 @@ so `no` is the string `no`, and `012` is twelve:
 ```yaml
 profile: production      # names the workdir, the state keys, the compute
 workdir: .colors         # resource, and the ~/.ssh/config Host alias
-deploy-pubkey: ssh-ed25519 AAAA... ci-deploy
 once:
   applications:
     - host: www.example.com
       image: ghcr.io/example/site:latest
+      github: acme/site
       env:
         DATABASE_URL: app-database-url
     - host: www.example.net

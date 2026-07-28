@@ -3,11 +3,13 @@ import { ansibleStep, ansibleWithSpec } from "red/ansible";
 import { scaffold, type RenderOpts, type Spec, type Template } from "red/scaffold";
 import * as tofu from "red/tofu";
 import type { Opts } from "red/workflow";
+import { publicKeys } from "./github.ts";
 import raw from "../resources/raw" with { type: "text" };
 import ansibleLocalCfg from "../resources/tools/ansible-local/ansible.cfg" with { type: "text" };
 import ansibleLocalInventory from "../resources/tools/ansible-local/inventory.ini" with { type: "text" };
 import ansibleLocalMain from "../resources/tools/ansible-local/main.yml" with { type: "text" };
 import ansibleCfg from "../resources/tools/ansible/ansible.cfg" with { type: "text" };
+import authorizedKeys from "../resources/tools/ansible/files/authorized-keys" with { type: "text" };
 import deploy from "../resources/tools/ansible/files/deploy" with { type: "text" };
 import onceModule from "../resources/tools/ansible/library/once" with { type: "text" };
 import ansibleMain from "../resources/tools/ansible/main.yml" with { type: "text" };
@@ -278,7 +280,10 @@ function resolveEnv(env: any): any {
 
 function applicationData(smtp: any, app: any): any {
   const zone = registrableDomain(app.host);
-  return { ...app, ...smtp, smtp_from: `Info <info@notifications.${zone}>`, ...(app.env && !Array.isArray(app.env) && typeof app.env === "object" ? { env: resolveEnv(app.env) } : {}) };
+  // github never reaches the host. It says where the deploy credentials are
+  // published, which is no business of the module reconciling containers.
+  const { github: _github, ...rest } = app;
+  return { ...rest, ...smtp, smtp_from: `Info <info@notifications.${zone}>`, ...(app.env && !Array.isArray(app.env) && typeof app.env === "object" ? { env: resolveEnv(app.env) } : {}) };
 }
 
 export function ansibleOnce(opts: Opts): string {
@@ -294,12 +299,28 @@ export function ansibleOnce(opts: Opts): string {
   return yaml([{ name: "Reconcile ONCE applications", become: true, once: configured }]);
 }
 
+// The authorized_keys lines for the current generation, one per application
+// naming a repository.
+//
+// Each key carries its own host inside the ForceCommand, so a key leaked from
+// one repository cannot redeploy another repository's application. Pure and
+// deterministic: this is rendered into the artifact the colours compare byte
+// for byte, which is also why the key comment holds no timestamp.
+export function deployKeysContent(opts: Opts): string {
+  const lines = publicKeys(opts).map(
+    ({ host, public: pub }) => `restrict,command="/usr/local/bin/deploy ${host}" ${pub}`,
+  );
+  return lines.length ? `${lines.join("\n")}\n` : "";
+}
+
 function ansibleRemoteSpecs(opts: Opts): Spec[] {
   const dir = toolDir(opts, "ansible-remote");
   const data = dataFn(opts);
   return [
     templateSpec({ name: "tools/ansible/ansible.cfg", content: ansibleCfg }, `${dir}/ansible.cfg`, data),
     templateSpec({ name: "tools/ansible/main.yml", content: ansibleMain }, `${dir}/main.yml`, data),
+    templateSpec({ name: "tools/ansible/files/authorized-keys", content: authorizedKeys }, `${dir}/files/authorized-keys`, data),
+    rawSpec(`${dir}/deploy_keys`, deployKeysContent(opts)),
     templateSpec({ name: "tools/ansible/files/deploy", content: deploy }, `${dir}/files/deploy`, data),
     templateSpec({ name: "tools/ansible/library/once", content: onceModule }, `${dir}/library/once`, data),
     rawSpec(`${dir}/inventory.json`, inventory(data)), rawSpec(`${dir}/once.yml`, ansibleOnce(data)),

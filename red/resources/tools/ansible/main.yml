@@ -66,6 +66,15 @@
         mode: "0755"
       become: yes
 
+    - name: Install authorized key reconciler
+      ansible.builtin.copy:
+        src: files/authorized-keys
+        dest: /usr/local/bin/once-authorized-keys
+        owner: root
+        group: root
+        mode: "0755"
+      become: yes
+
     - name: Ensure deploy .ssh directory
       ansible.builtin.file:
         path: /home/deploy/.ssh
@@ -75,10 +84,40 @@
         mode: "0700"
       become: yes
 
-    - name: Authorize deploy key with ForceCommand
+    - name: Ensure ONCE configuration directory
+      ansible.builtin.file:
+        path: /etc/once
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      become: yes
+
+    # Only this generation's keys are rendered, so the artifact stays a pure
+    # function of desired state. Retaining the previous generation is the
+    # reconciler's job, on the box, where the previous keys actually are.
+    - name: Stage current deploy keys
       ansible.builtin.copy:
-        dest: /home/deploy/.ssh/authorized_keys
-        content: "restrict,command=\"/usr/local/bin/deploy\" <{ deploy-pubkey }>\n"
+        src: deploy_keys
+        dest: /etc/once/deploy_keys
+        owner: root
+        group: root
+        mode: "0600"
+      become: yes
+
+    - name: Reconcile deploy authorized keys
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/once-authorized-keys
+          - /etc/once/deploy_keys
+          - /home/deploy/.ssh/authorized_keys
+      register: authorized_keys_result
+      changed_when: authorized_keys_result.stdout != "unchanged"
+      become: yes
+
+    - name: Own deploy authorized keys
+      ansible.builtin.file:
+        path: /home/deploy/.ssh/authorized_keys
         owner: deploy
         group: deploy
         mode: "0600"

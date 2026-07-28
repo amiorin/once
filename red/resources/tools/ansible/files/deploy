@@ -1,5 +1,11 @@
 #!/usr/local/bin/bb
 
+;; The ForceCommand behind every deploy key. It is what makes an ephemeral,
+;; unattended deploy key safe to hand to CI: a leaked key can trigger `once
+;; update` for the single host named in its own authorized_keys entry and
+;; nothing else. Loosening this widens the blast radius of every key on the
+;; box at once, so change it deliberately — deploy_test.clj guards the rules.
+
 (require '[babashka.process :as p]
          '[clojure.string :as str])
 
@@ -24,24 +30,32 @@
          (keep #(re-find #"[\w][\w.-]+\.[\w]{2,}(?= \()" %))
          set)))
 
-(defn -main [& _]
-  (let [original (System/getenv "SSH_ORIGINAL_COMMAND")]
-    (when (str/blank? original)
-      (die "interactive sessions are not allowed"))
-    (let [tokens (str/split (str/trim original) #"\s+")]
-      (when-not (= 4 (count tokens))
-        (die (str "command not allowed: " original)))
-      (let [[a b c host] tokens]
-        (when-not (and (= a "sudo") (= b "once") (= c "update"))
+(defn -main [& args]
+  ;; The permitted host arrives from the authorized_keys entry, not from the
+  ;; client, so one repository's key cannot update another's application.
+  (let [permitted (first args)]
+    (when (or (str/blank? (str permitted))
+              (not (re-matches host-pattern (str permitted))))
+      (die "no permitted host configured for this key"))
+    (let [original (System/getenv "SSH_ORIGINAL_COMMAND")]
+      (when (str/blank? original)
+        (die "interactive sessions are not allowed"))
+      (let [tokens (str/split (str/trim original) #"\s+")]
+        (when-not (= 4 (count tokens))
           (die (str "command not allowed: " original)))
-        (when-not (re-matches host-pattern host)
-          (die (str "invalid host: " host)))
-        (let [allowed (parse-allowed-hosts)]
-          (when-not (contains? allowed host)
-            (die (str "host not allowed: " host))))
-        (let [{:keys [exit]} @(p/process ["sudo" "once" "update" host]
-                                         {:out :inherit :err :inherit})]
-          (System/exit exit))))))
+        (let [[a b c host] tokens]
+          (when-not (and (= a "sudo") (= b "once") (= c "update"))
+            (die (str "command not allowed: " original)))
+          (when-not (re-matches host-pattern host)
+            (die (str "invalid host: " host)))
+          (when-not (= host permitted)
+            (die (str "host not permitted for this key: " host)))
+          (let [allowed (parse-allowed-hosts)]
+            (when-not (contains? allowed host)
+              (die (str "host not allowed: " host))))
+          (let [{:keys [exit]} @(p/process ["sudo" "once" "update" host]
+                                           {:out :inherit :err :inherit})]
+            (System/exit exit)))))))
 
 (when (= *file* (System/getProperty "babashka.file"))
   (apply -main *command-line-args*))

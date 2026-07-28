@@ -3,11 +3,11 @@
 # so any drift between the colours shows up here first.
 profile: parity
 workdir: .colors
-deploy-pubkey: ssh-ed25519 AAAAEXAMPLE ci-deploy
 once:
   applications:
     - host: www.example.com
       image: ghcr.io/bigconfig-ai/once-bigconfig:latest
+      github: bigconfig-ai/once-bigconfig
       env:
         EXAMPLE: app-example
     - host: www.example.net

@@ -8,6 +8,7 @@ from blue import tofu
 from blue.ansible import ansible_step, ansible_with_spec
 from blue.scaffold import scaffold
 
+from .github import public_keys
 from .utils import apps_domains, registrable_domain
 from .validate import tofu_env
 
@@ -240,11 +241,30 @@ def ansible_once(opts: dict) -> str:
     once = opts.get("once") or {}
     apps = []
     for app in once.get("applications", []):
-        configured = {**app, **smtp, "smtp_from": f"Info <info@notifications.{registrable_domain(app['host'])}>"}
+        # github never reaches the host. It says where the deploy credentials are
+        # published, which is no business of the module reconciling containers.
+        without_github = {k: v for k, v in app.items() if k != "github"}
+        configured = {**without_github, **smtp, "smtp_from": f"Info <info@notifications.{registrable_domain(app['host'])}>"}
         if isinstance(app.get("env"), dict):
             configured["env"] = _resolve_env(app["env"])
         apps.append(configured)
     return _yaml([{"name": "Reconcile ONCE applications", "become": True, "once": {**once, "applications": apps}}])
+
+
+def deploy_keys_content(opts: dict) -> str:
+    """The authorized_keys lines for the current generation.
+
+    One per application naming a repository. Each key carries its own host inside
+    the ForceCommand, so a key leaked from one repository cannot redeploy another
+    repository's application. Pure and deterministic: this is rendered into the
+    artifact the colours compare byte for byte, which is also why the key comment
+    holds no timestamp.
+    """
+    lines = [
+        f'restrict,command="/usr/local/bin/deploy {key["host"]}" {key["public"]}'
+        for key in public_keys(opts)
+    ]
+    return "".join(f"{line}\n" for line in lines)
 
 
 def _remote_specs(opts: dict) -> list[dict]:
@@ -252,6 +272,8 @@ def _remote_specs(opts: dict) -> list[dict]:
     return [
         _spec(_template("tools/ansible/ansible.cfg"), f"{dir}/ansible.cfg", data),
         _spec(_template("tools/ansible/main.yml"), f"{dir}/main.yml", data),
+        _spec(_template("tools/ansible/files/authorized-keys"), f"{dir}/files/authorized-keys", data),
+        _raw_spec(f"{dir}/deploy_keys", deploy_keys_content(opts)),
         _spec(_template("tools/ansible/files/deploy"), f"{dir}/files/deploy", data),
         _spec(_template("tools/ansible/library/once"), f"{dir}/library/once", data),
         _raw_spec(f"{dir}/inventory.json", inventory(data)),

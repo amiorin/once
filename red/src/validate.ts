@@ -85,9 +85,17 @@ function appSecretKeys(apps: any[]): string[] {
     : []);
 }
 
+const repoRe = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+// Applications naming a GitHub repository. These are the ones whose generated
+// deploy key is published; the rest get a key on the box and nothing else.
+export function githubApplications(opts: Opts): any[] {
+  return (applications(opts) ?? []).filter((app: any) => !placeholder(app.github));
+}
+
 export function stateErrors(opts: Opts): string[] {
   const errors: string[] = [];
-  for (const key of ["profile", "workdir", "deploy-pubkey", ...slotKeys(opts, "required")]) {
+  for (const key of ["profile", "workdir", ...slotKeys(opts, "required")]) {
     if (placeholder(opts[key])) errors.push(`${key} is required`);
   }
   for (const slot of slots) {
@@ -99,6 +107,11 @@ export function stateErrors(opts: Opts): string[] {
   for (const [index, app] of (apps ?? []).entries()) {
     if (placeholder(app.host) || !domainRe.test(String(app.host))) errors.push(`once applications[${index}] has an invalid host`);
     if (placeholder(app.image)) errors.push(`once applications[${index}] requires image`);
+    // github is optional; a value that is present has to name a repository,
+    // because it is interpolated straight into a gh invocation.
+    if (app.github !== undefined && app.github !== null && !repoRe.test(String(app.github))) {
+      errors.push(`once applications[${index}] github must be owner/repo`);
+    }
     if (app.env !== undefined && !Array.isArray(app.env) && (app.env === null || typeof app.env !== "object")) {
       errors.push(`once applications[${index}] env must map container variable names to colors.yml keys`);
     }
@@ -110,7 +123,6 @@ export function stateErrors(opts: Opts): string[] {
     }
   }
   if (typeof opts["compute-prevent-destroy"] !== "boolean") errors.push("compute-prevent-destroy must be true or false");
-  if (!String(opts["deploy-pubkey"] ?? "").startsWith("ssh-")) errors.push("deploy-pubkey must be an SSH public key");
   const computeKey = opts["compute-pubkey"];
   if (!placeholder(computeKey) && !String(computeKey).startsWith("ssh-")) errors.push("compute-pubkey must be an SSH public key");
   return errors;
@@ -118,7 +130,13 @@ export function stateErrors(opts: Opts): string[] {
 
 export function secretErrors(opts: Opts): string[] {
   const apps = applications(opts) ?? [];
-  const keys = [...slotKeys(opts, "secrets"), ...(opts["red/event"] === "create" ? appSecretKeys(apps) : [])];
+  // A GitHub token is needed for both create and delete, because delete has to
+  // revoke what create published.
+  const keys = [
+    ...slotKeys(opts, "secrets"),
+    ...(githubApplications(opts).length ? ["github-token"] : []),
+    ...(opts["red/event"] === "create" ? appSecretKeys(apps) : []),
+  ];
   return [...new Set(keys)]
     .filter((key) => placeholder(opts[key]))
     .map((key) => `required credential is not set: ${parName(key)}`);

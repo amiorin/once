@@ -10,12 +10,12 @@ Launcher-managed provider credentials and application secrets reach the workflow
 profile: production
 workdir: .colors
 
-deploy-pubkey: ssh-ed25519 AAAA... ci-deploy
 
 once:
   applications:
     - host: www.example.com
       image: ghcr.io/example/site:latest
+      github: acme/site
       env:
         DATABASE_URL: app-database-url
     - host: www.example.net
@@ -36,7 +36,20 @@ There is no domain key. Application hostnames are the source of truth and may sp
 
 `:env` maps a container variable name to the flat key holding its value; the value itself never appears in the file, and is supplied by the `COLORS_PAR_*` variable named after that key (`:app-database-url` ← `COLORS_PAR_APP_DATABASE_URL`). Application options supported by the ONCE reconciler also include `:auto_update`, `:auto_backup`, `:backup_path`, `:disable_tls`, `:cpus`, and `:memory`.
 
-`:deploy-pubkey` is required. It authorizes only `sudo once update <configured-host>` through a remote ForceCommand. Private keys remain outside the project and should be loaded in `ssh-agent`.
+Deploy keys are not configured here. An application naming a repository under
+`github` gets its own keypair, generated fresh on every `create` and never
+stored: the public half is installed on the server behind a ForceCommand
+restricted to that one host, and the private half is published, with the server
+address, user, and host key, to a GitHub Actions environment named after the
+profile. The
+previous generation is kept alongside the current one so a publication that
+fails leaves the old key working until the next `create` heals it.
+The host key is read from the server itself and published as
+`SSH_KNOWN_HOSTS`, so a workflow can pin it instead of running `ssh-keyscan`
+and trusting whatever answers on that address every deploy.
+
+`COLORS_PAR_GITHUB_TOKEN` is required whenever any application names a
+repository — for `delete` too, which withdraws what `create` published.
 
 `:compute-pubkey` is required by Yandex Cloud, which installs it for the `ubuntu` user through instance metadata. It is optional and unused by the other compute providers: DigitalOcean and Hetzner reference keys already registered with them, while OCI reads a local public-key file named by `:oci-ssh-authorized-keys`. If present it must look like a public key.
 

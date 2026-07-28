@@ -63,10 +63,11 @@ Create/build:
 
 ```text
 start ─┬─ tofu-compute ─┐                          ┌─ ansible-local
-       └─ tofu-smtp ────┴─ tofu-dns ─ smtp-post ───┴─ ansible-remote
+       └─ tofu-smtp ────┴─ tofu-dns ─ smtp-post ───┴─ ansible-remote ─ github
 ```
 
-Delete runs cleanup, SMTP post, DNS, then SMTP and compute in parallel. Step
+Delete withdraws published credentials first, then runs cleanup, SMTP post,
+DNS, then SMTP and compute in parallel. Step
 failures travel as color-namespaced exit/error keys rather than uncaught
 exceptions. Builds render without invoking tools; dry-runs touch nothing.
 

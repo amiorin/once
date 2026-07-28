@@ -113,16 +113,21 @@
 (def ^:private domain-re
   #"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$")
 (def ^:private env-name-re #"^[A-Z_][A-Z0-9_]*$")
+(def ^:private repo-re #"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 
 (defn- app-errors
   [applications]
   (mapcat
-   (fn [[idx {:keys [host image env]}]]
+   (fn [[idx {:keys [host image env github]}]]
      (concat
       (when (or (placeholder? host) (not (re-matches domain-re (str host))))
         [(format ":once :applications[%d] has an invalid :host" idx)])
       (when (placeholder? image)
         [(format ":once :applications[%d] requires :image" idx)])
+      ;; :github is optional; a value that is present has to name a repository,
+      ;; because it is interpolated straight into a gh invocation.
+      (when-not (or (nil? github) (re-matches repo-re (str github)))
+        [(format ":once :applications[%d] :github must be owner/repo" idx)])
       (when-not (or (nil? env) (map? env) (sequential? env))
         [(format ":once :applications[%d] :env must map container variable names to colors.yml keys"
                  idx)])
@@ -154,7 +159,7 @@
     (vec
      (concat
       (map #(str % " is required")
-           (missing-keys opts (concat [:profile :workdir :deploy-pubkey]
+           (missing-keys opts (concat [:profile :workdir]
                                       (slot-keys opts :required))))
       (for [slot slots
             :let [provider (get opts slot)]
@@ -166,8 +171,6 @@
         (app-errors applications))
       (when-not (boolean? (:compute-prevent-destroy opts))
         [":compute-prevent-destroy must be true or false"])
-      (when-not (str/starts-with? (str (:deploy-pubkey opts)) "ssh-")
-        [":deploy-pubkey must be an SSH public key"])
       ;; Yandex requires :compute-pubkey; for other providers it is optional.
       ;; Either way, a value that is present must look like a public key.
       (when-not (or (nil? (:compute-pubkey opts))
@@ -175,13 +178,25 @@
                     (str/starts-with? (str (:compute-pubkey opts)) "ssh-"))
         [":compute-pubkey must be an SSH public key"])))))
 
+(defn github-applications
+  "Applications naming a GitHub repository. These are the ones whose generated
+  deploy key is published; the rest get a key on the box and nothing else."
+  [opts]
+  (->> (get-in opts [:once :applications])
+       (filter #(not (placeholder? (:github %))))
+       vec))
+
 (defn secret-errors
   "Credentials the selected providers need that no `COLORS_PAR_*` variable
   supplied. Application `:env` keys join the list only on create, since
-  deleting does not need to reach the applications."
+  deleting does not need to reach the applications. A GitHub token is needed
+  for both, because delete has to revoke what create published."
   [opts]
   (let [applications (get-in opts [:once :applications])
         ks (cond-> (slot-keys opts :secrets)
+             (seq (github-applications opts))
+             (conj :github-token)
+
              (= :create (:green/event opts))
              (concat (app-secret-keys applications)))]
     (map #(str "required credential is not set: " (green-cli/par-name %))

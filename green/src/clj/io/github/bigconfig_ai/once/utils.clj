@@ -26,8 +26,13 @@
      every colour-native prefix; desired state is a single colors.yml found by
      walking up from the working directory; the shared work directory is
      .colors. A launcher pinned older reads a file that is no longer there and
-     resolves credentials under names nothing sets."
-  7)
+     resolves credentials under names nothing sets.
+  8: deploy keys are generated per application on every create instead of being
+     supplied as :deploy-pubkey, and an application may name a GitHub repository
+     whose environment receives the connection details. A launcher pinned older
+     still expects :deploy-pubkey in desired state and would ignore :github
+     silently, publishing nothing."
+  8)
 
 (defn registrable-domain
   "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes

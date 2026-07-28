@@ -718,12 +718,11 @@ start + validation ─┤                ├─ tofu-dns ─ tofu-smtp-post ─�
       <pre><code class="language-yaml">profile: production
 workdir: .colors
 
-deploy-pubkey: ssh-ed25519 AAAA... ci-deploy
-
 once:
   applications:
     - host: www.example.com
       image: ghcr.io/example/site:latest
+      github: acme/site
       env:
         DATABASE_URL: site-database-url
     - host: www.example.net
@@ -993,8 +992,8 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
         </article>
         <article class="card">
           <p class="label">Deployment</p>
-          <h3><code>deploy-pubkey</code></h3>
-          <p>Authorizes the remote <code>deploy</code> user through a forced command. Interactive sessions are denied; only <code>sudo once update &lt;configured-host&gt;</code> is accepted.</p>
+          <h3><code>github</code></h3>
+          <p>Optional, per application, as <code>owner/repo</code>. ONCE generates that application its own deploy keypair on every <code>create</code> and publishes the private half — with <code>SERVER_IP</code>, <code>SERVER_USER</code>, and <code>SSH_KNOWN_HOSTS</code> — to a GitHub Actions environment named after the <code>profile</code>. Pinning the host key lets a workflow drop <code>ssh-keyscan</code>, which otherwise trusts whatever answers on that address on every deploy. Requires <code>COLORS_PAR_GITHUB_TOKEN</code>. Deploy keys are never written into <code>colors.yml</code>.</p>
         </article>
       </div>
       <p>Public keys are not secrets, but private key files are. The skill may read only a public <code>.pub</code> file that you approve; it must never inspect a private SSH key.</p>
@@ -1100,7 +1099,7 @@ COLORS_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <h2 class="anchor-heading"><a href="#deploy-updates" aria-label="Link to Application updates">#</a>Application updates</h2>
       <p>The remote server gets a restricted <code>deploy</code> account intended for CI or controlled update jobs. Its forced command rejects interactive sessions, malformed commands, and hosts not already known to ONCE.</p>
       <pre><code class="language-bash">ssh deploy@SERVER_IP sudo once update www.example.com</code></pre>
-      <p>The key supplied as <code>deploy-pubkey</code> is the only credential authorized for that account. You can also set <code>auto_update true</code> on an application when ONCE should handle updates automatically.</p>
+      <p>Each application gets its own key, so a key issued for one repository cannot redeploy another's application. Keys are ephemeral — regenerated on every <code>create</code> and never stored — and the previous generation stays authorized until the new one has been published, so a failed publication leaves deploys working. You can also set <code>auto_update true</code> on an application when ONCE should handle updates automatically.</p>
       <p>Running <code>./green create</code> again is appropriate when infrastructure or declared application membership changes: the remote module reconciles by hostname, deploying hosts that are missing and removing hosts no longer present in desired state.</p>
       <div class="callout warning">
         <span class="callout-title">Reconciliation is by hostname</span>
@@ -1173,12 +1172,11 @@ COLORS_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <pre><code class="language-yaml">profile: production
 workdir: .colors
 
-deploy-pubkey: ssh-ed25519 AAAAC3... ci-deploy
-
 once:
   applications:
     - host: www.example.com
       image: ghcr.io/example/site:latest
+      github: acme/site
       env:
         DATABASE_URL: site-database-url
         SECRET_KEY_BASE: site-secret-key-base
@@ -1214,8 +1212,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
             <tr><td><code>profile</code></td><td>Yes</td><td>Names generated output, remote state keys, the compute resource, and the SSH host alias.</td></tr>
             <tr><td><code>workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.once</code>.</td></tr>
             <tr><td><code>compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
-            <tr><td><code>deploy-pubkey</code></td><td>Yes</td><td>Restricted application-update SSH public key.</td></tr>
-            <tr><td><code>once</code></td><td>Yes</td><td>Map containing a non-empty <code>applications</code> vector.</td></tr>
+            <tr><td><code>once</code></td><td>Yes</td><td>Map containing a non-empty <code>applications</code> vector. Each application takes <code>host</code>, <code>image</code>, an optional <code>github</code> repository, and an optional <code>env</code> map.</td></tr>
             <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-smtp</code></td><td>Yes</td><td><code>resend</code> or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-dns</code></td><td>Yes</td><td><code>cloudflare</code> or <code>no-infra</code>.</td></tr>
