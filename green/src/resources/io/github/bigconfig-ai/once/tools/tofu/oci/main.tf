@@ -15,11 +15,17 @@ data "oci_core_subnet" "public_subnet" {
   subnet_id = "<{ oci-subnet-id }>"
 }
 
+# The shape has to be the one the instance actually launches on. OCI images
+# carry a compatibility list, so filtering on a different shape can return an
+# image the instance cannot boot — this read A1.Flex while the instance took
+# whatever oci-shape said, and only kept working because A1 and A2 images
+# overlap. The resource name is left alone deliberately: it is a state address,
+# and renaming it would look like a replacement to every existing stack.
 data "oci_core_images" "ubuntu_24_04_arm" {
   compartment_id           = "<{ oci-compartment-id }>"
   operating_system         = "Canonical Ubuntu"
   operating_system_version = "24.04"
-  shape                    = "VM.Standard.A1.Flex"
+  shape                    = "<{ oci-shape }>"
   sort_by                  = "TIMECREATED"
   sort_order               = "DESC"
 }
