@@ -8,7 +8,7 @@
 // because a manifest in this directory would halt Bun's upward resolution of
 // `package-once-red` and break the development symlink at red/red.
 //
-//   "package-once-red": "github:bigconfig-ai/once#5e7134b65bc930eebdf167d6162011cdff44c136"
+//   "package-once-red": "github:bigconfig-ai/once#72e8135f6b3095dc9f0760230140d2629ebfca5b"
 //   "red": "github:amiorin/red#b434e37568b91228ef14c2271f6fbeea805ae7ae"
 import { exec, run } from "package-once-red";
 export { run };
