@@ -34,15 +34,19 @@ whether the user wants continuous deployment — see below.
 
 After confirmation:
 
-1. Copy this skill's bundled `red` to `./red` and make it executable.
-2. Write a `package.json` whose `dependencies` are the two lines quoted in the
-   bundled `red`'s header comment, copied verbatim. Those are the commits this
-   skill was built from — do not resolve them yourself, and never relax one to a
-   branch or tag. Merge them into an existing manifest rather than replacing it.
-3. Write `colors.yml` following the reference, with `workdir: .colors`.
-4. Add `.colors/` and any private environment file to `.gitignore` without replacing unrelated entries.
-5. Run `bun install`, `./red build`, and `./red create --dry-run`.
-6. Report required variable names only. Do not run a real create automatically.
+1. Copy this skill's bundled `red` to `./red` and make it executable. Its `PINS`
+   hold the immutable commits this skill was built from; the launcher resolves
+   them itself on first run, into `~/.cache/package-once-red/`. No manifest and
+   no install step are needed.
+2. Write `colors.yml` following the reference, with `workdir: .colors`.
+3. Add `.colors/` and any private environment file to `.gitignore` without replacing unrelated entries.
+4. Run `./red build` and `./red create --dry-run`.
+5. Report required variable names only. Do not run a real create automatically.
+
+A project may still declare `package-once-red` in a `package.json` — those
+versions win over the launcher's `PINS`, so a manifest and its lockfile stay
+authoritative where one already exists. Do not add one to a project that has
+none: it is a second place recording the same commit, and the two drift.
 
 ## Continuous deployment
 

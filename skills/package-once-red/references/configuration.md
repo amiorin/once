@@ -1,6 +1,13 @@
 # Red ONCE configuration
 
-The project manifest pins both repositories to full 40-character commits:
+No manifest is required. The bundled `red` carries both repositories pinned to
+full 40-character commits in its `PINS`, and resolves them itself on first run
+into `~/.cache/package-once-red/`, keyed by the pins so a re-pin never reuses an
+older tree. Nothing is written into the project.
+
+A project that already has a `package.json` may declare them instead, and those
+versions win — the launcher reads the manifest ahead of its own pins, so a
+lockfile stays authoritative:
 
 ```json
 {
@@ -12,10 +19,10 @@ The project manifest pins both repositories to full 40-character commits:
 }
 ```
 
-Both commits are recorded in the bundled `red`'s header comment, already
-resolved — copy those two lines verbatim rather than looking the commits up.
-The shape above is what the finished manifest must look like. Never relax
-either dependency to a branch or a tag.
+Copy those two lines from the bundled `red`'s `PINS` verbatim rather than
+looking the commits up, and never relax either to a branch or a tag. Do not add
+a manifest to a project that has none: it records the same commit a second time,
+and the two drift apart at the next re-pin.
 
 `colors.yml` is a YAML map. Provider settings are flat; applications are the only
 nested collection. Quote version-like YAML values such as `3.10`.
