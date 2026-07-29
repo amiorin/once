@@ -93,19 +93,29 @@ Run this once per project, after re-installing the skill and before the next
 ./green build                        # render the work tree at the new contract
 cd .colors/<profile>/tofu-dns
 tofu init
-tofu state pull > /tmp/tofu-dns.backup.tfstate    # keep this until the plan is clean
+tofu state pull > /tmp/tofu-dns.backup.tfstate    # keep this until you have applied once
 
 for old in $(tofu state list | grep io_github_bigconfig_ai_once_tools_); do
   tofu state mv "$old" "${old/io_github_bigconfig_ai_once_tools_/io_github_getcolors_once_tools_}"
 done
 
-tofu plan                            # must report no changes
+tofu state list | grep -c io_github_bigconfig_ai_once_tools_   # must print 0
+tofu state list | wc -l                                        # must equal the count from before
 ```
 
-`tofu plan` reporting **no changes** is the whole proof: the addresses now match
-what the templates render, and the records themselves were never touched. If it
-proposes anything, restore with `tofu state push /tmp/tofu-dns.backup.tfstate`
-before going further.
+Those two counts are the check. A `state mv` renames an address and copies the
+attributes verbatim, so a migration that moved everything and lost nothing is
+correct by construction; restore with `tofu state push
+/tmp/tofu-dns.backup.tfstate` if either count is wrong.
+
+**Do not verify with a bare `tofu plan` in that directory.** It will report
+changes, and they are not yours. `tofu-dns` is rendered from the outputs of the
+compute and SMTP stages, which a standalone `build` has no way to supply: the A
+records fall back to the placeholder `192.168.0.1`, and `smtp.tf.json` renders
+with no resources at all. A plan against that tree proposes rewriting every A
+record and destroying every SMTP record whether or not you have migrated
+anything. The real plan happens inside `create`, where the DAG threads those
+params through, and that is where a clean result means something.
 
 Only the `tofu-dns` stage is affected — compute, smtp, and smtp-post name their
 resources without the namespace. Zone settings are keyed by zone and setting
