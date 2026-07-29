@@ -23,6 +23,8 @@ jobs:
         run: devenv shell bash -lc 'cd blue && uv sync && uv run python -m pytest -q'
       - name: Byte parity
         run: devenv shell ./scripts/parity.sh
+      - name: Launcher resolution
+        run: devenv shell ./scripts/launcher.sh
 
   tag:
     needs: test
