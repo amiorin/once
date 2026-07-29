@@ -1,28 +1,14 @@
 # Red ONCE configuration
 
-No manifest is required. The bundled `red` carries both repositories pinned to
+No manifest is involved. The bundled `red` carries both repositories pinned to
 full 40-character commits in its `PINS`, and resolves them itself on first run
 into `~/.cache/package-once-red/`, keyed by the pins so a re-pin never reuses an
 older tree. Nothing is written into the project.
 
-A project that already has a `package.json` may declare them instead, and those
-versions win — the launcher reads the manifest ahead of its own pins, so a
-lockfile stays authoritative:
-
-```json
-{
-  "type": "module",
-  "dependencies": {
-    "package-once-red": "github:getcolors/once#<once-commit>",
-    "red": "github:getcolors/red#<red-commit>"
-  }
-}
-```
-
-Copy those two lines from the bundled `red`'s `PINS` verbatim rather than
-looking the commits up, and never relax either to a branch or a tag. Do not add
-a manifest to a project that has none: it records the same commit a second time,
-and the two drift apart at the next re-pin.
+`PINS` is the only source of versions — a `package.json` in the project is never
+read, exactly as green's inline SHAs and blue's PEP 723 metadata are the only
+source for them. Do not write one, and do not add these dependencies to an
+existing one expecting it to take effect. Repin by re-installing the skill.
 
 `colors.yml` is a YAML map. Provider settings are flat; applications are the only
 nested collection. Quote version-like YAML values such as `3.10`.

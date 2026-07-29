@@ -18,16 +18,18 @@ const PINS = {
   "red": "github:getcolors/red#b434e37568b91228ef14c2271f6fbeea805ae7ae",
 };
 
-// Red is the one colour whose dependencies were a separate step: green resolves
-// its git deps through add-deps and blue through uv's inline metadata, so only
-// here could a copied payload sit beside a manifest it never installed. It now
-// resolves them the same way — into a cache on first run — so `./red` works
-// from a fresh clone like `./green` and `./blue` do.
+// PINS is the only source of versions, as green's inline SHAs and blue's PEP
+// 723 metadata are for them. A project manifest is never consulted: it would be
+// a second record of the same commit, and the two drift.
 //
 // A static import would fail during resolution, before any line of this file
 // runs, with a bare "Cannot find package" naming no fix. The import stays
 // dynamic so the failure can be answered instead of reported. The answer cannot
 // live in the package for the obvious reason: the package is what is missing.
+//
+// Ordinary resolution still wins when it succeeds, which is what keeps a
+// checkout usable — the same role green's classpath check plays before it calls
+// add-deps.
 
 /** The nearest directory at or above `from` holding a package.json, or null. */
 function manifestDir(from) {
@@ -48,27 +50,7 @@ function readManifest(dir) {
   }
 }
 
-/** Dependencies to resolve, and where they came from.
- *
- * A project that names these dependencies owns their versions — resolving the
- * launcher's pins instead would silently run a different commit than the one
- * its manifest and lockfile record. The launcher's own pins are the fallback
- * for a payload dropped somewhere that declares nothing.
- */
-function effectiveDeps(root) {
-  const manifest = root ? readManifest(root) : null;
-  const declared = manifest?.dependencies?.["package-once-red"];
-  if (!declared) return { deps: PINS, source: "this launcher's pins" };
-  return {
-    deps: {
-      "package-once-red": declared,
-      red: manifest.dependencies?.red ?? PINS.red,
-    },
-    source: `${join(root, "package.json")}`,
-  };
-}
-
-/** Install `deps` into a cache keyed by their exact specifiers.
+/** Install `PINS` into a cache keyed by their exact specifiers.
  *
  * Keyed by content, so re-pinning lands in a new directory instead of reusing a
  * stale tree, and two projects on different pins never share one. Staged in a
@@ -76,22 +58,22 @@ function effectiveDeps(root) {
  * tree; whichever loses the rename discards its copy and uses the winner's,
  * which is byte-identical by construction.
  */
-function installToCache(deps, source) {
+function installToCache() {
   const home = process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
   const root = join(home, "package-once-red");
-  const key = Bun.hash(JSON.stringify(deps)).toString(16);
+  const key = Bun.hash(JSON.stringify(PINS)).toString(16);
   const target = join(root, key);
   if (existsSync(join(target, "node_modules"))) return { dir: target };
 
   // Announced only when something is actually fetched: every later run takes
   // the branch above, and a line claiming a first run on each of them would be
   // noise on the way to every command's real output.
-  console.error(`red: resolving dependencies from ${source} (first run)`);
+  console.error("red: resolving dependencies (first run)");
   mkdirSync(root, { recursive: true });
   const staging = mkdtempSync(join(root, `.${key}.`));
   writeFileSync(
     join(staging, "package.json"),
-    `${JSON.stringify({ name: "package-once-red-cache", private: true, dependencies: deps }, null, 2)}\n`,
+    `${JSON.stringify({ name: "package-once-red-cache", private: true, dependencies: PINS }, null, 2)}\n`,
   );
   const installed = Bun.spawnSync([process.execPath, "install"], {
     cwd: staging,
@@ -134,15 +116,12 @@ try {
       `red: cannot resolve '${err.specifier}'\n` +
         (root
           ? `dependencies are not installed; run: bun install --cwd ${root}`
-          : `no package.json at or above ${import.meta.dir}; write one whose\n` +
-            `dependencies are the two lines quoted in this file's PINS, then\n` +
-            `run: bun install`),
+          : `no package.json at or above ${import.meta.dir}`),
     );
     process.exit(2);
   }
 
-  const { deps, source } = effectiveDeps(root);
-  const { dir, error } = installToCache(deps, source);
+  const { dir, error } = installToCache();
   if (error) {
     console.error(`red: could not resolve dependencies\n${error}`);
     process.exit(2);

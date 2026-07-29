@@ -16,9 +16,13 @@ bun run typecheck
 working tree is the point, so the launcher deliberately refuses to fall back to
 a pinned copy and tells you to install instead. It recognises a checkout by the
 enclosing manifest being named `package-once-red`. Outside one, `./red`
-resolves its own dependencies into `~/.cache/package-once-red/` on first run —
-see the launcher's header. Set `RED_NO_BOOTSTRAP=1` to force the old
-error-and-exit behaviour anywhere.
+resolves its own `PINS` into `~/.cache/package-once-red/` on first run — see the
+launcher's header. Set `RED_NO_BOOTSTRAP=1` to force the error-and-exit
+behaviour anywhere.
+
+This manifest is a development dependency, not a version channel. The shipped
+launcher never reads a project's `package.json`; `PINS` is its only source of
+versions, as green's inline SHAs and blue's PEP 723 metadata are for them.
 
 Source is under `src/`, packaged templates under `resources/`, tests under
 `test/`. `./red` links to `../skills/package-once-red/red`. The repository root

@@ -95,11 +95,11 @@ grep -rqs "$launcher_pin" "$cache"/package-once-red/*/package.json ||
 ok "a payload with no manifest resolves the launcher's pins"
 
 # ---------------------------------------------------------------------------
-# 3. A project that names the dependency owns its version.
+# 3. A project manifest never changes which commit is resolved.
 #
-# once-colors pins an older `once` than the launcher ships. Resolving the
-# launcher's pin there would run a different DAG against live infrastructure
-# than its manifest and lockfile record.
+# PINS is the single source of versions. A manifest naming a different commit
+# must not quietly redirect the launcher, or the payload and the project become
+# two records of the same thing — the drift this arrangement exists to remove.
 # ---------------------------------------------------------------------------
 mkdir -p "$tmp/project"
 cp "$launcher" "$tmp/project/red"
@@ -115,16 +115,19 @@ cat >"$tmp/project/package.json" <<EOF
 EOF
 
 (cd "$tmp/project" && XDG_CACHE_HOME="$cache" ./red --help >/dev/null) ||
-  fail "a project with its own pin could not resolve"
-grep -rqs "$project_pin" "$cache"/package-once-red/*/package.json ||
-  fail "the project's pin ($project_pin) was not the one resolved"
-ok "a project's declared pin wins over the launcher's"
+  fail "a project carrying an unrelated manifest could not resolve"
+if grep -rqs "$project_pin" "$cache"/package-once-red/*/package.json; then
+  fail "a manifest pin ($project_pin) overrode PINS; the launcher must ignore manifests"
+fi
+grep -rqs "$launcher_pin" "$cache"/package-once-red/*/package.json ||
+  fail "PINS ($launcher_pin) was not the resolved pin"
+ok "a project manifest does not override PINS"
 
 # ---------------------------------------------------------------------------
 # 4. Resolution never writes into the project.
 #
-# once-colors tracks its bun.lock. A fallback that installed in place would
-# churn a tracked file on every first run.
+# A fallback that installed in place would leave node_modules and a lockfile in
+# a project that deliberately tracks neither.
 # ---------------------------------------------------------------------------
 for stray in node_modules bun.lock bun.lockb; do
   if [ -e "$tmp/project/$stray" ]; then fail "resolution created $stray inside the project"; fi
@@ -132,14 +135,26 @@ done
 ok "resolution leaves the project directory untouched"
 
 # ---------------------------------------------------------------------------
-# 5. The cache is keyed by the dependencies, not by name.
+# 5. The cache is keyed by PINS, so a re-pin cannot reuse the old tree.
 #
-# Two different pins must occupy two directories. Share one and a re-pinned
-# launcher silently reuses the tree built for the commit before it.
+# Stand in for `bb pin` by rewriting one pin in a copy of the launcher. Sharing
+# a cache entry across pins is the failure that would leave a re-pinned launcher
+# silently running the commit before it.
 # ---------------------------------------------------------------------------
-entries=$(find "$cache/package-once-red" -mindepth 1 -maxdepth 1 -type d | wc -l)
-[ "$entries" -eq 2 ] || fail "expected two cache entries for two pin sets, found $entries"
-ok "distinct pins occupy distinct cache entries"
+before=$(find "$cache/package-once-red" -mindepth 1 -maxdepth 1 -type d | wc -l)
+mkdir -p "$tmp/repinned"
+sed "s/$launcher_pin/$project_pin/" "$launcher" > "$tmp/repinned/red"
+chmod +x "$tmp/repinned/red"
+grep -q "$project_pin" "$tmp/repinned/red" || fail "fixture: the re-pin rewrite did not apply"
+
+(cd "$tmp/repinned" && XDG_CACHE_HOME="$cache" ./red --help >/dev/null) ||
+  fail "a re-pinned launcher could not resolve"
+after=$(find "$cache/package-once-red" -mindepth 1 -maxdepth 1 -type d | wc -l)
+[ "$after" -eq $((before + 1)) ] ||
+  fail "re-pinning did not create a new cache entry ($before -> $after)"
+grep -rqs "$project_pin" "$cache"/package-once-red/*/package.json ||
+  fail "the re-pinned commit was never fetched"
+ok "a re-pin lands in its own cache entry"
 
 # ---------------------------------------------------------------------------
 # 6. A resolved launcher actually renders.
