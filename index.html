@@ -714,7 +714,7 @@ start + validation ─┤                ├─ tofu-dns ─ tofu-smtp-post ─�
     <section id="desired-state">
       <h2 class="anchor-heading"><a href="#desired-state" aria-label="Link to Desired state">#</a>Desired state</h2>
       <p><code>colors.yml</code> is a flat YAML map except for applications, with kebab-case keys. Every colour reads it under the YAML 1.2 core schema, so <code>no</code> is the string <code>no</code> and <code>012</code> is twelve; quote anything that should stay text. Keep credentials, passwords, private keys, and application secret values out of it.</p>
-      <div class="callout info"><span class="callout-title">Interchangeable state</span>Use the same <code>profile</code>, <code>workdir: .once</code>, providers, and settings when switching colors. Generated paths, resource addresses, and bytes are identical.</div>
+      <div class="callout info"><span class="callout-title">Interchangeable state</span>Use the same <code>profile</code>, <code>workdir: .colors</code>, providers, and settings when switching colors. Generated paths, resource addresses, and bytes are identical.</div>
 
       <pre><code class="language-yaml">profile: production
 workdir: .colors
@@ -1082,7 +1082,7 @@ COLORS_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
       <pre><code class="language-bash">./green build -f ./production.edn
 ./green create --file ./production.edn --dry-run
 ./green describe -f ./production.edn</code></pre>
-      <p>Use distinct profiles for independent stacks. Use the same profile and <code>.once</code> workdir when changing only the implementation color.</p>
+      <p>Use distinct profiles for independent stacks. Use the same profile and <code>.colors</code> workdir when changing only the implementation color.</p>
     </section>
 
     <section id="safe-lifecycle">
@@ -1416,7 +1416,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
           <thead><tr><th>Key</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><code>profile</code></td><td>Yes</td><td>Names generated output, remote state keys, the compute resource, and the SSH host alias.</td></tr>
-            <tr><td><code>workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.once</code>.</td></tr>
+            <tr><td><code>workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.colors</code>.</td></tr>
             <tr><td><code>compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
             <tr><td><code>once</code></td><td>Yes</td><td>Map containing a non-empty <code>applications</code> vector. Each application takes <code>host</code>, <code>image</code>, an optional <code>github</code> repository, and an optional <code>env</code> map.</td></tr>
             <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
