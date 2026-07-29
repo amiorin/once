@@ -218,6 +218,36 @@
                (str/replace host "." "-")
                (str/replace host "." "_")])))
 
+(defn- host-variant-rx
+  "Match `variant` only where a longer hostname does not continue through it.
+
+  `getcolors.ai` is a substring of `www.getcolors.ai`, so a plain `includes?`
+  lets the shorter host claim the longer host's container. Dots and alphanumerics
+  block a match; `-` and `_` do not, because container names embed a
+  dot-substituted host inside a longer name (`/once-www-example-com`)."
+  [variant]
+  (re-pattern (str "(?<![a-z0-9.])"
+                   (java.util.regex.Pattern/quote variant)
+                   "(?![a-z0-9.])")))
+
+(defn- once-label-host
+  "The host ONCE recorded on the container, from its `once` label.
+
+  ONCE writes the application's desired state there as JSON, making this the
+  authoritative container-to-host mapping; everything else is inference from
+  names and third-party labels."
+  [container]
+  (let [raw (str (get-in container [:Config :Labels :once]))]
+    (when-not (str/blank? raw)
+      (try
+        (some-> (json/parse-string raw keyword)
+                :host
+                str
+                str/trim
+                not-empty
+                str/lower-case)
+        (catch Exception _ nil)))))
+
 (defn- container-search-text
   [container]
   (->> (select-keys container [:Name :Config :NetworkSettings])
@@ -228,11 +258,21 @@
 (defn- container-for-host?
   [host container]
   (let [text (container-search-text container)]
-    (some #(str/includes? text %) (host-variants host))))
+    (some #(re-find (host-variant-rx %) text) (host-variants host))))
 
 (defn- find-container-for-host
+  "Resolve the container serving `host`.
+
+  The `once` label wins outright: a labelled container belongs to exactly the
+  host it names, so it can never be claimed by another. Only containers ONCE did
+  not label fall through to matching on names and third-party labels."
   [containers host]
-  (some #(when (container-for-host? host %) %) containers))
+  (let [host (str/lower-case host)]
+    (or (some #(when (= host (once-label-host %)) %) containers)
+        (some #(when (and (nil? (once-label-host %))
+                          (container-for-host? host %))
+                 %)
+              containers))))
 
 (defn- image-identifiers
   [containers]

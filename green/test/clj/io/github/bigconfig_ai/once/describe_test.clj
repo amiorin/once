@@ -83,6 +83,34 @@
            (get-in (#'d/find-container-for-host containers "www.example.com")
                    [:Config :Image])))))
 
+(deftest docker-container-matching-prefers-the-once-label-host
+  (testing "a bare host does not claim the container of a host it prefixes"
+    (let [once-label (fn [host image]
+                       {:Name (str "/once-app-" (str/replace host "." "-"))
+                        :Config {:Image image
+                                 :Labels {:once (json/generate-string
+                                                 {:name "app" :image image :host host})}}})
+          ;; the longer host is listed first, so a substring match returns it
+          containers [(once-label "www.example.com" "ghcr.io/org/site:latest")
+                      (once-label "example.com" "ghcr.io/org/redirect:latest")]]
+      (is (= "ghcr.io/org/redirect:latest"
+             (get-in (#'d/find-container-for-host containers "example.com")
+                     [:Config :Image])))
+      (is (= "ghcr.io/org/site:latest"
+             (get-in (#'d/find-container-for-host containers "www.example.com")
+                     [:Config :Image])))))
+
+  (testing "a dotted host in a third-party label is boundary-checked"
+    ;; the name carries no host, so the traefik rule is the only evidence; the
+    ;; dot-substituted form (`example-com` inside `once-www-example-com`) stays
+    ;; ambiguous by nature, which is why the `once` label is what actually decides
+    (let [containers [{:Name "/app-1"
+                       :Config {:Image "ghcr.io/org/site:latest"
+                                :Labels {:traefik.http.routers.app.rule
+                                         "Host(`www.example.com`)"}}}]]
+      (is (some? (#'d/find-container-for-host containers "www.example.com")))
+      (is (nil? (#'d/find-container-for-host containers "example.com"))))))
+
 (deftest digest-selection-and-comparison
   (is (= "sha256:aaa"
          (d/matching-repo-digest "ghcr.io/org/app"
