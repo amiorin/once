@@ -8,7 +8,9 @@ license: MIT
 
 Use this skill in the user's current directory. Read
 [references/configuration.md](references/configuration.md) before creating or
-changing desired state and before a real create or delete.
+changing desired state and before a real create or delete, and
+[references/github-deploy.md](references/github-deploy.md) before writing or
+changing a GitHub Actions workflow.
 
 ## Safety
 
@@ -27,7 +29,8 @@ Gather profile, applications, providers, selected providers' non-secret
 settings. Deploy keys are not among them: ONCE generates one per repository
 named under `github` on every create and publishes it to a GitHub environment
 named after the profile, so ask only for `COLORS_PAR_GITHUB_TOKEN`. Never
-gather secret values.
+gather secret values. When an application names a repository, also ask whether
+the user wants continuous deployment — see below.
 
 After confirmation:
 
@@ -36,6 +39,28 @@ After confirmation:
 3. Add `.colors/` and private environment files to `.gitignore` without replacing unrelated entries.
 4. Run `./blue build` and `./blue create --dry-run`.
 5. Report required variable names only and do not provision automatically.
+
+## Continuous deployment
+
+`create` publishes `SSH_PRIVATE_KEY`, `SERVER_IP`, `SERVER_USER`, and
+`SSH_KNOWN_HOSTS` into an Actions environment named after the profile; nothing
+reads them until a workflow does. So whenever an application names `github`,
+ask whether to also add the workflow that builds the image and pings the server
+on every push to `main`. Do not ask when no application names a repository —
+without it nothing is published.
+
+On yes, adapt [references/github-deploy.md](references/github-deploy.md):
+substitute the profile for `PROFILE` and the application host for the
+environment URL. The workflow belongs in the **application's** repository, often
+not the directory holding `colors.yml`. Compare the `origin` remote to
+`owner/repo`: on a match write `.github/workflows/deploy.yml`, asking before
+overwriting an existing one; otherwise show the YAML and name its path rather
+than writing into the wrong repository. State that the repository needs its own
+`Dockerfile`, that the published image must equal the application's `image`, and
+that the first run works only after a real `create`.
+
+On no, nothing further is needed: `ssh -T deploy@SERVER_IP </dev/null` is the
+whole deploy interface, and `auto_update: true` updates without a ping.
 
 ## Operate
 

@@ -50,7 +50,9 @@ so a workflow can pin it instead of running `ssh-keyscan` and trusting whatever
 answers on that address every deploy. The previous generation stays authorized
 until the new one is published, so a failed publication heals on the next
 `create`. Requires `COLORS_PAR_GITHUB_TOKEN`, for `delete` too, which withdraws
-what `create` published.
+what `create` published. Nothing reads those values until a workflow in that
+repository does; [github-deploy.md](github-deploy.md) is the example workflow
+and the contract it consumes.
 
 Application `env` maps the container variable name to a flat desired-state key.
 Do not add that key's value to YAML. Supply it as `COLORS_PAR_APP_DATABASE_URL` or

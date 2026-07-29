@@ -25,7 +25,7 @@ Babashka runs the launcher. `create` and `delete` also require OpenTofu and Ansi
 - Before delete, remind the user that `:compute-prevent-destroy` defaults to `true`. Authorize an intentional delete with `COLORS_PAR_COMPUTE_PREVENT_DESTROY=false` (or its `COLORS_PAR_*` alias) rather than editing desired state.
 - Never edit `.colors/`. Green, Red, and Blue may use it interchangeably, but two implementations must never run concurrently against the same state.
 
-Read [references/configuration.md](references/configuration.md) before generating or changing desired state, and before any real `create` or `delete`.
+Read [references/configuration.md](references/configuration.md) before generating or changing desired state, and before any real `create` or `delete`. Read [references/github-deploy.md](references/github-deploy.md) before writing or changing a GitHub Actions workflow.
 
 ## Initialize in the current directory
 
@@ -37,7 +37,7 @@ Gather these non-secret inputs conversationally:
 - one or more applications: hostname, container image, and optional mapping of container variable names to the `colors.yml` keys holding their values. Hostnames may span domains; Green manages every derived DNS zone and Resend sending domain, and only the listed hostnames get application DNS records
 - compute, SMTP, DNS, and backend providers
 - the selected providers' non-secret settings
-- `:github` on any application whose deploy credentials ONCE should publish, as `owner/repo`. Deploy keys themselves are never collected: ONCE generates one per repository on every create and publishes it to a GitHub environment named after the profile, so ask only for `COLORS_PAR_GITHUB_TOKEN`. Also collect `:compute-pubkey` when Yandex is selected; Yandex installs it for the `ubuntu` user through instance metadata. Other providers instead reference a key already registered with them (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file path (`:oci-ssh-authorized-keys`)
+- `:github` on any application whose deploy credentials ONCE should publish, as `owner/repo`. Deploy keys themselves are never collected: ONCE generates one per repository on every create and publishes it to a GitHub environment named after the profile, so ask only for `COLORS_PAR_GITHUB_TOKEN`. Whenever an application names a repository, ask whether the user also wants continuous deployment — see [Continuous deployment](#continuous-deployment) below. Also collect `:compute-pubkey` when Yandex is selected; Yandex installs it for the `ubuntu` user through instance metadata. Other providers instead reference a key already registered with them (`:digitalocean-ssh-keys`, `:hcloud-ssh-keys`) or a local public-key file path (`:oci-ssh-authorized-keys`)
 
 Do not request secret values. Tell the user which `COLORS_PAR_*` names and native credential mechanisms are required for their selected providers.
 
@@ -71,6 +71,41 @@ Every command reads `./colors.yml` unless `-f|--file` names another desired-stat
 `build` renders OpenTofu and Ansible configuration without invoking them. Dry-run touches nothing. `describe` reads the OpenTofu outputs already in the work directory, probes SSH, lists remote ONCE applications through `once list` and `docker inspect` under passwordless `sudo`, and uses `skopeo` when available to compare image digests. Compute is reported as `running`, `unreachable` (state holds an address but SSH failed), or `absent` (the `tofu-compute` stage has no outputs, so it was never created); `no-infra` hosts are never `absent`, since OpenTofu does not create them. Describe exits non-zero when compute is not `running` and when the remote `once` command is missing; every other live check is a soft failure named in its output, so read the report rather than the exit status alone.
 
 Before real create/delete, check required `COLORS_PAR_*` variables by presence only. Do not print them. For OCI, S3, and SSH, confirm that the selected native credential mechanism is configured without reading secret material. Let the launcher perform its own final desired-state and environment validation.
+
+## Continuous deployment
+
+Publishing credentials and consuming them are two different things. `create`
+publishes `SSH_PRIVATE_KEY`, `SERVER_IP`, `SERVER_USER`, and `SSH_KNOWN_HOSTS`
+into a GitHub Actions environment named after the profile; nothing reads them
+until a workflow does. So whenever an application names a repository under
+`:github`, ask:
+
+> Should I also add the GitHub Actions workflow that builds the image and pings
+> the server on every push to `main`?
+
+Do not ask when no application names a repository — without `:github` nothing
+is published and the workflow would have no credentials to read.
+
+If the user says yes, read [references/github-deploy.md](references/github-deploy.md)
+and write the workflow with `PROFILE` replaced by the configured profile and
+the environment URL set to the application's host. Where it goes matters: the
+workflow belongs in the **application's** repository, which is frequently not
+the directory holding `colors.yml`. Check the current repository's `origin`
+remote against `owner/repo` first.
+
+- It matches: write `.github/workflows/deploy.yml`. Ask before overwriting an
+  existing workflow, and never merge into one silently.
+- It does not match, or the directory is not that repository: do not write into
+  the wrong repository. Show the adapted YAML and name the path it belongs at.
+
+Say plainly that the workflow builds from a `Dockerfile` the repository must
+already have, that the image it publishes has to equal the application's
+`:image`, and that the first run only succeeds after a real `create` has
+populated the environment.
+
+If the user says no, that is a complete answer: `ssh -T deploy@SERVER_IP </dev/null`
+from anywhere with the key is the whole deploy interface, and
+`auto_update: true` on an application lets ONCE update it without any ping.
 
 ## Generated application environment
 

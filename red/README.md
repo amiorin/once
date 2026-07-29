@@ -17,3 +17,10 @@ directory — the same file green and blue read, so switching colours needs no
 change to it. Secrets use `COLORS_PAR_*`; never place them in `colors.yml`. See
 the unified [`../index.html`](../index.html) manual and
 [`../skills/package-once-red`](../skills/package-once-red).
+
+An application naming `github: owner/repo` gets `SSH_PRIVATE_KEY`, `SERVER_IP`,
+`SERVER_USER`, and `SSH_KNOWN_HOSTS` published into an Actions environment named
+after the profile on every `create` — but nothing reads them until a workflow in
+that repository does.
+[`../skills/package-once-red/references/github-deploy.md`](../skills/package-once-red/references/github-deploy.md)
+is that workflow.

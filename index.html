@@ -573,6 +573,7 @@
       <ul>
         <li><a href="#safe-lifecycle">Safe lifecycle</a></li>
         <li><a href="#deploy-updates">Application updates</a></li>
+        <li><a href="#github-actions">GitHub Actions deployment</a></li>
         <li><a href="#upgrading">Upgrading an existing project</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
       </ul>
@@ -1111,6 +1112,205 @@ COLORS_PAR_COMPUTE_PREVENT_DESTROY=false ./green delete</code></pre>
         <span class="callout-title">Reconciliation is by hostname</span>
         Changing the <code>image</code>, <code>env</code>, or resource settings of an application that is <em>already deployed</em> does not redeploy it — the host is still present, so there is nothing to reconcile. Pull a new image by pinging the server from that repository's workflow, or change the settings on the server itself.
       </div>
+    </section>
+
+    <section id="github-actions">
+      <h2 class="anchor-heading"><a href="#github-actions" aria-label="Link to GitHub Actions deployment">#</a>GitHub Actions deployment</h2>
+      <p>Publishing credentials and consuming them are two separate things. <code>create</code> writes four values into a GitHub Actions environment named after the <code>profile</code>, and nothing reads them until a workflow in that repository does. This is that workflow.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Kind</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td><code>SSH_PRIVATE_KEY</code></td><td>secret</td><td>The deploy key's private half, regenerated on every <code>create</code> and never stored.</td></tr>
+            <tr><td><code>SERVER_IP</code></td><td>variable</td><td>The server address.</td></tr>
+            <tr><td><code>SERVER_USER</code></td><td>variable</td><td>Always <code>deploy</code>.</td></tr>
+            <tr><td><code>SSH_KNOWN_HOSTS</code></td><td>variable</td><td>The server's own host key, read over an authenticated session rather than scanned.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warning">
+        <span class="callout-title">All four are environment-scoped</span>
+        A job that does not declare <code>environment:</code> cannot see them at all. The values resolve to empty rather than erroring, so a workflow missing that block fails deep inside <code>ssh</code> with a useless message. Nothing is published at repository scope.
+      </div>
+      <p>The address and user are variables rather than secrets deliberately: DNS reveals the address anyway, and masking them only makes CI logs harder to read. The deploy step itself sends no command — the key's forced command already names every host that repository serves — so no hostname appears in the workflow, and adding a host to <code>colors.yml</code> needs no change to it.</p>
+      <p>The server pulls the tag named in the application's <code>image</code>. With <code>ghcr.io/example/site:latest</code>, the ping only means something once <code>:latest</code> points at the new build, which is why the build and manifest jobs come first.</p>
+      <pre><code class="language-yaml">name: Build and Publish Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # Each architecture pushes by digest under no tag at all. Mutable :arm and
+  # :amd tags would be shared across runs, so two pushes landing close together
+  # could interleave and leave :latest with its arm64 half from one commit and
+  # its amd64 half from another — undetected, and :latest is what the server
+  # pulls.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - arch: amd
+            platform: linux/amd64
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+          provenance: false
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # One imagetools call builds both tags from the digests just pushed, so the
+  # two halves of a manifest always come from the same run. It also reads each
+  # child's platform itself, which is why there are no manual
+  # `docker manifest annotate --os/--arch` pairs here.
+  manifest:
+    runs-on: ubuntu-24.04-arm
+    needs:
+      - build
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute short sha
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" &gt;&gt; "$GITHUB_OUTPUT"
+
+      - name: Create and push the manifest list
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository }}:latest \
+            --tag ghcr.io/${{ github.repository }}:sha-${{ steps.sha.outputs.short }} \
+            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+
+      - name: Show what was published
+        run: docker buildx imagetools inspect ghcr.io/${{ github.repository }}:latest
+
+  deploy:
+    runs-on: ubuntu-24.04-arm
+    needs:
+      - manifest
+    # The environment ONCE publishes into, named after the colors.yml profile.
+    # Without this the job cannot see the environment-scoped secret or
+    # variables at all, and every value below resolves to empty.
+    environment:
+      name: PROFILE
+      url: https://www.example.com
+    # Serialize rather than cancel: interrupting a deploy midway is worse than
+    # making the next one wait.
+    concurrency:
+      group: deploy-PROFILE
+      cancel-in-progress: false
+    steps:
+      - name: Deploy via SSH
+        env:
+          # Only the key is a secret. The address and user are variables, so CI
+          # logs stay readable — DNS reveals the address anyway.
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_IP: ${{ vars.SERVER_IP }}
+          SERVER_USER: ${{ vars.SERVER_USER }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+        run: |
+          # Create the .ssh directory and start the agent
+          mkdir -p ~/.ssh
+          eval $(ssh-agent -s)
+
+          # Add the private key to the agent
+          echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+
+          # Pinned by ONCE at provisioning time, not scanned here. Fail closed:
+          # falling back to ssh-keyscan would trust whatever answers on that
+          # address, which is the weakness pinning exists to remove.
+          if [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "SSH_KNOWN_HOSTS is unset - run 'once create' to publish it" &gt;&amp;2
+            exit 1
+          fi
+          printf '%s\n' "$SSH_KNOWN_HOSTS" &gt;&gt; ~/.ssh/known_hosts
+
+          # A ping, not a command. This key's authorized_keys entry already
+          # names every host this repository serves, and its forced command
+          # updates all of them — so there is no hostname to duplicate here,
+          # and adding a host to colors.yml needs no change to this file.
+          #
+          # Connect to SERVER_IP: ONCE keys the pinned SSH_KNOWN_HOSTS entry on
+          # the address, so a hostname here would find no match under
+          # StrictHostKeyChecking=yes.
+          #
+          # The exit status is the deploy result for every host this key owns.
+          ssh -T -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_IP" &lt; /dev/null</code></pre>
+      <h3>Adapting it</h3>
+      <ul>
+        <li>Replace <code>PROFILE</code> in both places with the <code>profile</code> from <code>colors.yml</code>. Any other name resolves an environment with no variables in it.</li>
+        <li><code>environment.url</code> is cosmetic — the application's host, so the deployment shows a link in the GitHub UI.</li>
+        <li>The image the manifest publishes must be exactly the application's <code>image</code>. <code>ghcr.io/${{ github.repository }}</code> expands to <code>ghcr.io/owner/repo</code>, so it matches only when desired state names that.</li>
+        <li><code>permissions: packages: write</code> is what lets <code>GITHUB_TOKEN</code> push to ghcr.io. Without it the run fails at the push rather than at login.</li>
+        <li>For one architecture only, drop the unwanted matrix entry and the whole <code>manifest</code> job, and give <code>build-push-action</code> <code>tags:</code> and <code>push: true</code> instead of <code>outputs:</code>.</li>
+        <li>The repository needs its own <code>Dockerfile</code> at <code>context: .</code>. This workflow builds the image the application runs; it does not create one.</li>
+      </ul>
+      <div class="callout info">
+        <span class="callout-title">Where the file goes</span>
+        The workflow belongs in the <em>application's</em> repository — the one named by <code>github: owner/repo</code> — which is frequently not the repository holding <code>colors.yml</code>.
+      </div>
+      <p>Run <code>create</code> before the first workflow run. ONCE creates the environment itself, so nothing has to exist in GitHub beforehand; until then it is empty, and the deploy job stops on the <code>SSH_KNOWN_HOSTS</code> check rather than trusting an unverified host. <code>COLORS_PAR_GITHUB_TOKEN</code> must be set for <code>create</code> to publish, and for <code>delete</code>, which withdraws all four values again.</p>
     </section>
 
     <section id="upgrading">

@@ -53,6 +53,10 @@ and trusting whatever answers on that address every deploy.
 `COLORS_PAR_GITHUB_TOKEN` is required whenever any application names a
 repository — for `delete` too, which withdraws what `create` published.
 
+Publishing is only half of it: nothing reads those values until a workflow in
+that repository does. [github-deploy.md](github-deploy.md) is the example
+workflow and the contract it consumes.
+
 `:compute-pubkey` is required by Yandex Cloud, which installs it for the `ubuntu` user through instance metadata. It is optional and unused by the other compute providers: DigitalOcean and Hetzner reference keys already registered with them, while OCI reads a local public-key file named by `:oci-ssh-authorized-keys`. If present it must look like a public key.
 
 ## Compute providers

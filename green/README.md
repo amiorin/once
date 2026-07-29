@@ -181,6 +181,12 @@ the remaining live checks are soft failures named in the report.
   `deploy` user whose keys are each pinned to a `ForceCommand` naming the hosts
   one repository serves, and reconciles the declared applications with the
   `once` Ansible module.
+- `github` publishes each repository's `SSH_PRIVATE_KEY`, `SERVER_IP`,
+  `SERVER_USER`, and `SSH_KNOWN_HOSTS` into an Actions environment named after
+  the profile, and withdraws them on delete. Nothing reads those values until a
+  workflow in that repository does;
+  [`../skills/package-once-green/references/github-deploy.md`](../skills/package-once-green/references/github-deploy.md)
+  is that workflow.
 
 A build of the example desired state produces:
 
