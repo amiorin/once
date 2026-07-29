@@ -2,7 +2,7 @@
 
 `once` provisions and operates a single-server [ONCE](https://github.com/basecamp/once)
 installation with OpenTofu and Ansible. It uses the
-[`green`](https://github.com/amiorin/green) DAG workflow engine. This is the
+[`green`](https://github.com/getcolors/green) DAG workflow engine. This is the
 Clojure implementation in a byte-compatible Green/Red/Blue monorepo; all three
 can manage the same `.colors/<profile>/` state between completed commands.
 
@@ -11,8 +11,8 @@ The implementation ships a thin launcher at
 file is the payload of the `package-once-green` agent skill:
 
 ```bash
-npx skills use bigconfig-ai/once@package-once-green
-npx skills add bigconfig-ai/once --skill package-once-green
+npx skills use getcolors/once@package-once-green
+npx skills add getcolors/once --skill package-once-green
 ```
 
 Standing alone, the launcher resolves `once` and `green` as pinned git

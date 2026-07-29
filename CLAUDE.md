@@ -2,7 +2,7 @@
 
 ## Repository
 
-This is the `bigconfig-ai/once` monorepo. It contains three implementations of
+This is the `getcolors/once` monorepo. It contains three implementations of
 one production ONCE workflow:
 
 - `green/` — Clojure/Babashka, over the `green` SDK

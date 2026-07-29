@@ -21,7 +21,7 @@
    [clojure.java.shell :as sh]
    [clojure.string :as str]))
 
-(def ^:private once-repo "bigconfig-ai/once")
+(def ^:private once-repo "getcolors/once")
 
 (def ^:private pin-sites
   "Every place a copied payload records which `once` commit to resolve.
@@ -32,9 +32,9 @@
   [{:path "skills/package-once-green/green"
     :rx #"\(def \^:private once-sha \"([0-9a-f]{40})\"\)"}
    {:path "skills/package-once-blue/blue"
-    :rx #"package-once-blue = \{ git = \"[^\"]*bigconfig-ai/once[^\"]*\", rev = \"([0-9a-f]{40})\""}
+    :rx #"package-once-blue = \{ git = \"[^\"]*getcolors/once[^\"]*\", rev = \"([0-9a-f]{40})\""}
    {:path "skills/package-once-red/red"
-    :rx #"\"package-once-red\": \"github:bigconfig-ai/once#([0-9a-f]{40})\""}])
+    :rx #"\"package-once-red\": \"github:getcolors/once#([0-9a-f]{40})\""}])
 
 (def ^:private green-site
   {:path "skills/package-once-green/green"

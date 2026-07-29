@@ -6,8 +6,8 @@ The copied launcher's PEP 723 metadata must resolve both packages from immutable
 ```toml
 # dependencies = ["package-once-blue", "blue"]
 # [tool.uv.sources]
-# package-once-blue = { git = "https://github.com/bigconfig-ai/once.git", rev = "<once-commit>", subdirectory = "blue" }
-# blue = { git = "https://github.com/amiorin/blue.git", rev = "<blue-commit>" }
+# package-once-blue = { git = "https://github.com/getcolors/once.git", rev = "<once-commit>", subdirectory = "blue" }
+# blue = { git = "https://github.com/getcolors/blue.git", rev = "<blue-commit>" }
 ```
 
 Replace both placeholders and remove development-only local paths before the

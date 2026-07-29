@@ -19,9 +19,9 @@ concurrently.
 ## Skills
 
 ```sh
-npx skills use bigconfig-ai/once@package-once-green
-npx skills use bigconfig-ai/once@package-once-red
-npx skills use bigconfig-ai/once@package-once-blue
+npx skills use getcolors/once@package-once-green
+npx skills use getcolors/once@package-once-red
+npx skills use getcolors/once@package-once-blue
 ```
 
 Skill packages are under [`skills/`](skills/). Each guides desired-state setup,

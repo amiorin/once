@@ -1,7 +1,7 @@
 {
   "name": "package-once-red",
   "version": "0.1.0",
-  "description": "Red/TypeScript facade for the bigconfig-ai/once monorepo",
+  "description": "Red/TypeScript facade for the getcolors/once monorepo",
   "type": "module",
   "license": "MIT",
   "exports": {

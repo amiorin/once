@@ -3,7 +3,7 @@
  ;; launcher fetches it that way. Temporarily use a local-root coordinate when
  ;; developing both checkouts together.
  :deps    {org.clojure/clojure          {:mvn/version "1.12.5"}
-           io.github.amiorin/green      {:git/url "https://github.com/amiorin/green.git"
+           io.github.getcolors/green      {:git/url "https://github.com/getcolors/green.git"
                                          :git/sha "1c1fb81563287c98aa1bcd0e12cd755296e6d98e"}}
  :aliases {:dev  {:extra-paths ["env/dev/clj" "test/clj" "test/resources"]}
            :test {:extra-paths ["test/clj" "test/resources"]

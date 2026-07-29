@@ -32,7 +32,7 @@
 ;; GREEN_LIB_ROOT override a pin with a working tree.
 
 (def ^:private launcher-contract
-  "Minimum io.github.bigconfig-ai/once contract this launcher requires.
+  "Minimum io.github.getcolors/once contract this launcher requires.
   Guarded at run time so a stale pin fails loudly instead of rendering
   templates from an older commit."
   9)
@@ -41,8 +41,8 @@
 (def ^:private once-sha "39f00e20044d5e1c3c674b430ae41c3acff18b9d")
 (def ^:private green-sha "1c1fb81563287c98aa1bcd0e12cd755296e6d98e")
 
-(def ^:private once-git-url "https://github.com/bigconfig-ai/once.git")
-(def ^:private green-git-url "https://github.com/amiorin/green.git")
+(def ^:private once-git-url "https://github.com/getcolors/once.git")
+(def ^:private green-git-url "https://github.com/getcolors/green.git")
 
 (defn- lib-coord
   [env-var url sha deps-root]
@@ -54,8 +54,8 @@
 (when (and (System/getProperty "babashka.version")
            (nil? (io/resource "io/github/bigconfig_ai/once/tools.clj")))
   ((requiring-resolve 'babashka.deps/add-deps)
-   {:deps {'io.github.bigconfig-ai/once (lib-coord "ONCE_LIB_ROOT" once-git-url once-sha "green")
-           'io.github.amiorin/green (lib-coord "GREEN_LIB_ROOT" green-git-url green-sha nil)}}))
+   {:deps {'io.github.getcolors/once (lib-coord "ONCE_LIB_ROOT" once-git-url once-sha "green")
+           'io.github.getcolors/green (lib-coord "GREEN_LIB_ROOT" green-git-url green-sha nil)}}))
 
 (require '[babashka.cli :as bb-cli]
          '[green.cli :as green-cli])

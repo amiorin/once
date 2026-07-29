@@ -108,8 +108,8 @@ cat >"$tmp/project/package.json" <<EOF
   "name": "launcher-fixture",
   "private": true,
   "dependencies": {
-    "package-once-red": "github:bigconfig-ai/once#$project_pin",
-    "red": "github:amiorin/red#b434e37568b91228ef14c2271f6fbeea805ae7ae"
+    "package-once-red": "github:getcolors/once#$project_pin",
+    "red": "github:getcolors/red#b434e37568b91228ef14c2271f6fbeea805ae7ae"
   }
 }
 EOF

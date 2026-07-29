@@ -6,7 +6,7 @@ This file describes the `once` codebase for AI assistants. Read it before making
 
 `once` provisions and operates a single-server [ONCE](https://github.com/basecamp/once) installation with [OpenTofu](https://opentofu.org/) and [Ansible](https://www.ansible.com/). It targets "vibe coders" who want one-click deployment.
 
-It is built on [`green`](https://github.com/amiorin/green), a DAG workflow engine: a graph of steps threaded by an `opts` map, with advice (before/after/around) attached per step. This branch is a rewrite — the BigConfig SDK, `bb run package …`, `options.clj` profiles, and `BC_PAR_*` variables are gone. Do not reintroduce those concepts.
+It is built on [`green`](https://github.com/getcolors/green), a DAG workflow engine: a graph of steps threaded by an `opts` map, with advice (before/after/around) attached per step. This branch is a rewrite — the BigConfig SDK, `bb run package …`, `options.clj` profiles, and `BC_PAR_*` variables are gone. Do not reintroduce those concepts.
 
 The repository ships two things from one file:
 
@@ -18,7 +18,7 @@ The repository ships two things from one file:
 ## Tech Stack
 
 - **Language**: Clojure 1.12.5 (JVM), plus Babashka for the launcher and for the two scripts that run on the remote host
-- **Workflow engine**: `io.github.amiorin/green` (`green.workflow`, `green.scaffold`, `green.tofu`, `green.ansible`, `green.cli`, `green.progress`, `green.dry-run`, `green.process`, `green.yaml`)
+- **Workflow engine**: `io.github.getcolors/green` (`green.workflow`, `green.scaffold`, `green.tofu`, `green.ansible`, `green.cli`, `green.progress`, `green.dry-run`, `green.process`, `green.yaml`)
 - **Infrastructure**: OpenTofu; **Config management**: Ansible
 - **Key libraries**: `cheshire` (JSON), `selmer` (templates, via `green.scaffold`)
 - **Dev environment**: Nix via `devenv` + `direnv`

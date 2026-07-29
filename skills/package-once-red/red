@@ -14,8 +14,8 @@ import { homedir } from "node:os";
 // directory, which would halt Bun's upward resolution of `package-once-red` and
 // break the development symlink at red/red.
 const PINS = {
-  "package-once-red": "github:bigconfig-ai/once#39f00e20044d5e1c3c674b430ae41c3acff18b9d",
-  "red": "github:amiorin/red#b434e37568b91228ef14c2271f6fbeea805ae7ae",
+  "package-once-red": "github:getcolors/once#39f00e20044d5e1c3c674b430ae41c3acff18b9d",
+  "red": "github:getcolors/red#b434e37568b91228ef14c2271f6fbeea805ae7ae",
 };
 
 // Red is the one colour whose dependencies were a separate step: green resolves

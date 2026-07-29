@@ -6,8 +6,8 @@ The project manifest pins both repositories to full 40-character commits:
 {
   "type": "module",
   "dependencies": {
-    "package-once-red": "github:bigconfig-ai/once#<once-commit>",
-    "red": "github:amiorin/red#<red-commit>"
+    "package-once-red": "github:getcolors/once#<once-commit>",
+    "red": "github:getcolors/red#<red-commit>"
   }
 }
 ```
