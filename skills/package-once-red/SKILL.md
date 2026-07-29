@@ -17,7 +17,7 @@ changing a GitHub Actions workflow.
 - Never request or print a secret, private key, token, password, or application value.
 - Secrets use `COLORS_PAR_*`, the one namespace every colour shares, and never belong in `colors.yml`, generated files, commands, or logs.
 - Read only a user-approved SSH `.pub` file. Never inspect a private key.
-- Do not overwrite `red`, `colors.yml`, or `package.json` without explicit approval.
+- Do not overwrite `red` or `colors.yml` without explicit approval.
 - Default to `build` and `create --dry-run`. A real create/delete needs explicit confirmation for that operation.
 - Build and dry-run are credential-free; never claim they validate credentials.
 - Delete remains blocked until `COLORS_PAR_COMPUTE_PREVENT_DESTROY=false` or `COLORS_PAR_COMPUTE_PREVENT_DESTROY=false` is present.
@@ -34,19 +34,11 @@ whether the user wants continuous deployment — see below.
 
 After confirmation:
 
-1. Copy this skill's bundled `red` to `./red` and make it executable. Its `PINS`
-   hold the immutable commits this skill was built from; the launcher resolves
-   them itself on first run, into `~/.cache/package-once-red/`. No manifest and
-   no install step are needed.
+1. Copy this skill's bundled `red` to `./red` and make it executable. Its `PINS` must pin both `package-once-red` and `red` to immutable Git commits; the launcher resolves them itself on first run.
 2. Write `colors.yml` following the reference, with `workdir: .colors`.
 3. Add `.colors/` and any private environment file to `.gitignore` without replacing unrelated entries.
 4. Run `./red build` and `./red create --dry-run`.
 5. Report required variable names only. Do not run a real create automatically.
-
-A project may still declare `package-once-red` in a `package.json` — those
-versions win over the launcher's `PINS`, so a manifest and its lockfile stay
-authoritative where one already exists. Do not add one to a project that has
-none: it is a second place recording the same commit, and the two drift.
 
 ## Continuous deployment
 
