@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.describe
+(ns io.github.getcolors.once.describe
   "Describe the active green desired state after provisioning.
 
   The report shows configured providers, compute status, and deployed ONCE
@@ -11,7 +11,7 @@
    [clojure.string :as str]
    [green.cli :as green-cli]
    [green.process :as process]
-   [io.github.bigconfig-ai.once.tools :as tools]))
+   [io.github.getcolors.once.tools :as tools]))
 
 ;;; -------------------------------------------------------------- command helpers
 

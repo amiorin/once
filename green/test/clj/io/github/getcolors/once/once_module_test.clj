@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.once-module-test
+(ns io.github.getcolors.once.once-module-test
   (:require
    [cheshire.core :as json]
    [clojure.java.io :as io]
@@ -8,7 +8,7 @@
 
 (def module
   (.getAbsolutePath
-   (io/file "src/resources/io/github/bigconfig-ai/once/tools/ansible/library/once")))
+   (io/file "src/resources/io/github/getcolors/once/tools/ansible/library/once")))
 
 (def smtp-password "re_a_real_secret")
 (def database-url "postgres://user:hunter2@db/app")

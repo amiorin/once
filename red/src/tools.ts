@@ -168,7 +168,7 @@ function cloudflareZoneId(zone: string): string {
 export function renderFn(source: "apps" | "smtp", data: any): string {
   if (source === "apps") {
     return tofu.constructsJson((data.applications ?? []).map((app: any) =>
-      tofu.construct("resource", "cloudflare_dns_record", addFqnSuffix("io.github.bigconfig-ai.once.tools/app-dns", `-${app.host}`), {
+      tofu.construct("resource", "cloudflare_dns_record", addFqnSuffix("io.github.getcolors.once.tools/app-dns", `-${app.host}`), {
         zone_id: cloudflareZoneId(registrableDomain(app.host)!), name: app.host, content: data.ip,
         type: "A", proxied: true, ttl: 1,
       })));
@@ -176,7 +176,7 @@ export function renderFn(source: "apps" | "smtp", data: any): string {
   return tofu.constructsJson((data.domains ?? []).flatMap((domain: any) =>
     (domain.records ?? []).map((record: any) => tofu.construct(
       "resource", "cloudflare_dns_record",
-      addFqnSuffix("io.github.bigconfig-ai.once.tools/smtp-dns", `-${domain.zone}-${record.record}-${record.type}`),
+      addFqnSuffix("io.github.getcolors.once.tools/smtp-dns", `-${domain.zone}-${record.record}-${record.type}`),
       {
         zone_id: cloudflareZoneId(domain.zone), name: record.name, ttl: "1", type: record.type,
         proxied: false,

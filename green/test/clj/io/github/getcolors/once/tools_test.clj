@@ -1,11 +1,11 @@
-(ns io.github.bigconfig-ai.once.tools-test
+(ns io.github.getcolors.once.tools-test
   (:require
    [cheshire.core :as json]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [green.ansible :as ansible]
-   [io.github.bigconfig-ai.once.tools :as tools]))
+   [io.github.getcolors.once.tools :as tools]))
 
 (defn- temp-dir
   []

@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.utils
+(ns io.github.getcolors.once.utils
   "The compatibility contract, and the DNS zone derivation every stage shares."
   (:require
    [clojure.string :as str]))
@@ -35,8 +35,14 @@
   9: :oci-image-id pins the compute image. A launcher pinned older renders the
      image data source regardless and takes whatever Canonical published most
      recently, so the pin is ignored without a word and a plan proposes
-     replacing the instance."
-  9)
+     replacing the instance.
+  10: the Clojure namespaces move from io.github.bigconfig-ai.once.* to
+     io.github.getcolors.once.*, following the repository's move to the
+     getcolors org. The launcher resolves these names directly, so one pinned
+     older cannot find them. The rename also changes generated Terraform
+     resource addresses, which existing stacks must migrate with
+     `tofu state mv` before their next apply -- see README.md."
+  10)
 
 (defn registrable-domain
   "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes

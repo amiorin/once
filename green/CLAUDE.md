@@ -30,14 +30,14 @@ green/
 ├── green                    # symlink -> ../skills/package-once-green/green
 ├── (colors.yml at the repo root — one desired state for every colour)
 ├── src/
-│   ├── clj/io/github/bigconfig_ai/once/
+│   ├── clj/io/github/getcolors/once/
 │   │   ├── tools.clj        # the six step functions, template specs, generated JSON
 │   │   ├── workflow.clj     # the DAG: start, cleanup, wire-fn, backend advice
 │   │   ├── validate.clj     # the provider registry and desired-state validation
 │   │   ├── github.clj       # deploy-key generation and publication to the Actions environment
 │   │   ├── describe.clj     # post-provisioning report (providers, compute status, apps)
 │   │   └── utils.clj        # contract number and DNS zone derivation
-│   └── resources/io/github/bigconfig-ai/once/
+│   └── resources/io/github/getcolors/once/
 │       ├── raw              # `<{ content|safe }>` — the template used for generated content
 │       └── tools/
 │           ├── tofu/{digitalocean,hcloud,yandex,oci,no-infra}/main.tf
@@ -47,7 +47,7 @@ green/
 │           ├── ansible/            # remote host: playbook, ansible.cfg, files/deploy, library/once
 │           └── ansible-local/      # local machine: playbook, ansible.cfg, inventory.ini
 ├── tasks/pin.clj            # `bb pin`, the maintainer-only launcher stamp
-├── test/clj/io/github/bigconfig_ai/once/
+├── test/clj/io/github/getcolors/once/
 │   ├── tools_test.clj       # rendering, generated DNS records, ansible-local lifecycle
 │   ├── workflow_test.clj    # validation gates, the graph shape, backends, a whole build
 │   ├── validate_test.clj    # the provider registry and every desired-state rule
@@ -167,7 +167,7 @@ Note the asymmetry: the compute step's work directory is `tofu-compute` but its 
 
 ### Rendering
 
-`green.scaffold` maps a qualified keyword to a classpath resource (`:io.github.bigconfig-ai.once.tools.tofu.oci/main.tf` → `io/github/bigconfig-ai/once/tools/tofu/oci/main.tf`) and renders it with Selmer. `tools/template-opts` overrides the delimiters, so templates use `<{ var }>` for values and `<% if … %>` for tags, leaving `{{ … }}` and `{% … %}` for Jinja2 in the Ansible files. Providers are selected by directory, not by conditionals in one file.
+`green.scaffold` maps a qualified keyword to a classpath resource (`:io.github.getcolors.once.tools.tofu.oci/main.tf` → `io/github/getcolors/once/tools/tofu/oci/main.tf`) and renders it with Selmer. `tools/template-opts` overrides the delimiters, so templates use `<{ var }>` for values and `<% if … %>` for tags, leaving `{{ … }}` and `{% … %}` for Jinja2 in the Ansible files. Providers are selected by directory, not by conditionals in one file.
 
 Content that is computed rather than templated is written through `raw-spec`, which renders the one-line `raw` template: `apps.tf.json`, `smtp.tf.json`, `inventory.json`, and `once.yml`. `tools/render-fn` builds the two DNS files from `green.tofu/construct` and `constructs-json`, which merges and sorts them so the JSON is deterministic. `backend.tf.json` is the exception — `green.tofu` writes it directly from the backend advice, outside the scaffold.
 
@@ -226,7 +226,7 @@ Keys are per repository and ephemeral: `validate/deploy-groups` groups applicati
 
 ## Code Conventions
 
-- **Namespaces**: `io.github.bigconfig-ai.once.*`. Six of them, mapping to distinct concerns — `tools` (the steps), `workflow` (the graph), `validate` (the provider registry and its rules), `describe` (the report), `github` (deploy keys and the environment they are published to), `utils` (the contract and zone derivation). Adding a seventh needs a genuinely new concern.
+- **Namespaces**: `io.github.getcolors.once.*`. Six of them, mapping to distinct concerns — `tools` (the steps), `workflow` (the graph), `validate` (the provider registry and its rules), `describe` (the report), `github` (deploy keys and the environment they are published to), `utils` (the contract and zone derivation). Adding a seventh needs a genuinely new concern.
 - **Keys**: plain kebab-case keywords for desired state (they match template variable names); namespaced keywords for engine state (`:green/…`, `:once/…`).
 - **Steps** take `opts` and return `opts`, and report failure through `:green/exit` / `:green/err`.
 - **`^:private`** for everything not called from the launcher or the tests. The launcher's own helpers are `defn-`; the workflow steps it exposes are not.

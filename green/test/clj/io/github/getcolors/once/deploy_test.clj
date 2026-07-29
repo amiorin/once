@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.deploy-test
+(ns io.github.getcolors.once.deploy-test
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
@@ -7,7 +7,7 @@
 
 (def deploy-script
   (.getAbsolutePath
-   (io/file "src/resources/io/github/bigconfig-ai/once/tools/ansible/files/deploy")))
+   (io/file "src/resources/io/github/getcolors/once/tools/ansible/files/deploy")))
 
 (defn- make-temp-dir! []
   (.toFile (java.nio.file.Files/createTempDirectory

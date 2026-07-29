@@ -1,7 +1,7 @@
-(ns io.github.bigconfig-ai.once.utils-test
+(ns io.github.getcolors.once.utils-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [io.github.bigconfig-ai.once.utils :as sut]))
+   [io.github.getcolors.once.utils :as sut]))
 
 (deftest registrable-domain-test
   (testing "the zone is the last two labels"

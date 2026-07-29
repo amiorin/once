@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.workflow-test
+(ns io.github.getcolors.once.workflow-test
   (:require
    [cheshire.core :as json]
    [clojure.java.io :as io]
@@ -7,8 +7,8 @@
    [green.ansible :as ansible]
    [green.tofu :as tofu]
    [green.workflow :as wf]
-   [io.github.bigconfig-ai.once.tools :as tools]
-   [io.github.bigconfig-ai.once.workflow :as sut]))
+   [io.github.getcolors.once.tools :as tools]
+   [io.github.getcolors.once.workflow :as sut]))
 
 (defn- temp-dir
   []

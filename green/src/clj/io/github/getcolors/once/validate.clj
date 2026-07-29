@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.validate
+(ns io.github.getcolors.once.validate
   "The provider registry and the desired-state validation it drives.
 
   Every provider the four provider slots can be pointed at is described once,

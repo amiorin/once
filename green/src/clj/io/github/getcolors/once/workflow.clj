@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.workflow
+(ns io.github.getcolors.once.workflow
   "The DAG the launcher runs, and the two steps that are not a tool.
 
   Create and build fork compute and SMTP, join them at DNS, and fork again
@@ -18,10 +18,10 @@
    [green.progress :as progress]
    [green.tofu :as tofu]
    [green.workflow :as wf]
-   [io.github.bigconfig-ai.once.github :as github]
-   [io.github.bigconfig-ai.once.tools :as tools]
-   [io.github.bigconfig-ai.once.utils :as utils]
-   [io.github.bigconfig-ai.once.validate :as validate]))
+   [io.github.getcolors.once.github :as github]
+   [io.github.getcolors.once.tools :as tools]
+   [io.github.getcolors.once.utils :as utils]
+   [io.github.getcolors.once.validate :as validate]))
 
 ;; ---------------------------------------------------------------------------
 ;; start

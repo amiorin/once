@@ -126,7 +126,7 @@ def _zone_id(zone: str) -> str:
 def render_fn(source: str, data: dict) -> str:
     if source == "apps":
         return tofu.constructs_json([
-            tofu.construct("resource", "cloudflare_dns_record", _add_suffix("io.github.bigconfig-ai.once.tools/app-dns", f"-{app['host']}"), {
+            tofu.construct("resource", "cloudflare_dns_record", _add_suffix("io.github.getcolors.once.tools/app-dns", f"-{app['host']}"), {
                 "zone_id": _zone_id(registrable_domain(app["host"])), "name": app["host"], "content": data.get("ip"), "type": "A", "proxied": True, "ttl": 1,
             }) for app in data.get("applications", [])
         ])
@@ -138,7 +138,7 @@ def render_fn(source: str, data: dict) -> str:
                 block["content"] = f'"{record.get("value")}"'
             if record.get("type") == "MX":
                 block.update({"priority": record.get("priority"), "content": record.get("value")})
-            constructs.append(tofu.construct("resource", "cloudflare_dns_record", _add_suffix("io.github.bigconfig-ai.once.tools/smtp-dns", f"-{domain['zone']}-{record.get('record')}-{record.get('type')}"), block))
+            constructs.append(tofu.construct("resource", "cloudflare_dns_record", _add_suffix("io.github.getcolors.once.tools/smtp-dns", f"-{domain['zone']}-{record.get('record')}-{record.get('type')}"), block))
     return tofu.constructs_json(constructs)
 
 

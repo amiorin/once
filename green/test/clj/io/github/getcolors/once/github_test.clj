@@ -1,11 +1,11 @@
-(ns io.github.bigconfig-ai.once.github-test
+(ns io.github.getcolors.once.github-test
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [green.process :as process]
-   [io.github.bigconfig-ai.once.github :as sut]
-   [io.github.bigconfig-ai.once.tools :as tools]))
+   [io.github.getcolors.once.github :as sut]
+   [io.github.getcolors.once.tools :as tools]))
 
 (def ^:private opts
   "Two applications share one repository — the same image answering for two
@@ -169,7 +169,7 @@
 
 (def ^:private reconciler
   (.getAbsolutePath
-   (io/file "src/resources/io/github/bigconfig-ai/once/tools/ansible/files/authorized-keys")))
+   (io/file "src/resources/io/github/getcolors/once/tools/ansible/files/authorized-keys")))
 
 (defn- line
   "An entry as ONCE renders it: every host the repository serves inside the

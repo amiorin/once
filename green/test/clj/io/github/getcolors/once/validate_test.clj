@@ -1,8 +1,8 @@
-(ns io.github.bigconfig-ai.once.validate-test
+(ns io.github.getcolors.once.validate-test
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [io.github.bigconfig-ai.once.validate :as sut]))
+   [io.github.getcolors.once.validate :as sut]))
 
 (def ^:private valid
   {:profile "test"

@@ -1,10 +1,10 @@
-(ns io.github.bigconfig-ai.once.describe-test
+(ns io.github.getcolors.once.describe-test
   (:require
    [cheshire.core :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [io.github.bigconfig-ai.once.describe :as d]
-   [io.github.bigconfig-ai.once.tools :as tools]))
+   [io.github.getcolors.once.describe :as d]
+   [io.github.getcolors.once.tools :as tools]))
 
 (def ^:private base-opts
   {:profile "test"

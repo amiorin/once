@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.tools
+(ns io.github.getcolors.once.tools
   (:require
    [cheshire.core :as json]
    [clojure.java.io :as io]
@@ -9,12 +9,12 @@
    [green.tofu :as tofu]
    [green.workflow :as wf]
    [green.yaml :as yaml]
-   [io.github.bigconfig-ai.once.github :as github]
-   [io.github.bigconfig-ai.once.utils :as utils]
-   [io.github.bigconfig-ai.once.validate :as validate]))
+   [io.github.getcolors.once.github :as github]
+   [io.github.getcolors.once.utils :as utils]
+   [io.github.getcolors.once.validate :as validate]))
 
-(def ^:private template-root "io.github.bigconfig-ai.once.tools")
-(def ^:private raw-template :io.github.bigconfig-ai.once/raw)
+(def ^:private template-root "io.github.getcolors.once.tools")
+(def ^:private raw-template :io.github.getcolors.once/raw)
 (def ^:private template-opts {:tag-open \<
                               :tag-close \>
                               :filter-open \{

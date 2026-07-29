@@ -79,6 +79,38 @@ read; a stale one is ignored and the run stops with `required credential is not
 set`. An outdated launcher refuses to run rather than rendering from a stale
 contract.
 
+### Migrating DNS resource addresses (contract 10)
+
+Contract 10 renames the Clojure namespaces to `io.github.getcolors.once.*`.
+That name is not only internal: it is part of the address of every DNS record
+this project manages, so the rename moves them and **an unmigrated `create`
+will destroy and recreate every record in the zone.**
+
+Run this once per project, after re-installing the skill and before the next
+`create`. It rewrites the addresses in place; nothing is created or destroyed.
+
+```sh
+./green build                        # render the work tree at the new contract
+cd .colors/<profile>/tofu-dns
+tofu init
+tofu state pull > /tmp/tofu-dns.backup.tfstate    # keep this until the plan is clean
+
+for old in $(tofu state list | grep io_github_bigconfig_ai_once_tools_); do
+  tofu state mv "$old" "${old/io_github_bigconfig_ai_once_tools_/io_github_getcolors_once_tools_}"
+done
+
+tofu plan                            # must report no changes
+```
+
+`tofu plan` reporting **no changes** is the whole proof: the addresses now match
+what the templates render, and the records themselves were never touched. If it
+proposes anything, restore with `tofu state push /tmp/tofu-dns.backup.tfstate`
+before going further.
+
+Only the `tofu-dns` stage is affected — compute, smtp, and smtp-post name their
+resources without the namespace. Zone settings are keyed by zone and setting
+name and do not move either.
+
 ## Development
 
 ```sh

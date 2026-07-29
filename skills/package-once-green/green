@@ -35,7 +35,7 @@
   "Minimum io.github.getcolors/once contract this launcher requires.
   Guarded at run time so a stale pin fails loudly instead of rendering
   templates from an older commit."
-  9)
+  10)
 
 ;; Managed by `bb pin` — do not edit by hand.
 (def ^:private once-sha "8208b6eae2d0b3b7bd370f51ef2c890dfc725a2e")
@@ -52,7 +52,7 @@
       deps-root (assoc :deps/root deps-root))))
 
 (when (and (System/getProperty "babashka.version")
-           (nil? (io/resource "io/github/bigconfig_ai/once/tools.clj")))
+           (nil? (io/resource "io/github/getcolors/once/tools.clj")))
   ((requiring-resolve 'babashka.deps/add-deps)
    {:deps {'io.github.getcolors/once (lib-coord "ONCE_LIB_ROOT" once-git-url once-sha "green")
            'io.github.getcolors/green (lib-coord "GREEN_LIB_ROOT" green-git-url green-sha nil)}}))
@@ -65,14 +65,14 @@
 ;; them defensively so the contract check below can answer instead.
 (def ^:private load-error
   (try
-    (require 'io.github.bigconfig-ai.once.describe
-             'io.github.bigconfig-ai.once.workflow)
+    (require 'io.github.getcolors.once.describe
+             'io.github.getcolors.once.workflow)
     nil
     (catch Throwable t (or (ex-message t) (str (class t))))))
 
 (defn- once-contract
   []
-  (or (some-> (requiring-resolve 'io.github.bigconfig-ai.once.utils/contract) deref)
+  (or (some-> (requiring-resolve 'io.github.getcolors.once.utils/contract) deref)
       0))
 
 (defn- contract-error
@@ -148,10 +148,10 @@
       ;; loaded once contract-error has passed
       (or (contract-error)
           (if (= "describe" command)
-            ((requiring-resolve 'io.github.bigconfig-ai.once.describe/describe-file)
+            ((requiring-resolve 'io.github.getcolors.once.describe/describe-file)
              (describe-args args))
             (green-cli/run-cli
-             @(requiring-resolve 'io.github.bigconfig-ai.once.workflow/workflow)
+             @(requiring-resolve 'io.github.getcolors.once.workflow/workflow)
              args)))
       :else {:green/exit 2 :green/err usage})))
 

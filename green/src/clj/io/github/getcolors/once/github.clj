@@ -1,4 +1,4 @@
-(ns io.github.bigconfig-ai.once.github
+(ns io.github.getcolors.once.github
   "Deploy keys, and the GitHub environment they are published to.
 
   This is a sixth concern rather than a step in `tools`: nothing here renders a
@@ -30,7 +30,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [green.process :as process]
-   [io.github.bigconfig-ai.once.validate :as validate]))
+   [io.github.getcolors.once.validate :as validate]))
 
 (def ^:private run-timeout-ms 30000)
 

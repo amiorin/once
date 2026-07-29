@@ -2,7 +2,7 @@
 ;; `host=image` line per entry. Red and blue print the same shape, so parity.sh
 ;; can diff them directly.
 (require '[cheshire.core :as json]
-         '[io.github.bigconfig-ai.once.describe :as describe])
+         '[io.github.getcolors.once.describe :as describe])
 
 (let [path (first *command-line-args*)
       {:keys [containers hosts]} (json/parse-string (slurp path) keyword)]

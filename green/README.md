@@ -217,8 +217,8 @@ clojure-lsp format
 clj-kondo --lint src/clj test/clj ../skills/package-once-green/green
 ```
 
-Source namespaces are under `src/clj/io/github/bigconfig_ai/once/`; templates
-are under `src/resources/io/github/bigconfig-ai/once/tools/`. `.colors/` is
+Source namespaces are under `src/clj/io/github/getcolors/once/`; templates
+are under `src/resources/io/github/getcolors/once/tools/`. `.colors/` is
 generated and must not be edited.
 
 After committing and pushing a change to the launcher, `src/clj`, or the
