@@ -89,9 +89,35 @@ export function matchingRepoDigest(repository: string, digests: unknown[] = []):
 function containerText(container: any): string {
   return JSON.stringify({ Name: container.Name, Config: container.Config, NetworkSettings: container.NetworkSettings }).toLowerCase();
 }
-function containerForHost(containers: any[], host: string): any {
-  const variants = [host, host.replaceAll(".", "-"), host.replaceAll(".", "_")].map((x) => x.toLowerCase());
-  return containers.find((container) => variants.some((variant) => containerText(container).includes(variant)));
+// The host ONCE recorded on the container, from its `once` label. ONCE writes the
+// application's desired state there as JSON, making this the authoritative
+// container-to-host mapping; everything else is inference from names and labels.
+function onceLabelHost(container: any): string | null {
+  const raw = String(container?.Config?.Labels?.once ?? "").trim();
+  if (!raw) return null;
+  try {
+    const host = JSON.parse(raw)?.host;
+    return host ? String(host).trim().toLowerCase() || null : null;
+  } catch {
+    return null;
+  }
+}
+// `example.com` sits inside `www.example.com`, so a plain substring lets the shorter host
+// claim the longer one's container. Dots and alphanumerics block a match; `-` and `_` do
+// not, because container names embed a dot-substituted host inside a longer name
+// (`/once-www-example-com`).
+function hostVariantRegExp(variant: string): RegExp {
+  return new RegExp(`(?<![a-z0-9.])${variant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9.])`);
+}
+// The `once` label wins outright: a labelled container belongs to exactly the host it
+// names and can never be claimed by another, so only unlabelled containers fall through
+// to matching on names and third-party labels.
+export function containerForHost(containers: any[], host: string): any {
+  const lower = host.toLowerCase();
+  const labelled = containers.find((container) => onceLabelHost(container) === lower);
+  if (labelled) return labelled;
+  const variants = [...new Set([lower, lower.replaceAll(".", "-"), lower.replaceAll(".", "_")])].map(hostVariantRegExp);
+  return containers.find((container) => onceLabelHost(container) === null && variants.some((rx) => rx.test(containerText(container))));
 }
 
 async function registryDigest(runner: Runner, image: string, os: string, arch: string) {

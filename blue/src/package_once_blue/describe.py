@@ -79,9 +79,41 @@ def matching_repo_digest(repository: str, digests: list | None) -> str | None:
     return None
 
 
+def _once_label_host(container: dict) -> str | None:
+    """The host ONCE recorded on the container, from its `once` label. ONCE writes the
+    application's desired state there as JSON, making this the authoritative
+    container-to-host mapping; everything else is inference from names and labels."""
+    raw = str(((container.get("Config") or {}).get("Labels") or {}).get("once") or "").strip()
+    if not raw:
+        return None
+    try:
+        host = json.loads(raw).get("host")
+    except (ValueError, AttributeError):
+        return None
+    return str(host).strip().lower() or None if host else None
+
+
+def _host_variant_re(variant: str) -> re.Pattern:
+    """`example.com` sits inside `www.example.com`, so a plain substring lets the shorter
+    host claim the longer one's container. Dots and alphanumerics block a match; `-` and
+    `_` do not, because container names embed a dot-substituted host inside a longer
+    name (`/once-www-example-com`)."""
+    return re.compile(rf"(?<![a-z0-9.]){re.escape(variant)}(?![a-z0-9.])")
+
+
+def _container_text(container: dict) -> str:
+    return json.dumps({k: container.get(k) for k in ["Name", "Config", "NetworkSettings"]}).lower()
+
+
 def _container_for_host(containers: list[dict], host: str) -> dict | None:
-    variants = [host, host.replace(".", "-"), host.replace(".", "_")]
-    return next((container for container in containers if any(v.lower() in json.dumps({k: container.get(k) for k in ["Name", "Config", "NetworkSettings"]}).lower() for v in variants)), None)
+    """The `once` label wins outright: a labelled container belongs to exactly the host it
+    names and can never be claimed by another, so only unlabelled containers fall
+    through to matching on names and third-party labels."""
+    host = host.lower()
+    if labelled := next((c for c in containers if _once_label_host(c) == host), None):
+        return labelled
+    variants = [_host_variant_re(v) for v in dict.fromkeys([host, host.replace(".", "-"), host.replace(".", "_")])]
+    return next((c for c in containers if _once_label_host(c) is None and any(rx.search(_container_text(c)) for rx in variants)), None)
 
 
 async def _application_report(runner: Runner, containers: list, images: list, app: dict) -> dict:

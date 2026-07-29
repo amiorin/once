@@ -1,0 +1,73 @@
+{
+  "_comment": [
+    "Container-to-host resolution the three colours must agree on.",
+    "",
+    "describe() talks to a live host, so none of its logic is reachable from the",
+    "build-artifact diff — this fixture is how it gets covered instead. The cases",
+    "below are the ones that actually diverged: a bare host that prefixes another",
+    "one used to claim the longer host's container, because matching was a",
+    "substring scan that returned the first hit.",
+    "",
+    "Containers are deliberately ordered longest-host-first, so a colour that",
+    "regressed to substring matching resolves example.com to the site image and",
+    "fails this diff."
+  ],
+  "containers": [
+    {
+      "Name": "/once-app-www-example-com",
+      "Config": {
+        "Image": "ghcr.io/org/site:latest",
+        "Labels": {
+          "once": "{\"name\":\"site.2bffdd\",\"image\":\"ghcr.io/org/site:latest\",\"host\":\"www.example.com\"}"
+        }
+      }
+    },
+    {
+      "Name": "/once-app-example-com",
+      "Config": {
+        "Image": "ghcr.io/org/redirect:latest",
+        "Labels": {
+          "once": "{\"name\":\"redirect.92af38\",\"image\":\"ghcr.io/org/redirect:latest\",\"host\":\"example.com\"}"
+        }
+      }
+    },
+    {
+      "Name": "/once-app-forms-example-com",
+      "Config": {
+        "Image": "ghcr.io/org/forms:latest",
+        "Labels": {
+          "once": "{\"name\":\"forms.dbfb15\",\"image\":\"ghcr.io/org/forms:latest\",\"host\":\"FORMS.example.com\"}"
+        }
+      }
+    },
+    {
+      "Name": "/legacy-proxy",
+      "Config": {
+        "Image": "ghcr.io/org/legacy:latest",
+        "Labels": {
+          "traefik.http.routers.app.rule": "Host(`legacy.example.com`)"
+        }
+      }
+    },
+    {
+      "Name": "/once-app-broken",
+      "Config": {
+        "Image": "ghcr.io/org/broken:latest",
+        "Labels": {
+          "once": "{not valid json",
+          "traefik.http.routers.app.rule": "Host(`broken.example.com`)"
+        }
+      }
+    }
+  ],
+  "hosts": [
+    "example.com",
+    "www.example.com",
+    "FORMS.example.com",
+    "forms.example.com",
+    "legacy.example.com",
+    "broken.example.com",
+    "example.co",
+    "absent.example.com"
+  ]
+}

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { run as runWorkflow } from "red/workflow";
 import { run as runCli } from "../src/cli.ts";
-import { describeReport, imageRepositoryTag, parseOnceList } from "../src/describe.ts";
+import { containerForHost, describeReport, imageRepositoryTag, parseOnceList } from "../src/describe.ts";
 import { ansibleOnce, renderFn } from "../src/tools.ts";
 import { readPars } from "red/cli";
 import { appsDomains } from "../src/utils.ts";
@@ -107,4 +107,21 @@ test("describe helpers remain process-free with an injected runner", async () =>
   const runner = async () => ({ exit: 1, out: "", err: "offline" });
   const report = await describeReport({ ...valid }, runner, false);
   expect(report.compute.status).toBe("absent");
+});
+
+test("container matching prefers the once label host", () => {
+  const labelled = (host: string, image: string) => ({
+    Name: `/once-app-${host.replaceAll(".", "-")}`,
+    Config: { Image: image, Labels: { once: JSON.stringify({ name: "app", image, host }) } },
+  });
+  // the longer host is listed first, so a substring match returns it
+  const containers = [labelled("www.example.com", "ghcr.io/org/site:latest"), labelled("example.com", "ghcr.io/org/redirect:latest")];
+  expect(containerForHost(containers, "example.com").Config.Image).toBe("ghcr.io/org/redirect:latest");
+  expect(containerForHost(containers, "www.example.com").Config.Image).toBe("ghcr.io/org/site:latest");
+
+  // the name carries no host, so the traefik rule is the only evidence; the
+  // dot-substituted form stays ambiguous by nature, which is why the label decides
+  const unlabelled = [{ Name: "/app-1", Config: { Image: "ghcr.io/org/site:latest", Labels: { "traefik.http.routers.app.rule": "Host(`www.example.com`)" } } }];
+  expect(containerForHost(unlabelled, "www.example.com")).toBeDefined();
+  expect(containerForHost(unlabelled, "example.com")).toBeUndefined();
 });

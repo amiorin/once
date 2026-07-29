@@ -58,5 +58,18 @@ scalars="$root/test/parity/scalars.yml"
 diff "$tmp/scalars-green" "$tmp/scalars-red"
 diff "$tmp/scalars-green" "$tmp/scalars-blue"
 
+# `describe` reaches a live host, so none of its logic shows up in the build
+# artifacts diffed above — which is exactly how container matching drifted apart
+# once already, fixed in one colour while the other two kept the bug. Resolving a
+# fixed container set against a fixed host list is pure, so it can be compared
+# here without a server.
+containers="$root/test/parity/containers.json"
+(cd "$root/green" && bb ../scripts/containers-green.clj "$containers") >"$tmp/containers-green"
+(cd "$root/red" && bun ../scripts/containers-red.ts "$containers") >"$tmp/containers-red"
+(cd "$root/blue" && uv run python ../scripts/containers-blue.py "$containers") >"$tmp/containers-blue"
+diff "$tmp/containers-green" "$tmp/containers-red"
+diff "$tmp/containers-green" "$tmp/containers-blue"
+
 echo "green, red, and blue build artifacts are byte-identical"
 echo "green, red, and blue agree on every scalar in the parity corpus"
+echo "green, red, and blue resolve every container in the parity corpus alike"
