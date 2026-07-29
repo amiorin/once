@@ -1,10 +1,12 @@
 # Blue ONCE
 
 Python/uv implementation of the production ONCE package. Read `../CLAUDE.md`
-and `/home/ubuntu/code/blue/README.md` before editing.
+first, and the `README.md` of the separate `blue` SDK checkout
+(`github.com/getcolors/blue`, pinned by SHA in `pyproject.toml`) before
+changing anything that touches the engine.
 
 ```sh
-uv sync
+uv sync              # required before the first test run and after any pin change
 uv run python -m pytest -q
 uv run python -m package_once_blue build
 ```

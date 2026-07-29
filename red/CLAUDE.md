@@ -1,14 +1,24 @@
 # Red ONCE
 
 TypeScript/Bun implementation of the production ONCE package. Read the root
-`../CLAUDE.md` and `/home/ubuntu/code/red/CLAUDE.md` before changes.
+`../CLAUDE.md` first, and the `CLAUDE.md` of the separate `red` SDK checkout
+(`github.com/getcolors/red`, pinned by SHA in `package.json`) before changing
+anything that touches the engine.
 
 ```sh
-bun install
+bun install          # required before the first test run and after any pin change
 bun test
 bun run typecheck
 ./red build
 ```
+
+`bun install` is required **here** and is not going away: inside a checkout the
+working tree is the point, so the launcher deliberately refuses to fall back to
+a pinned copy and tells you to install instead. It recognises a checkout by the
+enclosing manifest being named `package-once-red`. Outside one, `./red`
+resolves its own dependencies into `~/.cache/package-once-red/` on first run —
+see the launcher's header. Set `RED_NO_BOOTSTRAP=1` to force the old
+error-and-exit behaviour anywhere.
 
 Source is under `src/`, packaged templates under `resources/`, tests under
 `test/`. `./red` links to `../skills/package-once-red/red`. The repository root

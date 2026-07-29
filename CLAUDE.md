@@ -5,16 +5,27 @@
 This is the `bigconfig-ai/once` monorepo. It contains three implementations of
 one production ONCE workflow:
 
-- `green/` — Clojure/Babashka over `/home/ubuntu/code/green`
-- `red/` — TypeScript/Bun over `/home/ubuntu/code/red`
-- `blue/` — Python/uv over `/home/ubuntu/code/blue`
+- `green/` — Clojure/Babashka, over the `green` SDK
+- `red/` — TypeScript/Bun, over the `red` SDK
+- `blue/` — Python/uv, over the `blue` SDK
 - `skills/package-once-{green,red,blue}/` — agent skills and launcher payloads
 - `index.html` — the only HTML manual in this repository
 
-Read the implementation's own `CLAUDE.md` before editing inside it. Red's
-library instructions are `/home/ubuntu/code/red/CLAUDE.md`; Green's are
-`/home/ubuntu/code/green/CLAUDE.md`; Blue's conventions are in
-`/home/ubuntu/code/blue/README.md`.
+Read the implementation's own `CLAUDE.md` before editing inside it:
+`green/CLAUDE.md`, `red/CLAUDE.md`, `blue/CLAUDE.md`.
+
+**The SDK repositories are separate checkouts and share these names.** `green/`
+here is the ONCE package; the workflow engine it is built on is the `green`
+repository (`github.com/getcolors/green`), pinned by SHA in `green/deps.edn` —
+and likewise `red/package.json` and `blue/pyproject.toml`. Their instructions
+are in those checkouts: `CLAUDE.md` for green and red, `README.md` for blue.
+
+To develop a package and its SDK together, point the launcher at a working tree
+instead of the pin — `GREEN_LIB_ROOT`, `RED_LIB_ROOT`, `BLUE_LIB_ROOT` for the
+SDK, `ONCE_LIB_ROOT` for this repository. Inside this checkout `green/bb.edn`
+already supplies `:local/root "."` for the ONCE side, so only the SDK override
+is usually needed. A change that spans both is two commits in two repositories,
+and the SDK one has to be pushed before `bb pin` can stamp it.
 
 ## Required parity
 
@@ -62,11 +73,31 @@ commands, but must never run concurrently against the same state.
 ## Commands
 
 ```sh
-cd green && clojure -M:test
-cd red && bun test && bun run typecheck
-cd blue && uv run python -m pytest -q
+cd green && clojure -X:test
+cd red && bun install && bun test && bun run typecheck
+cd blue && uv sync && uv run python -m pytest -q
 ./scripts/parity.sh
+./scripts/launcher.sh
 ```
+
+`launcher.sh` covers the red launcher in the environments a copied payload
+actually lands in — no manifest, or one pinning a different commit — which no
+suite here can reach, since all of them run inside a checkout where the package
+self-resolves to the working tree. It skips its resolution checks when GitHub is
+unreachable, the way the end-to-end suites skip without `tofu`.
+
+These are what `.github/workflows/cicd.yml` runs, each under `devenv shell`.
+The `bun install` and `uv sync` are not optional on a fresh checkout or after a
+SDK pin changes — without them the suite tests the previously resolved
+dependency, which is exactly the case where you most want it not to.
+
+That applies to *this checkout*. All three shipped launchers resolve their own
+dependencies on first run — green through `babashka.deps/add-deps` into
+`~/.gitlibs`, blue through uv's inline script metadata, red into
+`~/.cache/package-once-red/` — so a user of a skill never runs an install step
+for any colour. Red's launcher recognises this checkout (the enclosing manifest
+is named `package-once-red`) and refuses that fallback, because resolving a
+pinned copy here would test the pinned commit rather than the edits under test.
 
 The root npm package is the `package-once-red` facade because npm Git
 dependencies cannot select a monorepo subdirectory. Green uses the git

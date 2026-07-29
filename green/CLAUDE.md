@@ -34,6 +34,7 @@ green/
 │   │   ├── tools.clj        # the six step functions, template specs, generated JSON
 │   │   ├── workflow.clj     # the DAG: start, cleanup, wire-fn, backend advice
 │   │   ├── validate.clj     # the provider registry and desired-state validation
+│   │   ├── github.clj       # deploy-key generation and publication to the Actions environment
 │   │   ├── describe.clj     # post-provisioning report (providers, compute status, apps)
 │   │   └── utils.clj        # contract number and DNS zone derivation
 │   └── resources/io/github/bigconfig-ai/once/
