@@ -10,6 +10,47 @@
 //
 //   "package-once-red": "github:bigconfig-ai/once#72e8135f6b3095dc9f0760230140d2629ebfca5b"
 //   "red": "github:amiorin/red#b434e37568b91228ef14c2271f6fbeea805ae7ae"
-import { exec, run } from "package-once-red";
-export { run };
-if (import.meta.main) await exec();
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+// Red is the one colour whose dependencies are a separate step: green resolves
+// its git deps through add-deps and blue through uv's inline metadata, so only
+// here can a copied payload sit beside a manifest it never installed. A static
+// import would fail during resolution — before any line of this file runs —
+// with a bare "Cannot find package" naming no fix, so the import is dynamic and
+// the failure answers with the command. It cannot live in the package for the
+// obvious reason: the package is what is missing.
+
+/** The nearest directory at or above `from` holding a package.json, or null. */
+function manifestDir(from) {
+  let dir = from;
+  for (;;) {
+    if (existsSync(join(dir, "package.json"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+let once;
+try {
+  once = await import("package-once-red");
+} catch (err) {
+  // Only the launcher-as-script may exit; an importer keeps ESM semantics.
+  if (err?.code !== "ERR_MODULE_NOT_FOUND" || !import.meta.main) throw err;
+  // Resolution starts beside the launcher, not at the caller, so the answer is
+  // the same from any subdirectory a colour was invoked from.
+  const root = manifestDir(import.meta.dir);
+  console.error(
+    `red: cannot resolve '${err.specifier}'\n` +
+      (root
+        ? `dependencies are not installed; run: bun install --cwd ${root}`
+        : `no package.json at or above ${import.meta.dir}; write one whose\n` +
+          `dependencies are the two lines quoted in this file's header comment,\n` +
+          `then run: bun install`),
+  );
+  process.exit(2);
+}
+
+export const run = once.run;
+if (import.meta.main) await once.exec();
