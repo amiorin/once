@@ -4,7 +4,7 @@
 # dependencies = ["package-once-blue", "blue"]
 #
 # [tool.uv.sources]
-# package-once-blue = { git = "https://github.com/bigconfig-ai/once.git", rev = "87125757d2d21959fb6a0b99360779509cf873b9", subdirectory = "blue" }
+# package-once-blue = { git = "https://github.com/bigconfig-ai/once.git", rev = "39f00e20044d5e1c3c674b430ae41c3acff18b9d", subdirectory = "blue" }
 # blue = { git = "https://github.com/amiorin/blue.git", rev = "7dd17ac920060f622f9f98b503bbe36e35d730ec" }
 # ///
 """Thin launcher for package-once-blue."""
