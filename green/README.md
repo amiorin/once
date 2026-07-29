@@ -26,20 +26,27 @@ Create and build use this graph:
 ```text
        ┌─ tofu-compute ─┐                             ┌─ ansible-local
 start ─┤                ├─ tofu-dns ─ tofu-smtp-post ─┤
-       └─ tofu-smtp ────┘                             └─ ansible-remote
+       └─ tofu-smtp ────┘                             └─ ansible-remote ─ github
 ```
 
 Compute and SMTP run concurrently. DNS joins their outputs, SMTP verification
-runs after DNS, and the two Ansible stages then run concurrently. Build renders
-the same files without invoking OpenTofu or Ansible; the join falls back to
-placeholder outputs so rendering never needs state.
+runs after DNS, and the two Ansible stages then run concurrently. Publishing
+follows the remote stage, not the local one: the credentials describe a
+configured host, so a workstation-side failure does not gate them. Build
+renders the same files without invoking OpenTofu or Ansible; the join falls
+back to placeholder outputs so rendering never needs state.
 
 Delete reverses the graph:
 
 ```text
-start ─ ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
-                                                     └─ tofu-compute
+start ─ github ─ ansible-cleanup ─ tofu-smtp-post ─ tofu-dns ─┬─ tofu-smtp
+                                                              └─ tofu-compute
 ```
+
+Revoking runs before anything is destroyed: a withdrawn credential against a
+live host is a loud, recoverable broken deploy, while a live credential against
+a destroyed host is silent. It needs no key material, so it also works when the
+box is already gone.
 
 Cleanup replays the local Ansible play to drop the managed `~/.ssh/config`
 block and removes the rendered Ansible trees; SMTP verification and DNS are

@@ -35,13 +35,18 @@ Create and build:
 ```text
        ┌─ tofu-compute ─┐                             ┌─ ansible-local
 start ─┤                ├─ tofu-dns ─ tofu-smtp-post ─┤
-       └─ tofu-smtp ────┘                             └─ ansible-remote
+       └─ tofu-smtp ────┘                             └─ ansible-remote ─ github
 ```
 
-Delete reverses the graph and removes the managed local SSH block before
-infrastructure. Providers are DigitalOcean, Hetzner Cloud, Yandex Cloud, OCI,
-or an existing host; Resend or existing SMTP; Cloudflare or unmanaged DNS; and
-local, S3, or R2 state.
+Publishing follows the remote stage, not the local one: the credentials
+describe a configured host, so a workstation-side failure does not gate them.
+
+Delete reverses the graph. It withdraws the published credentials first — a
+withdrawn credential against a live host is a loud, recoverable broken deploy,
+while a live credential against a destroyed host is silent — then removes the
+managed local SSH block before infrastructure. Providers are DigitalOcean,
+Hetzner Cloud, Yandex Cloud, OCI, or an existing host; Resend or existing SMTP;
+Cloudflare or unmanaged DNS; and local, S3, or R2 state.
 
 ## Secrets
 
