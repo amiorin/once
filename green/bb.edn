@@ -1,8 +1,3 @@
-{:paths ["tasks"]
- :deps {io.github.amiorin/green      {:git/url "https://github.com/amiorin/green.git"
+{:deps {io.github.amiorin/green      {:git/url "https://github.com/amiorin/green.git"
                                       :git/sha "1c1fb81563287c98aa1bcd0e12cd755296e6d98e"}
-        io.github.bigconfig-ai/once {:local/root "."}}
- :tasks
- {pin {:doc "Stamp package-once-green/green with this repository's HEAD (maintainers only)"
-       :requires ([pin])
-       :task (pin/-main)}}}
+        io.github.bigconfig-ai/once {:local/root "."}}}

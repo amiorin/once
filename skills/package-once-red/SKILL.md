@@ -32,8 +32,10 @@ Do not gather secret values.
 After confirmation:
 
 1. Copy this skill's bundled `red` to `./red` and make it executable.
-2. Write a minimal `package.json` with immutable Git commit dependencies on
-   `package-once-red` (`bigconfig-ai/once`) and `red` (`amiorin/red`).
+2. Write a `package.json` whose `dependencies` are the two lines quoted in the
+   bundled `red`'s header comment, copied verbatim. Those are the commits this
+   skill was built from — do not resolve them yourself, and never relax one to a
+   branch or tag. Merge them into an existing manifest rather than replacing it.
 3. Write `colors.yml` following the reference, with `workdir: .colors`.
 4. Add `.colors/` and any private environment file to `.gitignore` without replacing unrelated entries.
 5. Run `bun install`, `./red build`, and `./red create --dry-run`.

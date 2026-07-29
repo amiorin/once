@@ -12,8 +12,10 @@ The project manifest pins both repositories to full 40-character commits:
 }
 ```
 
-Resolve and substitute both placeholders before running `bun install`; never
-leave a branch name or unpinned dependency.
+Both commits are recorded in the bundled `red`'s header comment, already
+resolved — copy those two lines verbatim rather than looking the commits up.
+The shape above is what the finished manifest must look like. Never relax
+either dependency to a branch or a tag.
 
 `colors.yml` is a YAML map. Provider settings are flat; applications are the only
 nested collection. Quote version-like YAML values such as `3.10`.

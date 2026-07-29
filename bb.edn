@@ -1,0 +1,7 @@
+;; Repository-wide maintainer tasks. `pin` stamps all three colours, so it lives
+;; here rather than inside one of them reaching sideways into the others.
+{:paths ["tasks"]
+ :tasks
+ {pin {:doc "Stamp every bundled launcher with this repository's HEAD (maintainers only)"
+       :requires ([pin])
+       :task (pin/-main)}}}
