@@ -6,16 +6,16 @@ workdir: .colors
 once:
   applications:
     - host: www.example.com
-      image: ghcr.io/bigconfig-ai/once-bigconfig:latest
-      github: bigconfig-ai/once-bigconfig
+      image: ghcr.io/example/site:latest
+      github: example/site
       env:
         EXAMPLE: app-example
     # Same image, same repository, second host. Deploy keys are per repository,
     # so this and www.example.com share one key whose ForceCommand names both —
     # the case that has to render identically in all three colours.
     - host: www.example.net
-      image: ghcr.io/bigconfig-ai/once-bigconfig:latest
-      github: bigconfig-ai/once-bigconfig
+      image: ghcr.io/example/site:latest
+      github: example/site
 provider-compute: digitalocean
 provider-smtp: resend
 provider-dns: cloudflare

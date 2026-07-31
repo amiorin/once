@@ -39,9 +39,16 @@ jobs:
           tag="1.0.${count}"
           local_sha=$(git rev-parse HEAD)
           remote_sha=$(git ls-remote --tags origin "refs/tags/${tag}" | awk '{print $1}')
-          if [ -n "$remote_sha" ] && [ "$remote_sha" = "$local_sha" ]; then
-            echo "Tag ${tag} already at ${local_sha}, skipping"
-            exit 0
+          if [ -n "$remote_sha" ]; then
+            if [ "$remote_sha" = "$local_sha" ]; then
+              echo "Tag ${tag} already at ${local_sha}, skipping"
+              exit 0
+            fi
+            # Same revision count, different commit: main's history was
+            # rewritten. Overwriting would silently move a tag someone may
+            # already have pinned, so stop and let a human decide.
+            echo "::error::Tag ${tag} is on origin at ${remote_sha}, but HEAD is ${local_sha}. Refusing to move a published tag."
+            exit 1
           fi
-          git tag -f "$tag"
-          git push --force origin "$tag"
+          git tag "$tag"
+          git push origin "$tag"

@@ -47,13 +47,13 @@ compute-pubkey: REPLACE_ME # required by Yandex Cloud
 once:
   applications:
     - host: www.example.com
-      image: ghcr.io/bigconfig-ai/once-bigconfig:latest
-      github: bigconfig-ai/once-bigconfig
+      image: ghcr.io/example/site:latest
+      github: example/site
       env:
         EXAMPLE: app-example
     - host: www.example.net
-      image: ghcr.io/bigconfig-ai/once-bigconfig:latest
-      github: bigconfig-ai/once-bigconfig
+      image: ghcr.io/example/site:latest
+      github: example/site
 
 provider-compute: digitalocean
 provider-smtp: resend
