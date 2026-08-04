@@ -848,6 +848,7 @@ COLORS_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
         <table>
           <thead><tr><th>Selection</th><th>Required environment variables</th><th>When</th></tr></thead>
           <tbody>
+            <tr><td>Azure</td><td>None — uses the native Azure CLI session</td><td>—</td></tr>
             <tr><td>AWS</td><td>None — uses the native AWS credential chain</td><td>—</td></tr>
             <tr><td>DigitalOcean</td><td><code>COLORS_PAR_DO_TOKEN</code> or <code>COLORS_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Hetzner Cloud</td><td><code>COLORS_PAR_HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
@@ -880,6 +881,23 @@ done</code></pre>
 
     <section id="compute-providers">
       <h2 class="anchor-heading"><a href="#compute-providers" aria-label="Link to Compute providers">#</a>Compute providers</h2>
+
+      <h3>Azure</h3>
+      <pre><code class="language-yaml">provider-compute: azure
+azure-subscription-id: 00000000-0000-0000-0000-000000000000
+azure-location: swedencentral
+azure-resource-group: once
+azure-name: once
+azure-vm-size: Standard_D2pls_v6
+azure-image-publisher: Canonical
+azure-image-offer: ubuntu-24_04-lts
+azure-image-sku: server-arm64
+azure-image-version: 24.04.202608020
+azure-vnet-cidr: 10.10.0.0/16
+azure-subnet-cidr: 10.10.1.0/24
+azure-boot-disk-size-gb: 30
+azure-ssh-authorized-keys: ~/.ssh/id_ed25519.pub</code></pre>
+      <p>Creates a dedicated resource group, VNet, subnet, public IP, network security group, NIC, and VM. Authentication uses the native Azure CLI session.</p>
 
       <h3>AWS</h3>
       <pre><code class="language-yaml">provider-compute: aws
@@ -1443,7 +1461,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
             <tr><td><code>workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.colors</code>.</td></tr>
             <tr><td><code>compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
             <tr><td><code>once</code></td><td>Yes</td><td>Map containing a non-empty <code>applications</code> vector. Each application takes <code>host</code>, <code>image</code>, an optional <code>github</code> repository, and an optional <code>env</code> map.</td></tr>
-            <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>aws</code>, <code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
+            <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>azure</code>, <code>aws</code>, <code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-smtp</code></td><td>Yes</td><td><code>resend</code> or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-dns</code></td><td>Yes</td><td><code>cloudflare</code> or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-backend</code></td><td>Yes</td><td><code>local</code>, <code>s3</code>, or <code>r2</code>.</td></tr>
@@ -1457,6 +1475,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
         <table>
           <thead><tr><th>Provider</th><th>Keys</th></tr></thead>
           <tbody>
+            <tr><td>Azure</td><td><code>azure-subscription-id</code>, <code>azure-location</code>, <code>azure-resource-group</code>, <code>azure-name</code>, <code>azure-vm-size</code>, <code>azure-image-publisher</code>, <code>azure-image-offer</code>, <code>azure-image-sku</code>, <code>azure-image-version</code>, <code>azure-vnet-cidr</code>, <code>azure-subnet-cidr</code>, <code>azure-boot-disk-size-gb</code>, <code>azure-ssh-authorized-keys</code></td></tr>
             <tr><td>AWS</td><td><code>aws-region</code>, <code>aws-availability-zone</code>, <code>aws-name</code>, <code>aws-instance-type</code>, <code>aws-image-id</code>, <code>aws-vpc-cidr</code>, <code>aws-subnet-cidr</code>, <code>aws-root-volume-size-gb</code>, <code>aws-ssh-authorized-keys</code></td></tr>
             <tr><td>DigitalOcean</td><td><code>digitalocean-name</code>, <code>digitalocean-region</code>, <code>digitalocean-size</code>, <code>digitalocean-image</code>, <code>digitalocean-ssh-keys</code>; optional <code>digitalocean-vpc-uuid</code></td></tr>
             <tr><td>Hetzner</td><td><code>hcloud-name</code>, <code>hcloud-image</code>, <code>hcloud-server-type</code>, <code>hcloud-location</code>, <code>hcloud-ssh-keys</code></td></tr>

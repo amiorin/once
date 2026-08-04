@@ -61,6 +61,27 @@ workflow and the contract it consumes.
 
 ## Compute providers
 
+### Azure
+
+```yaml
+provider-compute: azure
+azure-subscription-id: 00000000-0000-0000-0000-000000000000
+azure-location: swedencentral
+azure-resource-group: once
+azure-name: once
+azure-vm-size: Standard_D2pls_v6
+azure-image-publisher: Canonical
+azure-image-offer: ubuntu-24_04-lts
+azure-image-sku: server-arm64
+azure-image-version: 24.04.202608020
+azure-vnet-cidr: 10.10.0.0/16
+azure-subnet-cidr: 10.10.1.0/24
+azure-boot-disk-size-gb: 30
+azure-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
+```
+
+Azure uses the native Azure CLI session from `az login`. It creates a dedicated resource group, VNet, subnet, public IP, network security group, NIC, and VM.
+
 ### AWS
 
 ```yaml

@@ -10,6 +10,7 @@
 # COLORS_PAR_DO_TOKEN. Any key below can be overridden the same way.
 #
 # Required per provider:
+#   azure          (none — OpenTofu uses the ambient Azure CLI session)
 #   aws            (none — OpenTofu uses the ambient AWS credential chain)
 #   digitalocean   COLORS_PAR_DO_TOKEN
 #   hcloud         COLORS_PAR_HCLOUD_TOKEN
@@ -61,6 +62,20 @@ provider-smtp: resend
 provider-dns: cloudflare
 provider-backend: r2
 compute-prevent-destroy: true
+
+azure-subscription-id: REPLACE_ME
+azure-location: swedencentral
+azure-resource-group: once
+azure-name: once
+azure-vm-size: Standard_D2pls_v6
+azure-image-publisher: Canonical
+azure-image-offer: ubuntu-24_04-lts
+azure-image-sku: server-arm64
+azure-image-version: REPLACE_ME
+azure-vnet-cidr: 10.10.0.0/16
+azure-subnet-cidr: 10.10.1.0/24
+azure-boot-disk-size-gb: 30
+azure-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
 
 aws-region: eu-west-1
 aws-availability-zone: eu-west-1a

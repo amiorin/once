@@ -11,6 +11,7 @@
     pkgs.jet
     pkgs.hcl2json
     pkgs.awscli2
+    pkgs.azure-cli
     pkgs.skopeo
     pkgs.hcloud
     pkgs.doctl

@@ -30,6 +30,7 @@ build_variant() {
 }
 
 build_variant local
+build_variant azure COLORS_PAR_PROVIDER_COMPUTE=azure
 build_variant aws COLORS_PAR_PROVIDER_COMPUTE=aws
 build_variant digitalocean-vpc COLORS_PAR_DIGITALOCEAN_VPC_UUID=vpc-123
 build_variant hcloud COLORS_PAR_PROVIDER_COMPUTE=hcloud

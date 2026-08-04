@@ -88,7 +88,7 @@ once:
     - host: www.example.net
       image: ghcr.io/example/site:latest
       github: acme/site      # same repository as www.example.com: one key, both hosts
-provider-compute: digitalocean  # aws, digitalocean, hcloud, yandex, oci, no-infra
+provider-compute: digitalocean  # azure, aws, digitalocean, hcloud, yandex, oci, no-infra
 provider-smtp: resend           # resend, no-infra
 provider-dns: cloudflare        # cloudflare, no-infra
 provider-backend: r2            # r2, s3, local
@@ -172,7 +172,7 @@ the remaining live checks are soft failures named in the report.
 
 ## Providers and generated configuration
 
-- Compute templates: AWS, DigitalOcean, Hetzner Cloud, Yandex Cloud, OCI, and an
+- Compute templates: Azure, AWS, DigitalOcean, Hetzner Cloud, Yandex Cloud, OCI, and an
   existing `no-infra` host. Yandex creates its own network and subnet, installs
   `compute-pubkey` through instance metadata, and authenticates with
   `COLORS_PAR_YANDEX_TOKEN`.

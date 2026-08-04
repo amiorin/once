@@ -56,7 +56,7 @@ YAML.
 
 Providers:
 
-- compute: `aws`, `digitalocean`, `hcloud`, `yandex`, `oci`, `no-infra`
+- compute: `azure`, `aws`, `digitalocean`, `hcloud`, `yandex`, `oci`, `no-infra`
 - SMTP: `resend`, `no-infra`
 - DNS: `cloudflare`, `no-infra`
 - backend: `local`, `s3`, `r2`
@@ -64,7 +64,7 @@ Providers:
 Credential suffixes are `DO_TOKEN`, `HCLOUD_TOKEN`, `YANDEX_TOKEN`,
 `RESEND_API_KEY`, `RESEND_PASSWORD`, `NO_INFRA_SMTP_PASSWORD`,
 `CLOUDFLARE_API_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`. Prefix
-with `COLORS_PAR_`. OCI uses its profile, AWS compute and S3 use the AWS
+with `COLORS_PAR_`. OCI uses its profile, Azure uses the ambient Azure CLI session, and AWS compute and S3 use the AWS
 credential chain, and SSH uses `ssh-agent`.
 
 Application hosts derive DNS zones and Resend domains. Only explicitly listed

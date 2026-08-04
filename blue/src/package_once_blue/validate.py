@@ -7,6 +7,7 @@ from blue.cli import par_name
 
 providers: dict[str, dict[str, dict[str, Any]]] = {
     "provider-compute": {
+        "azure": {"required": ["azure-subscription-id", "azure-location", "azure-resource-group", "azure-name", "azure-vm-size", "azure-image-publisher", "azure-image-offer", "azure-image-sku", "azure-image-version", "azure-vnet-cidr", "azure-subnet-cidr", "azure-boot-disk-size-gb", "azure-ssh-authorized-keys"], "secrets": [], "tofu-env": {}},
         "aws": {"required": ["aws-region", "aws-availability-zone", "aws-name", "aws-instance-type", "aws-image-id", "aws-vpc-cidr", "aws-subnet-cidr", "aws-root-volume-size-gb", "aws-ssh-authorized-keys"], "secrets": [], "tofu-env": {}},
         "digitalocean": {"required": ["digitalocean-name", "digitalocean-region", "digitalocean-size", "digitalocean-image", "digitalocean-ssh-keys"], "secrets": ["do-token"], "tofu-env": {"do-token": "DIGITALOCEAN_TOKEN"}},
         "hcloud": {"required": ["hcloud-name", "hcloud-image", "hcloud-server-type", "hcloud-location", "hcloud-ssh-keys"], "secrets": ["hcloud-token"], "tofu-env": {"hcloud-token": "HCLOUD_TOKEN"}},

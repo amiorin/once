@@ -24,7 +24,15 @@
   plaintext. A secret that is not in `:tofu-env` reaches its tool some other
   way: the SMTP passwords are looked up by Ansible at play time."
   {:provider-compute
-   {"aws" {:required [:aws-region :aws-availability-zone :aws-name
+   {"azure" {:required [:azure-subscription-id :azure-location
+                          :azure-resource-group :azure-name :azure-vm-size
+                          :azure-image-publisher :azure-image-offer
+                          :azure-image-sku :azure-image-version :azure-vnet-cidr
+                          :azure-subnet-cidr :azure-boot-disk-size-gb
+                          :azure-ssh-authorized-keys]
+              :secrets []
+              :tofu-env {}}
+    "aws" {:required [:aws-region :aws-availability-zone :aws-name
                        :aws-instance-type :aws-image-id :aws-vpc-cidr
                        :aws-subnet-cidr :aws-root-volume-size-gb
                        :aws-ssh-authorized-keys]

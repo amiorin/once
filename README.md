@@ -44,7 +44,7 @@ describe a configured host, so a workstation-side failure does not gate them.
 Delete reverses the graph. It withdraws the published credentials first — a
 withdrawn credential against a live host is a loud, recoverable broken deploy,
 while a live credential against a destroyed host is silent — then removes the
-managed local SSH block before infrastructure. Providers are AWS, DigitalOcean,
+managed local SSH block before infrastructure. Providers are Azure, AWS, DigitalOcean,
 Hetzner Cloud, Yandex Cloud, OCI, or an existing host; Resend or existing SMTP;
 Cloudflare or unmanaged DNS; and local, S3, or R2 state.
 

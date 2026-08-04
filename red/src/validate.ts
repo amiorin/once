@@ -9,6 +9,10 @@ export interface ProviderEntry {
 
 export const providers: Record<string, Record<string, ProviderEntry>> = {
   "provider-compute": {
+    azure: {
+      required: ["azure-subscription-id", "azure-location", "azure-resource-group", "azure-name", "azure-vm-size", "azure-image-publisher", "azure-image-offer", "azure-image-sku", "azure-image-version", "azure-vnet-cidr", "azure-subnet-cidr", "azure-boot-disk-size-gb", "azure-ssh-authorized-keys"],
+      secrets: [], tofuEnv: {},
+    },
     aws: {
       required: ["aws-region", "aws-availability-zone", "aws-name", "aws-instance-type", "aws-image-id", "aws-vpc-cidr", "aws-subnet-cidr", "aws-root-volume-size-gb", "aws-ssh-authorized-keys"],
       secrets: [], tofuEnv: {},

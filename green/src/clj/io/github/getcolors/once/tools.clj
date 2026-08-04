@@ -94,6 +94,11 @@
   [{:keys [profile provider-compute] :as opts}]
   (let [name (or profile "once")]
     (case provider-compute
+      "azure" {:ip "192.168.0.1"
+               :sudoer "ubuntu"
+               :uid "1000"
+               :name name
+               :user "ubuntu"}
       "aws" {:ip "192.168.0.1"
              :sudoer "ubuntu"
              :uid "1000"
