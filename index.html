@@ -850,6 +850,7 @@ COLORS_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
           <tbody>
             <tr><td>Azure</td><td>None — uses the native Azure CLI session</td><td>—</td></tr>
             <tr><td>AWS</td><td>None — uses the native AWS credential chain</td><td>—</td></tr>
+            <tr><td>Google Cloud</td><td>None — uses Application Default Credentials</td><td>—</td></tr>
             <tr><td>DigitalOcean</td><td><code>COLORS_PAR_DO_TOKEN</code> or <code>COLORS_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Hetzner Cloud</td><td><code>COLORS_PAR_HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Yandex Cloud</td><td><code>COLORS_PAR_YANDEX_TOKEN</code></td><td>Create and delete</td></tr>
@@ -911,6 +912,21 @@ aws-subnet-cidr: 10.0.1.0/24
 aws-root-volume-size-gb: 30
 aws-ssh-authorized-keys: ~/.ssh/id_ed25519.pub</code></pre>
       <p>Creates an isolated VPC, public subnet, internet gateway, security group, key pair, and EC2 instance. Authentication uses the native AWS credential chain.</p>
+
+      <h3>Google Cloud</h3>
+      <pre><code class="language-yaml">provider-compute: google
+google-project: example-project
+google-region: europe-west4
+google-zone: europe-west4-b
+google-name: once
+google-machine-type: t2a-standard-1
+google-image-project: ubuntu-os-cloud
+google-image-family: ubuntu-2404-lts-arm64
+google-image-id: projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-arm64-v20260723
+google-subnet-cidr: 10.20.1.0/24
+google-boot-disk-size-gb: 30
+google-ssh-authorized-keys: ~/.ssh/id_ed25519.pub</code></pre>
+      <p>Creates a custom VPC, subnet, firewall rule, static address, and Compute Engine instance. Authentication uses Application Default Credentials.</p>
 
       <h3>DigitalOcean</h3>
       <pre><code class="language-yaml">provider-compute: digitalocean
@@ -1461,7 +1477,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
             <tr><td><code>workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.colors</code>.</td></tr>
             <tr><td><code>compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
             <tr><td><code>once</code></td><td>Yes</td><td>Map containing a non-empty <code>applications</code> vector. Each application takes <code>host</code>, <code>image</code>, an optional <code>github</code> repository, and an optional <code>env</code> map.</td></tr>
-            <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>azure</code>, <code>aws</code>, <code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
+            <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>azure</code>, <code>aws</code>, <code>google</code>, <code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-smtp</code></td><td>Yes</td><td><code>resend</code> or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-dns</code></td><td>Yes</td><td><code>cloudflare</code> or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-backend</code></td><td>Yes</td><td><code>local</code>, <code>s3</code>, or <code>r2</code>.</td></tr>
@@ -1477,6 +1493,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
           <tbody>
             <tr><td>Azure</td><td><code>azure-subscription-id</code>, <code>azure-location</code>, <code>azure-resource-group</code>, <code>azure-name</code>, <code>azure-vm-size</code>, <code>azure-image-publisher</code>, <code>azure-image-offer</code>, <code>azure-image-sku</code>, <code>azure-image-version</code>, <code>azure-vnet-cidr</code>, <code>azure-subnet-cidr</code>, <code>azure-boot-disk-size-gb</code>, <code>azure-ssh-authorized-keys</code></td></tr>
             <tr><td>AWS</td><td><code>aws-region</code>, <code>aws-availability-zone</code>, <code>aws-name</code>, <code>aws-instance-type</code>, <code>aws-image-id</code>, <code>aws-vpc-cidr</code>, <code>aws-subnet-cidr</code>, <code>aws-root-volume-size-gb</code>, <code>aws-ssh-authorized-keys</code></td></tr>
+            <tr><td>Google</td><td><code>google-project</code>, <code>google-region</code>, <code>google-zone</code>, <code>google-name</code>, <code>google-machine-type</code>, <code>google-image-project</code>, <code>google-image-family</code>, <code>google-image-id</code>, <code>google-subnet-cidr</code>, <code>google-boot-disk-size-gb</code>, <code>google-ssh-authorized-keys</code></td></tr>
             <tr><td>DigitalOcean</td><td><code>digitalocean-name</code>, <code>digitalocean-region</code>, <code>digitalocean-size</code>, <code>digitalocean-image</code>, <code>digitalocean-ssh-keys</code>; optional <code>digitalocean-vpc-uuid</code></td></tr>
             <tr><td>Hetzner</td><td><code>hcloud-name</code>, <code>hcloud-image</code>, <code>hcloud-server-type</code>, <code>hcloud-location</code>, <code>hcloud-ssh-keys</code></td></tr>
             <tr><td>Yandex</td><td><code>compute-pubkey</code>, <code>yandex-cloud-id</code>, <code>yandex-folder-id</code>, <code>yandex-zone</code>, <code>yandex-image-family</code>, <code>yandex-name</code>, <code>yandex-subnet-cidr</code>, <code>yandex-platform-id</code>, <code>yandex-cores</code>, <code>yandex-memory-gb</code>, <code>yandex-core-fraction</code>, <code>yandex-disk-size-gb</code></td></tr>

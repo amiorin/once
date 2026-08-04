@@ -17,6 +17,10 @@ export const providers: Record<string, Record<string, ProviderEntry>> = {
       required: ["aws-region", "aws-availability-zone", "aws-name", "aws-instance-type", "aws-image-id", "aws-vpc-cidr", "aws-subnet-cidr", "aws-root-volume-size-gb", "aws-ssh-authorized-keys"],
       secrets: [], tofuEnv: {},
     },
+    google: {
+      required: ["google-project", "google-region", "google-zone", "google-name", "google-machine-type", "google-image-project", "google-image-family", "google-image-id", "google-subnet-cidr", "google-boot-disk-size-gb", "google-ssh-authorized-keys"],
+      secrets: [], tofuEnv: {},
+    },
     digitalocean: {
       required: ["digitalocean-name", "digitalocean-region", "digitalocean-size", "digitalocean-image", "digitalocean-ssh-keys"],
       secrets: ["do-token"], tofuEnv: { "do-token": "DIGITALOCEAN_TOKEN" },

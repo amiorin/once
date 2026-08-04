@@ -22,6 +22,7 @@ import smtpResend from "../resources/tools/tofu-smtp/resend/main.tf" with { type
 import computeAzure from "../resources/tools/tofu/azure/main.tf" with { type: "text" };
 import computeAws from "../resources/tools/tofu/aws/main.tf" with { type: "text" };
 import computeDigitalocean from "../resources/tools/tofu/digitalocean/main.tf" with { type: "text" };
+import computeGoogle from "../resources/tools/tofu/google/main.tf" with { type: "text" };
 import computeHcloud from "../resources/tools/tofu/hcloud/main.tf" with { type: "text" };
 import computeNoInfra from "../resources/tools/tofu/no-infra/main.tf" with { type: "text" };
 import computeOci from "../resources/tools/tofu/oci/main.tf" with { type: "text" };
@@ -35,6 +36,7 @@ const rawTemplate: Template = { name: "once/raw", content: raw };
 const computeTemplates: Record<string, Template> = {
   azure: { name: "tools/tofu/azure/main.tf", content: computeAzure },
   aws: { name: "tools/tofu/aws/main.tf", content: computeAws },
+  google: { name: "tools/tofu/google/main.tf", content: computeGoogle },
   digitalocean: { name: "tools/tofu/digitalocean/main.tf", content: computeDigitalocean },
   hcloud: { name: "tools/tofu/hcloud/main.tf", content: computeHcloud },
   yandex: { name: "tools/tofu/yandex/main.tf", content: computeYandex },
@@ -98,6 +100,7 @@ export function fallbackComputeParams(opts: Opts): Record<string, unknown> {
     case "aws": return { ip: "192.168.0.1", sudoer: "ubuntu", uid: "1000", name, user: "ubuntu" };
     case "oci": return { ip: "192.168.0.1", sudoer: "ubuntu", uid: "1001", name, user: "ubuntu" };
     case "yandex": return { ip: "192.168.0.1", sudoer: "ubuntu", uid: "1000", name, user: "ubuntu" };
+    case "google": return { ip: "192.168.0.1", sudoer: "ubuntu", uid: "1000", name, user: "ubuntu" };
     case "no-infra": return {
       ip: opts["no-infra-compute-ip"] ?? "192.168.0.1",
       sudoer: opts["no-infra-compute-sudoer"] ?? "root",

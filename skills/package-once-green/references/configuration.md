@@ -99,6 +99,25 @@ aws-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
 
 AWS uses the native credential chain (for example, temporary credentials from `aws login`). It creates an isolated VPC, public subnet, internet gateway, security group, key pair, and EC2 instance.
 
+### Google Cloud
+
+```yaml
+provider-compute: google
+google-project: example-project
+google-region: europe-west4
+google-zone: europe-west4-b
+google-name: once
+google-machine-type: t2a-standard-1
+google-image-project: ubuntu-os-cloud
+google-image-family: ubuntu-2404-lts-arm64
+google-image-id: projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-arm64-v20260723
+google-subnet-cidr: 10.20.1.0/24
+google-boot-disk-size-gb: 30
+google-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
+```
+
+Google uses Application Default Credentials from `gcloud auth application-default login`. It creates a custom VPC, subnet, firewall rule, static address, and Compute Engine instance.
+
 ### DigitalOcean
 
 ```yaml

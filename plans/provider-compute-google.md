@@ -1,6 +1,6 @@
 # Google Cloud compute provider
 
-Status: planned.
+Status: implemented and live-verified on 2026-08-04. `europe-west4` replaced the original `europe-west1` choice because it is the European region offering the selected ARM64 T2A machine type.
 
 ## Goal
 
@@ -11,8 +11,8 @@ The deployment uses Google Compute Engine, Resend SMTP, Cloudflare DNS, and loca
 ## Fixed decisions
 
 - Google Cloud project: `once-504515` (billing enabled)
-- Region: `europe-west1`
-- Zone: `europe-west1-b`
+- Region: `europe-west4`
+- Zone: `europe-west4-b`
 - Architecture: ARM64
 - Machine type: `t2a-standard-1` (1 vCPU, 4 GB RAM)
 - Image: Ubuntu 24.04 LTS ARM64
@@ -30,14 +30,13 @@ Use flat keys consistent with the existing provider registries:
 ```yaml
 provider-compute: google
 google-project: once-504515
-google-region: europe-west1
-google-zone: europe-west1-b
+google-region: europe-west4
+google-zone: europe-west4-b
 google-name: once-google
 google-machine-type: t2a-standard-1
 google-image-project: ubuntu-os-cloud
 google-image-family: ubuntu-2404-lts-arm64
-google-image-id: <pinned-self-link>
-google-vpc-cidr: 10.20.0.0/16
+google-image-id: projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-arm64-v20260723
 google-subnet-cidr: 10.20.1.0/24
 google-boot-disk-size-gb: 30
 google-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
@@ -99,7 +98,7 @@ Create sibling `once-google/` using the same local working-tree launcher arrange
 
 - `green` symlink
 - linked `devenv.nix` and `devenv.lock`
-- `.envrc` selecting local ONCE/Green trees, project `once-504515`, region `europe-west1`, and zone `europe-west1-b`
+- `.envrc` selecting local ONCE/Green trees, project `once-504515`, region `europe-west4`, and zone `europe-west4-b`
 - gitignored, mode-0600 `.envrc.private`, copied from `once-aws/.envrc.private` without exposing values
 - `colors.yml` with `profile: once-google`, local backend, Resend, Cloudflare, and `google.bigconfig.online`
 
@@ -107,7 +106,7 @@ Create sibling `once-google/` using the same local working-tree launcher arrange
 
 1. Install/check Google Cloud CLI.
 2. Run browser-based `gcloud auth application-default login`, set project `once-504515`, and verify identity/quota project without printing credentials.
-3. Confirm the Compute Engine API is enabled, `t2a-standard-1` is available in `europe-west1-b`, and resolve/pin the current Ubuntu 24.04 ARM64 image.
+3. Confirm the Compute Engine API is enabled, `t2a-standard-1` is available in `europe-west4-b`, and resolve/pin the current Ubuntu 24.04 ARM64 image.
 4. Run `build` and `create --dry-run` credential-free.
 5. Run a compute-only OpenTofu apply/destroy to prove ARM boot and SSH-agent access.
 6. Run full `./green create` and verify `describe`, SSH, the container digest, and HTTP 200 from `https://google.bigconfig.online`.

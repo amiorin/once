@@ -114,6 +114,11 @@
                 :uid "1000"
                 :name name
                 :user "ubuntu"}
+      "google" {:ip "192.168.0.1"
+                :sudoer "ubuntu"
+                :uid "1000"
+                :name name
+                :user "ubuntu"}
       "no-infra" (cond-> {:ip (or (:no-infra-compute-ip opts) "192.168.0.1")
                           :sudoer (or (:no-infra-compute-sudoer opts) "root")
                           :name name

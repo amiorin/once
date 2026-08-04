@@ -38,6 +38,13 @@
                        :aws-ssh-authorized-keys]
            :secrets []
            :tofu-env {}}
+    "google" {:required [:google-project :google-region :google-zone
+                          :google-name :google-machine-type
+                          :google-image-project :google-image-family
+                          :google-image-id :google-subnet-cidr :google-boot-disk-size-gb
+                          :google-ssh-authorized-keys]
+              :secrets []
+              :tofu-env {}}
     "digitalocean" {:required [:digitalocean-name :digitalocean-region
                                :digitalocean-size :digitalocean-image
                                :digitalocean-ssh-keys]

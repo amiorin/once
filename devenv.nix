@@ -12,6 +12,7 @@
     pkgs.hcl2json
     pkgs.awscli2
     pkgs.azure-cli
+    pkgs.google-cloud-sdk
     pkgs.skopeo
     pkgs.hcloud
     pkgs.doctl

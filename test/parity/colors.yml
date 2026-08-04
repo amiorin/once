@@ -43,6 +43,17 @@ aws-vpc-cidr: 10.0.0.0/16
 aws-subnet-cidr: 10.0.1.0/24
 aws-root-volume-size-gb: 30
 aws-ssh-authorized-keys: /tmp/once.pub
+google-project: once-example
+google-region: europe-west4
+google-zone: europe-west4-b
+google-name: once
+google-machine-type: t2a-standard-1
+google-image-project: ubuntu-os-cloud
+google-image-family: ubuntu-2404-lts-arm64
+google-image-id: projects/ubuntu-os-cloud/global/images/ubuntu-example
+google-subnet-cidr: 10.20.1.0/24
+google-boot-disk-size-gb: 30
+google-ssh-authorized-keys: /tmp/once.pub
 digitalocean-name: once
 digitalocean-region: ams3
 digitalocean-size: s-1vcpu-1gb-35gb-intel

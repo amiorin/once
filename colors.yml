@@ -12,6 +12,7 @@
 # Required per provider:
 #   azure          (none — OpenTofu uses the ambient Azure CLI session)
 #   aws            (none — OpenTofu uses the ambient AWS credential chain)
+#   google         (none — OpenTofu uses Application Default Credentials)
 #   digitalocean   COLORS_PAR_DO_TOKEN
 #   hcloud         COLORS_PAR_HCLOUD_TOKEN
 #   yandex         COLORS_PAR_YANDEX_TOKEN
@@ -132,6 +133,18 @@ hcloud-image: ubuntu-24.04
 hcloud-server-type: cx23
 hcloud-location: hel1
 hcloud-ssh-keys: REPLACE_ME
+
+google-project: REPLACE_ME
+google-region: europe-west4
+google-zone: europe-west4-b
+google-name: once
+google-machine-type: t2a-standard-1
+google-image-project: ubuntu-os-cloud
+google-image-family: ubuntu-2404-lts-arm64
+google-image-id: REPLACE_ME
+google-subnet-cidr: 10.20.1.0/24
+google-boot-disk-size-gb: 30
+google-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
 
 digitalocean-name: once
 digitalocean-region: ams3
