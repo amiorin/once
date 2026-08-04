@@ -21,7 +21,7 @@ def _template(path: str) -> dict:
 
 
 _RAW = _template("raw")
-_COMPUTE = {name: _template(f"tools/tofu/{name}/main.tf") for name in ["digitalocean", "hcloud", "yandex", "oci", "no-infra"]}
+_COMPUTE = {name: _template(f"tools/tofu/{name}/main.tf") for name in ["aws", "digitalocean", "hcloud", "yandex", "oci", "no-infra"]}
 _SMTP = {name: _template(f"tools/tofu-smtp/{name}/main.tf") for name in ["resend", "no-infra"]}
 _DNS = {name: _template(f"tools/tofu-dns/{name}/main.tf") for name in ["cloudflare", "no-infra"]}
 _SMTP_POST = {name: _template(f"tools/tofu-smtp-post/{name}/main.tf") for name in ["resend", "no-infra"]}
@@ -60,6 +60,8 @@ def backend_credential_env(opts: dict) -> dict[str, str] | None:
 def fallback_compute_params(opts: dict) -> dict:
     name = str(opts.get("profile") or "once")
     provider = opts.get("provider-compute")
+    if provider == "aws":
+        return {"ip": "192.168.0.1", "sudoer": "ubuntu", "uid": "1000", "name": name, "user": "ubuntu"}
     if provider == "oci":
         return {"ip": "192.168.0.1", "sudoer": "ubuntu", "uid": "1001", "name": name, "user": "ubuntu"}
     if provider == "yandex":

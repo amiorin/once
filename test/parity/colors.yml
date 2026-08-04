@@ -21,6 +21,15 @@ provider-smtp: resend
 provider-dns: cloudflare
 provider-backend: local
 compute-prevent-destroy: true
+aws-region: eu-west-1
+aws-availability-zone: eu-west-1a
+aws-name: once
+aws-instance-type: t3.small
+aws-image-id: ami-example
+aws-vpc-cidr: 10.0.0.0/16
+aws-subnet-cidr: 10.0.1.0/24
+aws-root-volume-size-gb: 30
+aws-ssh-authorized-keys: /tmp/once.pub
 digitalocean-name: once
 digitalocean-region: ams3
 digitalocean-size: s-1vcpu-1gb-35gb-intel

@@ -61,6 +61,23 @@ workflow and the contract it consumes.
 
 ## Compute providers
 
+### AWS
+
+```yaml
+provider-compute: aws
+aws-region: eu-west-1
+aws-availability-zone: eu-west-1a
+aws-name: once
+aws-instance-type: t3.small
+aws-image-id: ami-...
+aws-vpc-cidr: 10.0.0.0/16
+aws-subnet-cidr: 10.0.1.0/24
+aws-root-volume-size-gb: 30
+aws-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
+```
+
+AWS uses the native credential chain (for example, temporary credentials from `aws login`). It creates an isolated VPC, public subnet, internet gateway, security group, key pair, and EC2 instance.
+
 ### DigitalOcean
 
 ```yaml

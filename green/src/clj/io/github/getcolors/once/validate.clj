@@ -24,7 +24,13 @@
   plaintext. A secret that is not in `:tofu-env` reaches its tool some other
   way: the SMTP passwords are looked up by Ansible at play time."
   {:provider-compute
-   {"digitalocean" {:required [:digitalocean-name :digitalocean-region
+   {"aws" {:required [:aws-region :aws-availability-zone :aws-name
+                       :aws-instance-type :aws-image-id :aws-vpc-cidr
+                       :aws-subnet-cidr :aws-root-volume-size-gb
+                       :aws-ssh-authorized-keys]
+           :secrets []
+           :tofu-env {}}
+    "digitalocean" {:required [:digitalocean-name :digitalocean-region
                                :digitalocean-size :digitalocean-image
                                :digitalocean-ssh-keys]
                     :secrets [:do-token]

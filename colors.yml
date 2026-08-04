@@ -10,6 +10,7 @@
 # COLORS_PAR_DO_TOKEN. Any key below can be overridden the same way.
 #
 # Required per provider:
+#   aws            (none — OpenTofu uses the ambient AWS credential chain)
 #   digitalocean   COLORS_PAR_DO_TOKEN
 #   hcloud         COLORS_PAR_HCLOUD_TOKEN
 #   yandex         COLORS_PAR_YANDEX_TOKEN
@@ -60,6 +61,16 @@ provider-smtp: resend
 provider-dns: cloudflare
 provider-backend: r2
 compute-prevent-destroy: true
+
+aws-region: eu-west-1
+aws-availability-zone: eu-west-1a
+aws-name: once
+aws-instance-type: t3.small
+aws-image-id: REPLACE_ME
+aws-vpc-cidr: 10.0.0.0/16
+aws-subnet-cidr: 10.0.1.0/24
+aws-root-volume-size-gb: 30
+aws-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
 
 no-infra-smtp-server: smtp.resend.com
 no-infra-smtp-port: 587

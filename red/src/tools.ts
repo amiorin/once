@@ -19,6 +19,7 @@ import smtpPostNoInfra from "../resources/tools/tofu-smtp-post/no-infra/main.tf"
 import smtpPostResend from "../resources/tools/tofu-smtp-post/resend/main.tf" with { type: "text" };
 import smtpNoInfra from "../resources/tools/tofu-smtp/no-infra/main.tf" with { type: "text" };
 import smtpResend from "../resources/tools/tofu-smtp/resend/main.tf" with { type: "text" };
+import computeAws from "../resources/tools/tofu/aws/main.tf" with { type: "text" };
 import computeDigitalocean from "../resources/tools/tofu/digitalocean/main.tf" with { type: "text" };
 import computeHcloud from "../resources/tools/tofu/hcloud/main.tf" with { type: "text" };
 import computeNoInfra from "../resources/tools/tofu/no-infra/main.tf" with { type: "text" };
@@ -31,6 +32,7 @@ const templateOpts: RenderOpts = { tagOpen: "<", tagClose: ">", filterOpen: "{",
 const rawTemplate: Template = { name: "once/raw", content: raw };
 
 const computeTemplates: Record<string, Template> = {
+  aws: { name: "tools/tofu/aws/main.tf", content: computeAws },
   digitalocean: { name: "tools/tofu/digitalocean/main.tf", content: computeDigitalocean },
   hcloud: { name: "tools/tofu/hcloud/main.tf", content: computeHcloud },
   yandex: { name: "tools/tofu/yandex/main.tf", content: computeYandex },
@@ -90,6 +92,7 @@ export function backendCredentialEnv(opts: Opts): Record<string, string> | undef
 export function fallbackComputeParams(opts: Opts): Record<string, unknown> {
   const name = String(opts.profile ?? "once");
   switch (opts["provider-compute"]) {
+    case "aws": return { ip: "192.168.0.1", sudoer: "ubuntu", uid: "1000", name, user: "ubuntu" };
     case "oci": return { ip: "192.168.0.1", sudoer: "ubuntu", uid: "1001", name, user: "ubuntu" };
     case "yandex": return { ip: "192.168.0.1", sudoer: "ubuntu", uid: "1000", name, user: "ubuntu" };
     case "no-infra": return {
