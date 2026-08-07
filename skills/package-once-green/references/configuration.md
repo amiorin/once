@@ -153,7 +153,7 @@ provider-compute: yandex
 compute-pubkey: ssh-ed25519 AAAA... operator
 yandex-cloud-id: b1g...
 yandex-folder-id: b1g...
-yandex-zone: ru-central1-a
+yandex-zone: kz1-a
 yandex-image-family: ubuntu-2404-lts
 yandex-name: once
 yandex-subnet-cidr: 10.0.0.0/24
