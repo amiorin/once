@@ -24,7 +24,7 @@
 #   r2 backend     COLORS_PAR_R2_ACCESS_KEY_ID COLORS_PAR_R2_SECRET_ACCESS_KEY
 #   s3 backend     (none — OpenTofu uses the ambient AWS credential chain)
 # Plus one variable per application env entry, named after the key it maps to.
-profile: default
+profile: once-example
 workdir: .colors
 
 compute-pubkey: REPLACE_ME # required by Yandex Cloud
