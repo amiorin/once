@@ -20,15 +20,15 @@
             (into-array java.nio.file.attribute.FileAttribute []))))
 
 (defn- failing-deploy-shim!
-  "A `once` shim whose `list` reports nothing deployed and whose `deploy` fails
+  "A `once` shim whose `list` reports `listed-hosts` and whose `deploy` fails
   with the whole invocation echoed back — the worst case for a leak."
-  [dir]
+  [dir listed-hosts]
   (let [once (io/file dir "once")]
     ;; the verb follows `-n <namespace>`, so scan rather than index
     (spit once (str "#!/bin/sh\n"
                     "for a in \"$@\"; do\n"
                     "  case \"$a\" in\n"
-                    "    list)   exit 0 ;;\n"
+                    "    list)   printf '%s\\n' \"$ONCE_LIST\"; exit 0 ;;\n"
                     "    deploy) echo \"once deploy failed: $@\" >&2; exit 3 ;;\n"
                     "  esac\n"
                     "done\n"
@@ -37,13 +37,16 @@
     (.getAbsolutePath dir)))
 
 (defn- run-module-args
-  [args]
-  (let [dir (temp-dir!)
-        shim (failing-deploy-shim! dir)
-        args-file (io/file dir "args.json")]
-    (spit args-file (json/generate-string args))
-    (process/run ["bb" module (.getAbsolutePath args-file)]
-                 {:extra-env {"PATH" (str shim ":" (System/getenv "PATH"))}})))
+  ([args] (run-module-args args []))
+  ([args listed-hosts]
+   (let [dir (temp-dir!)
+         shim (failing-deploy-shim! dir listed-hosts)
+         args-file (io/file dir "args.json")]
+     (spit args-file (json/generate-string args))
+     (process/run ["bb" module (.getAbsolutePath args-file)]
+                  {:extra-env {"PATH" (str shim ":" (System/getenv "PATH"))
+                               "ONCE_LIST" (str/join "\n" (map #(str % " (running)")
+                                                                     listed-hosts))}}))))
 
 (defn- run-module
   [app]
@@ -89,3 +92,18 @@
     (is (= [] (:would_remove result)))
     (is (= "" (get-in result [:diff :before])))
     (is (= "www.example.com" (get-in result [:diff :after])))))
+
+(deftest check-mode-models-teardown-before-reconciling
+  (let [host "www.example.com"
+        {:keys [exit out]} (run-module-args
+                            {:applications [{:host host
+                                             :image "ghcr.io/example/site:latest"}]
+                             :teardown true
+                             :_ansible_check_mode true}
+                            [host])
+        result (json/parse-string out true)]
+    (is (= 0 exit))
+    (is (true? (:changed result)))
+    (is (= [host] (:would_deploy result)))
+    (is (= host (get-in result [:diff :before])))
+    (is (= host (get-in result [:diff :after])))))

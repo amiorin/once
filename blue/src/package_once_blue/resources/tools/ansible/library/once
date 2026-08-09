@@ -115,9 +115,13 @@
         desired-hosts (set (keys apps-by-host))
         list-out      (strip-ansi (:out (run! ["once" "-n" namespace "list"])))
         deployed      (parse-deployed-hosts list-out)
-        to-deploy     (set/difference desired-hosts deployed)
-        to-remove     (set/difference deployed desired-hosts)
-        changed?      (boolean (or (seq to-deploy) (seq to-remove)))
+        ;; A real teardown empties the namespace before reconciliation. Model
+        ;; that transition in check mode without executing it, or an already
+        ;; converged namespace would incorrectly report changed=false.
+        reconcile-from (if (and teardown? check-mode?) #{} deployed)
+        to-deploy     (set/difference desired-hosts reconcile-from)
+        to-remove     (set/difference reconcile-from desired-hosts)
+        changed?      (boolean (or teardown? (seq to-deploy) (seq to-remove)))
         diff          {:before (str/join "\n" (sort deployed))
                        :after  (str/join "\n" (sort desired-hosts))}]
     (if check-mode?
