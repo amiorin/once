@@ -281,7 +281,10 @@
         (is (zero? (:green/exit dns-result)))
         (testing "every sorted application zone becomes a public zone"
           (is (str/includes? main "toset([\"example.com\", \"example.net\"])"))
-          (is (str/includes? main "resource \"yandex_dns_zone\" \"domains\"")))
+          (is (str/includes? main "resource \"yandex_dns_zone\" \"domains\""))
+          (is (str/includes? main
+                             "substr(replace(each.value, \".\", \"-\"), 0, 40)"))
+          (is (str/includes? main "substr(md5(each.value), 0, 12)")))
         (testing "the folder renders, the token never does"
           (is (str/includes? main "folder_id = \"folder-id\""))
           (is (not (str/includes? main "a-real-yandex-token"))))

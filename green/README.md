@@ -178,9 +178,9 @@ the remaining live checks are soft failures named in the report.
   `compute-pubkey` through instance metadata, and authenticates with
   `COLORS_PAR_YANDEX_TOKEN`.
 - SMTP templates: Resend or `no-infra` SMTP settings.
-- DNS templates: Cloudflare or `no-infra`; the per-application and Resend DNS
-  records are generated as `apps.tf.json` and `smtp.tf.json` at the
-  compute/SMTP join.
+- DNS templates: Cloudflare, Yandex Cloud DNS, or `no-infra`; Yandex creates
+  public zones and direct application and Resend records. The generated records
+  live in `apps.tf.json` and `smtp.tf.json` at the compute/SMTP join.
 - Backends: local, S3, and Cloudflare R2, emitted as `backend.tf.json` and
   isolated by profile and tool under the state key `<profile>/<tool>.tfstate`.
 - `ansible-local` runs a playbook that writes the managed `Host <profile>`

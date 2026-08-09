@@ -22,12 +22,13 @@ locals {
 # public zones are created here: Yandex serves every public zone from the same
 # nameservers (ns1.yandexcloud.net, ns2.yandexcloud.net), so delegation is a
 # one-time NS change at the registrar and the zone itself carries no further
-# configuration. The "zone-" prefix keeps the resource name valid for domains
-# that start with a digit.
+# configuration. Keep the display name under Yandex's 63-character limit even
+# for a valid long domain; the hash makes truncated names deterministic and
+# distinct. The actual DNS zone remains the full value below.
 resource "yandex_dns_zone" "domains" {
   for_each = local.zones
 
-  name   = "zone-${replace(each.value, ".", "-")}"
+  name   = "zone-${substr(replace(each.value, ".", "-"), 0, 40)}-${substr(md5(each.value), 0, 12)}"
   zone   = "${each.value}."
   public = true
 }
