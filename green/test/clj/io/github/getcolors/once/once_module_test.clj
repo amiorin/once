@@ -20,15 +20,15 @@
             (into-array java.nio.file.attribute.FileAttribute []))))
 
 (defn- failing-deploy-shim!
-  "A `once` shim whose `list` reports nothing deployed and whose `deploy` fails
+  "A `once` shim whose `list` reports `listed-hosts` and whose `deploy` fails
   with the whole invocation echoed back — the worst case for a leak."
-  [dir]
+  [dir listed-hosts]
   (let [once (io/file dir "once")]
     ;; the verb follows `-n <namespace>`, so scan rather than index
     (spit once (str "#!/bin/sh\n"
                     "for a in \"$@\"; do\n"
                     "  case \"$a\" in\n"
-                    "    list)   exit 0 ;;\n"
+                    "    list)   printf '%s\\n' \"$ONCE_LIST\"; exit 0 ;;\n"
                     "    deploy) echo \"once deploy failed: $@\" >&2; exit 3 ;;\n"
                     "  esac\n"
                     "done\n"
@@ -36,14 +36,21 @@
     (.setExecutable once true false)
     (.getAbsolutePath dir)))
 
+(defn- run-module-args
+  ([args] (run-module-args args []))
+  ([args listed-hosts]
+   (let [dir (temp-dir!)
+         shim (failing-deploy-shim! dir listed-hosts)
+         args-file (io/file dir "args.json")]
+     (spit args-file (json/generate-string args))
+     (process/run ["bb" module (.getAbsolutePath args-file)]
+                  {:extra-env {"PATH" (str shim ":" (System/getenv "PATH"))
+                               "ONCE_LIST" (str/join "\n" (map #(str % " (running)")
+                                                                     listed-hosts))}}))))
+
 (defn- run-module
   [app]
-  (let [dir (temp-dir!)
-        shim (failing-deploy-shim! dir)
-        args-file (io/file dir "args.json")]
-    (spit args-file (json/generate-string {:applications [app]}))
-    (process/run ["bb" module (.getAbsolutePath args-file)]
-                 {:extra-env {"PATH" (str shim ":" (System/getenv "PATH"))}})))
+  (run-module-args {:applications [app]}))
 
 (deftest a-failed-deploy-reports-no-secrets
   (let [{:keys [exit out]} (run-module {:host "www.example.com"
@@ -70,3 +77,33 @@
     (testing "stderr from the failing command is scrubbed as well"
       (is (str/includes? (:msg result) "once deploy failed"))
       (is (str/includes? (:msg result) "***")))))
+
+(deftest check-mode-plans-without-deploying
+  ;; The shim's `deploy` fails loudly, so a zero exit proves check mode never
+  ;; ran it: `once list` is the only command a check run may execute.
+  (let [{:keys [exit out]} (run-module-args
+                            {:applications [{:host "www.example.com"
+                                             :image "ghcr.io/example/site:latest"}]
+                             :_ansible_check_mode true})
+        result (json/parse-string out true)]
+    (is (= 0 exit) "the failing deploy shim was never invoked")
+    (is (true? (:changed result)))
+    (is (= ["www.example.com"] (:would_deploy result)))
+    (is (= [] (:would_remove result)))
+    (is (= "" (get-in result [:diff :before])))
+    (is (= "www.example.com" (get-in result [:diff :after])))))
+
+(deftest check-mode-models-teardown-before-reconciling
+  (let [host "www.example.com"
+        {:keys [exit out]} (run-module-args
+                            {:applications [{:host host
+                                             :image "ghcr.io/example/site:latest"}]
+                             :teardown true
+                             :_ansible_check_mode true}
+                            [host])
+        result (json/parse-string out true)]
+    (is (= 0 exit))
+    (is (true? (:changed result)))
+    (is (= [host] (:would_deploy result)))
+    (is (= host (get-in result [:diff :before])))
+    (is (= host (get-in result [:diff :after])))))
