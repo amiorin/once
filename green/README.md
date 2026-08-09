@@ -90,7 +90,7 @@ once:
       github: acme/site      # same repository as www.example.com: one key, both hosts
 provider-compute: digitalocean  # azure, aws, google, digitalocean, hcloud, yandex, oci, no-infra
 provider-smtp: resend           # resend, no-infra
-provider-dns: cloudflare        # cloudflare, no-infra
+provider-dns: cloudflare        # cloudflare, yandex, no-infra
 provider-backend: r2            # r2, s3, local
 compute-prevent-destroy: true
 ```
@@ -102,8 +102,9 @@ There is no domain key. Application hosts are the source of truth and may span
 domains. Green derives every DNS zone from each host's last two labels, creates
 and verifies a Resend sending domain at `notifications.<zone>`, and gives each
 application an `info@notifications.<zone>` From address in its own zone. Each
-host gets its own proxied `A` record — there is no implicit apex or wildcard
-record, so an unlisted host does not resolve.
+host gets its own `A` record — proxied on Cloudflare, plain on Yandex — and
+there is no implicit apex or wildcard record, so an unlisted host does not
+resolve.
 
 `env` maps a container variable **name** to the flat key holding its value,
 never to the value itself.
@@ -181,9 +182,9 @@ the remaining live checks are soft failures named in the report.
   optionally pins the boot image; without it, later family releases are ignored
   to prevent surprise server replacement.
 - SMTP templates: Resend or `no-infra` SMTP settings.
-- DNS templates: Cloudflare or `no-infra`; the per-application and Resend DNS
-  records are generated as `apps.tf.json` and `smtp.tf.json` at the
-  compute/SMTP join.
+- DNS templates: Cloudflare, Yandex Cloud DNS, or `no-infra`; Yandex creates
+  public zones and direct application and Resend records. The generated records
+  live in `apps.tf.json` and `smtp.tf.json` at the compute/SMTP join.
 - Backends: local, S3, and Cloudflare R2, emitted as `backend.tf.json` and
   isolated by profile and tool under the state key `<profile>/<tool>.tfstate`.
 - `ansible-local` runs a playbook that writes the managed `Host <profile>`

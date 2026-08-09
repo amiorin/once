@@ -58,7 +58,7 @@ Providers:
 
 - compute: `azure`, `aws`, `google`, `digitalocean`, `hcloud`, `yandex`, `oci`, `no-infra`
 - SMTP: `resend`, `no-infra`
-- DNS: `cloudflare`, `no-infra`
+- DNS: `cloudflare`, `yandex`, `no-infra`
 - backend: `local`, `s3`, `r2`
 
 For Yandex compute, `yandex-static-ip: true` reserves the public address across
