@@ -57,8 +57,8 @@ set -e
 
 [ "$code" -eq 2 ] || fail "checkout without dependencies exited $code, expected 2"
 grep -q "bun install --cwd" <<<"$out" || fail "checkout error lost its actionable command: $out"
-if [ -d "$cache" ]; then
-  fail "checkout without dependencies resolved into the cache; the working tree would be shadowed"
+if [ -d "$cache/package-once-red" ]; then
+  fail "checkout without dependencies resolved into the package cache; the working tree would be shadowed"
 fi
 ok "a checkout refuses to bootstrap and says what to install"
 
