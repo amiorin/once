@@ -42,11 +42,11 @@
      older cannot find them. The rename also changes generated Terraform
      resource addresses, which existing stacks must migrate with
      `tofu state mv` before their next apply -- see README.md.
-  11: :yandex-static-ip reserves a public address the instance's NAT is pinned
-     to, and :yandex-allow-stopping-for-update lets tofu stop the instance for
-     changes Yandex cannot apply in place. A launcher pinned older renders
-     neither key and ignores both silently, so the server keeps its ephemeral
-     address and loses it on the next stop."
+  11: Yandex compute gains :yandex-static-ip,
+     :yandex-allow-stopping-for-update, and :yandex-image-id. The family image
+     path also stops tracking later resolved ids. A launcher pinned older
+     ignores the new keys and can still lose an ephemeral address or plan an
+     unexpected replacement when an image family moves."
   11)
 
 (defn registrable-domain

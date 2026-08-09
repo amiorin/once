@@ -42,6 +42,9 @@ build_variant yandex COLORS_PAR_PROVIDER_COMPUTE=yandex
 build_variant yandex-static COLORS_PAR_PROVIDER_COMPUTE=yandex \
   COLORS_PAR_YANDEX_STATIC_IP=true \
   COLORS_PAR_YANDEX_ALLOW_STOPPING_FOR_UPDATE=true
+# Cover the image-id conditional independently of the address toggles.
+build_variant yandex-pinned COLORS_PAR_PROVIDER_COMPUTE=yandex \
+  COLORS_PAR_YANDEX_IMAGE_ID=fd8example
 build_variant oci COLORS_PAR_PROVIDER_COMPUTE=oci
 # Both sides of the oci-image-id branch. The unpinned side renders a data
 # source and the pinned side renders none, so a colour whose template engine

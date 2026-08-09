@@ -114,6 +114,10 @@ yandex-disk-size-gb: 20
 # memory, platform) fails instead of taking the instance down.
 yandex-static-ip: false
 yandex-allow-stopping-for-update: false
+# Optional. Pins the boot image. Left unset, the image resolves from
+# yandex-image-family and the resolved id is ignored on later applies, because
+# following a moving family would plan a replacement of the server.
+# yandex-image-id: fd8...
 
 oci-config-file-profile: REPLACE_ME
 oci-subnet-id: REPLACE_ME

@@ -165,6 +165,7 @@ yandex-disk-size-gb: 20
 # Optional:
 yandex-static-ip: false
 yandex-allow-stopping-for-update: false
+yandex-image-id: fd8...   # optional; pins the boot image
 ```
 
 Green creates a network, subnet, NAT-enabled instance, and boot disk. The public key is installed for the `ubuntu` user; keep its private half in `ssh-agent`. Required credential: `COLORS_PAR_YANDEX_TOKEN`, passed to OpenTofu as the provider-native `YC_TOKEN`.
@@ -174,6 +175,11 @@ Green creates a network, subnet, NAT-enabled instance, and boot disk. The public
 `:yandex-allow-stopping-for-update` lets OpenTofu stop the instance to apply a change Yandex cannot make in place, such as `:yandex-cores`, `:yandex-memory-gb`, or `:yandex-platform-id`. Leave it off for a server that carries traffic: the apply then fails naming the flag instead of taking the instance down mid-deploy, and it can be enabled for the single deploy that resizes the instance (`COLORS_PAR_YANDEX_ALLOW_STOPPING_FOR_UPDATE=true`). Attaching a reserved address does not require it.
 
 Both keys default to `false`, which renders exactly as before.
+
+`:yandex-image-id` optionally pins the boot image. Unset, the image resolves
+from `:yandex-image-family` for the first create and later resolved ids are
+ignored so upstream releases cannot replace the server unexpectedly. Changing
+the pin deliberately plans a replacement.
 
 ### Oracle Cloud Infrastructure
 

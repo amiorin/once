@@ -15,7 +15,9 @@ bun run typecheck
 Desired state is the `colors.yml` found by walking up from the working
 directory — the same file green and blue read, so switching colours needs no
 change to it. Yandex compute supports `yandex-static-ip` and
-`yandex-allow-stopping-for-update`; both default to `false`. Secrets use
+`yandex-allow-stopping-for-update`; both default to `false`.
+`yandex-image-id` optionally pins the boot image; without it, later family
+releases do not replace the server. Secrets use
 `COLORS_PAR_*`; never place them in `colors.yml`. See
 the unified [`../index.html`](../index.html) manual and
 [`../skills/package-once-red`](../skills/package-once-red).
