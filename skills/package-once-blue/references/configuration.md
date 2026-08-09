@@ -61,6 +61,10 @@ Providers:
 - DNS: `cloudflare`, `no-infra`
 - backend: `local`, `s3`, `r2`
 
+For Yandex compute, `yandex-static-ip: true` reserves the public address across
+stop/start. `yandex-allow-stopping-for-update: true` separately permits updates
+that require stopping the instance. Both default to `false`.
+
 Credential suffixes are `DO_TOKEN`, `HCLOUD_TOKEN`, `YANDEX_TOKEN`,
 `RESEND_API_KEY`, `RESEND_PASSWORD`, `NO_INFRA_SMTP_PASSWORD`,
 `CLOUDFLARE_API_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`. Prefix
