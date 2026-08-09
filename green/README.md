@@ -175,7 +175,9 @@ the remaining live checks are soft failures named in the report.
 - Compute templates: Azure, AWS, Google Cloud, DigitalOcean, Hetzner Cloud, Yandex Cloud, OCI, and an
   existing `no-infra` host. Yandex creates its own network and subnet, installs
   `compute-pubkey` through instance metadata, and authenticates with
-  `COLORS_PAR_YANDEX_TOKEN`.
+  `COLORS_PAR_YANDEX_TOKEN`. `yandex-image-id` optionally pins the boot image;
+  without it, later family releases are ignored to prevent surprise server
+  replacement.
 - SMTP templates: Resend or `no-infra` SMTP settings.
 - DNS templates: Cloudflare or `no-infra`; the per-application and Resend DNS
   records are generated as `apps.tf.json` and `smtp.tf.json` at the

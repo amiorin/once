@@ -58,6 +58,11 @@ Provider choices and required fields match the unified repository manual:
 - DNS: `cloudflare`, `no-infra`
 - backend: `local`, `s3`, `r2`
 
+For Yandex compute, `yandex-image-id` optionally pins the boot image. Without
+it, the image family is used for the first create and later family releases are
+ignored so they cannot replace the server unexpectedly. Changing a pin plans a
+replacement.
+
 Credentials use `COLORS_PAR_*`, the one namespace every colour shares:
 `DO_TOKEN`, `HCLOUD_TOKEN`, `YANDEX_TOKEN`, `RESEND_API_KEY`,
 `RESEND_PASSWORD`, `NO_INFRA_SMTP_PASSWORD`, `CLOUDFLARE_API_TOKEN`,

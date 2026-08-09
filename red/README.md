@@ -14,7 +14,9 @@ bun run typecheck
 
 Desired state is the `colors.yml` found by walking up from the working
 directory — the same file green and blue read, so switching colours needs no
-change to it. Secrets use `COLORS_PAR_*`; never place them in `colors.yml`. See
+change to it. `yandex-image-id` optionally pins the Yandex boot image; without
+it, later family releases do not replace the server. Secrets use
+`COLORS_PAR_*`; never place them in `colors.yml`. See
 the unified [`../index.html`](../index.html) manual and
 [`../skills/package-once-red`](../skills/package-once-red).
 
