@@ -4,7 +4,7 @@
 # dependencies = ["package-once-blue", "blue"]
 #
 # [tool.uv.sources]
-# package-once-blue = { git = "https://github.com/getcolors/once.git", rev = "c8050271491c47c040047a08fd0877443f4e973f", subdirectory = "blue" }
+# package-once-blue = { git = "https://github.com/getcolors/once.git", rev = "d9679d8413ee1917757b166b571f1f24a2406aaf", subdirectory = "blue" }
 # blue = { git = "https://github.com/getcolors/blue.git", rev = "369c5aafea790a03b649b3513003651e672f3f57" }
 # ///
 """Thin launcher for package-once-blue."""
