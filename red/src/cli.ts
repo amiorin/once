@@ -1,6 +1,4 @@
-import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { execCli, runCli } from "red/cli";
+import { execCli, findUp, runCli } from "red/cli";
 import type { Opts } from "red/workflow";
 import { describeFile } from "./describe.ts";
 import { onceWorkflow } from "./workflow.ts";
@@ -9,30 +7,20 @@ export const usage = "Usage: red <build|create|delete|describe> [-f|--file color
 
 // Walking up means a colour can be run from any subdirectory of a project and
 // still find the one desired state every colour shares.
-function findUp(name: string, from: string = process.cwd()): string {
-  let dir = resolve(from);
-  for (;;) {
-    const candidate = join(dir, name);
-    if (existsSync(candidate)) return candidate;
-    const parent = dirname(dir);
-    if (parent === dir) return name;
-    dir = parent;
-  }
-}
 
 function hasFileArg(args: string[]): boolean {
   return args.some((arg) => arg === "-f" || arg === "--file" || arg.startsWith("--file="));
 }
 
 export function defaultArgs(args: string[]): string[] {
-  return hasFileArg(args) ? args : [...args, "-f", findUp("colors.yml")];
+  return hasFileArg(args) ? args : [...args, "-f", findUp("colors.yml") ?? "colors.yml"];
 }
 
 function fileFromArgs(args: string[]): string {
   const equals = args.find((arg) => arg.startsWith("--file="));
   if (equals) return equals.slice("--file=".length);
   const index = args.findIndex((arg) => arg === "-f" || arg === "--file");
-  return index >= 0 ? args[index + 1] ?? findUp("colors.yml") : findUp("colors.yml");
+  return index >= 0 ? args[index + 1] ?? findUp("colors.yml") ?? "colors.yml" : findUp("colors.yml") ?? "colors.yml";
 }
 
 export async function run(...input: string[]): Promise<Opts> {

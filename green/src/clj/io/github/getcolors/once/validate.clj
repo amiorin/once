@@ -10,7 +10,8 @@
   stage ever uses."
   (:require
    [clojure.string :as str]
-   [green.cli :as green-cli]))
+   [green.cli :as green-cli]
+   [green.providers :as provider-ops]))
 
 (def providers
   "Provider slot -> provider name -> what that choice implies.
@@ -104,32 +105,26 @@
 (def ^:private slots
   [:provider-compute :provider-smtp :provider-dns :provider-backend])
 
-(defn- entry
-  [opts slot]
-  (get-in providers [slot (get opts slot)]))
+(defn- entry [opts slot]
+  (provider-ops/entry providers opts slot))
 
 (defn tofu-env
   "Flat key -> the environment variable OpenTofu reads it from, for the
   provider selected in `slot`."
   [opts slot]
-  (:tofu-env (entry opts slot) {}))
+  (provider-ops/tofu-env providers opts slot))
 
-(defn- slot-keys
-  [opts field]
-  (mapcat #(get (entry opts %) field []) slots))
+(defn- slot-keys [opts field]
+  (provider-ops/slot-keys providers opts slots field))
 
 (defn placeholder?
   "Whether a value is missing in the ways a hand-edited EDN file produces:
   absent, blank, or still carrying the scaffold's REPLACE_ME."
   [x]
-  (or (nil? x)
-      (and (string? x)
-           (or (str/blank? x)
-               (= "REPLACE_ME" (str/upper-case x))))))
+  (provider-ops/placeholder? x))
 
-(defn- missing-keys
-  [opts ks]
-  (keep (fn [k] (when (placeholder? (get opts k)) k)) ks))
+(defn- missing-keys [opts ks]
+  (provider-ops/missing-keys opts ks))
 
 (def ^:private domain-re
   #"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$")

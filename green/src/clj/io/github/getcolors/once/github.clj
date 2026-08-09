@@ -244,19 +244,15 @@
        (let [opts (cond-> opts
                     (and (not delete?) (seq (validate/deploy-groups opts)))
                     (assoc :once/known-hosts (fetch-host-key opts run-fn)))
-             failure (reduce
-                      (fn [_ {:keys [args label]}]
-                        (let [result (run-fn (vec args)
-                                             {:extra-env (token-env opts)}
-                                             run-timeout-ms)]
-                          (if (or delete? (zero? (:exit result -1)))
-                            nil
-                            (reduced (format "gh failed for %s: %s"
-                                             label
-                                             (str/trim (str (:err result))))))))
-                      nil
-                      (commands opts))
+             result (process/run-plan
+                     (commands opts)
+                     {:runner (fn [{:keys [args]}]
+                                (run-fn (vec args) {:extra-env (token-env opts)} run-timeout-ms))
+                      :continue? (fn [_ _] delete?)})
              opts (cleanup! opts)]
-         (if failure
-           (assoc opts :green/exit 1 :green/err failure)
-           (assoc opts :green/exit 0)))))))
+         (if (zero? (:exit result))
+           (assoc opts :green/exit 0)
+           (assoc opts :green/exit 1
+                  :green/err (format "gh failed for %s: %s"
+                                     (get-in result [:command :label])
+                                     (str/trim (str (:err result)))))))))))

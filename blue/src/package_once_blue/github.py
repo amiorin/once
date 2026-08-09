@@ -34,6 +34,7 @@ import tempfile
 from pathlib import Path
 from typing import Awaitable, Callable
 
+from blue.process import run_plan
 from blue.runtime import ExecResult, runtime
 
 from .validate import deploy_groups
@@ -261,13 +262,11 @@ async def github_step(opts: dict, run_fn: Runner | None = None) -> dict:
     if not is_delete and deploy_groups(opts):
         opts = {**opts, "once/known-hosts": await fetch_host_key(opts, run)}
     env = {"GH_TOKEN": str(opts.get("github-token") or "")}
-    failure: str | None = None
-    for command in commands(opts):
-        result = await run(command["args"], env=env)
-        if result.exit != 0 and not is_delete:
-            failure = f"gh failed for {command['label']}: {str(result.err or '').strip()}"
-            break
+    result = await run_plan(
+        commands(opts), runner=lambda command: run(command["args"], env=env),
+        continue_on_error=lambda _command, _result: is_delete,
+    )
     cleaned = _cleanup(opts)
-    if failure:
-        return {**cleaned, "blue/exit": 1, "blue/err": failure}
+    if result["exit"]:
+        return {**cleaned, "blue/exit": 1, "blue/err": f"gh failed for {result['command']['label']}: {str(result['err'] or '').strip()}"}
     return {**cleaned, "blue/exit": 0}

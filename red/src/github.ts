@@ -31,6 +31,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runtime, type ExecResult } from "red/runtime";
 import type { Opts } from "red/workflow";
+import { runPlan } from "red/process";
 import { deployGroups } from "./validate.ts";
 
 const runTimeoutMs = 30000;
@@ -235,14 +236,12 @@ export async function githubStep(opts: Opts, runFn: Runner = defaultRunner): Pro
     opts = { ...opts, "once/known-hosts": await fetchHostKey(opts, runFn) };
   }
   const env = { GH_TOKEN: String(opts["github-token"] ?? "") };
-  let failure: string | undefined;
-  for (const { args, label } of commands(opts)) {
-    const result = await runFn(args, { env });
-    if (result.exit !== 0 && !isDelete) {
-      failure = `gh failed for ${label}: ${String(result.err ?? "").trim()}`;
-      break;
-    }
-  }
+  const result = await runPlan(commands(opts), {
+    runner: (command) => runFn(command.args, { env }),
+    continueOnError: () => isDelete,
+  });
   const cleaned = cleanup(opts);
-  return failure ? { ...cleaned, "red/exit": 1, "red/err": failure } : { ...cleaned, "red/exit": 0 };
+  return result.exit
+    ? { ...cleaned, "red/exit": 1, "red/err": `gh failed for ${result.command?.label}: ${String(result.err).trim()}` }
+    : { ...cleaned, "red/exit": 0 };
 }

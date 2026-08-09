@@ -1,10 +1,10 @@
-import { dirname, isAbsolute, join } from "node:path";
 import { ansibleStep, ansibleWithSpec } from "red/ansible";
-import { scaffold, type RenderOpts, type Spec, type Template } from "red/scaffold";
+import { contentSpec, PRESERVE_JINJA_DELIMITERS, scaffold, type RenderOpts, type Spec, type Template } from "red/scaffold";
+import { stageDir } from "red/cli";
 import * as tofu from "red/tofu";
 import type { Opts } from "red/workflow";
+import { toolEnv } from "red/providers";
 import { publicKeys } from "./github.ts";
-import raw from "../resources/raw" with { type: "text" };
 import ansibleLocalCfg from "../resources/tools/ansible-local/ansible.cfg" with { type: "text" };
 import ansibleLocalInventory from "../resources/tools/ansible-local/inventory.ini" with { type: "text" };
 import ansibleLocalMain from "../resources/tools/ansible-local/main.yml" with { type: "text" };
@@ -28,10 +28,9 @@ import computeNoInfra from "../resources/tools/tofu/no-infra/main.tf" with { typ
 import computeOci from "../resources/tools/tofu/oci/main.tf" with { type: "text" };
 import computeYandex from "../resources/tools/tofu/yandex/main.tf" with { type: "text" };
 import { appsDomains, registrableDomain } from "./utils.ts";
-import { tofuEnv } from "./validate.ts";
+import { providers } from "./validate.ts";
 
-const templateOpts: RenderOpts = { tagOpen: "<", tagClose: ">", filterOpen: "{", filterClose: "}" };
-const rawTemplate: Template = { name: "once/raw", content: raw };
+const templateOpts: RenderOpts = PRESERVE_JINJA_DELIMITERS;
 
 const computeTemplates: Record<string, Template> = {
   azure: { name: "tools/tofu/azure/main.tf", content: computeAzure },
@@ -60,12 +59,7 @@ const smtpPostTemplates: Record<string, Template> = {
 // the current one, so every colour shares one work directory however deep in
 // the project it was invoked from.
 export function toolDir(opts: Opts, tool: string): string {
-  const workdir = String(opts.workdir ?? ".colors");
-  const stateFile = opts["red/state-file"];
-  const root = !isAbsolute(workdir) && typeof stateFile === "string"
-    ? join(dirname(stateFile), workdir)
-    : workdir;
-  return `${root}/${opts.profile ?? "default"}/${tool}`;
+  return stageDir(opts, tool, { defaultProfile: "default" });
 }
 
 function templateSpec(template: Template, target: string, data: Record<string, unknown>): Spec {
@@ -73,7 +67,7 @@ function templateSpec(template: Template, target: string, data: Record<string, u
 }
 
 function rawSpec(target: string, content: string): Spec {
-  return templateSpec(rawTemplate, target, { content });
+  return contentSpec(target, content);
 }
 
 function outputParams(opts: Opts): Record<string, unknown> | undefined {
@@ -81,12 +75,7 @@ function outputParams(opts: Opts): Record<string, unknown> | undefined {
 }
 
 function credentialEnv(opts: Opts, ...slots: string[]): Record<string, string> | undefined {
-  const mappings = Object.assign({}, ...[...slots, "provider-backend"].map((slot) => tofuEnv(opts, slot)));
-  const env = Object.fromEntries(Object.entries(mappings).flatMap(([key, variable]) => {
-    const value = opts[key];
-    return value === undefined || value === null || String(value) === "" ? [] : [[variable, String(value)]];
-  }));
-  return Object.keys(env).length ? env : undefined;
+  return toolEnv(providers, opts, [...slots, "provider-backend"]);
 }
 
 export function backendCredentialEnv(opts: Opts): Record<string, string> | undefined {

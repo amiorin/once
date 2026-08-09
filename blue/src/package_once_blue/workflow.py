@@ -5,6 +5,7 @@ from pathlib import Path
 
 from blue import dry_run, progress, tofu
 from blue.cli import par_name
+from blue.lifecycle import preflight
 from blue.workflow import advice_add, workflow
 
 from blue.cli import read_pars
@@ -43,17 +44,18 @@ async def _adopt_existing_state(opts: dict) -> dict:
 
 
 async def start_step(original: dict, env: dict[str, str] | None = None) -> dict:
-    opts = read_pars({"compute-prevent-destroy": True, **original}, os.environ if env is None else env)
-    event, real = opts.get("blue/event"), not opts.get("blue/dry-run")
-    lifecycle = event in ("create", "delete")
-    errors = [*state_errors(opts), *(secret_errors(opts) if real and lifecycle else [])]
-    if real and event == "delete" and opts.get("compute-prevent-destroy"):
-        errors.append(f"compute destruction is protected; set {par_name('compute-prevent-destroy')}=false to delete")
-    if errors:
-        return {**opts, "blue/exit": 2, "blue/err": "\n".join(errors)}
-    if real and event == "delete":
-        return {**(await _adopt_existing_state(opts)), "blue/exit": 0}
-    return await _with_deploy_keys(opts, real)
+    async def after(opts, _env, context):
+        if context["real"] and context["event"] == "delete":
+            return {**(await _adopt_existing_state(opts)), "blue/exit": 0}
+        return await _with_deploy_keys(opts, context["real"])
+    return await preflight(
+        original, defaults={"compute-prevent-destroy": True}, overlay=read_pars, env=env,
+        validators=[
+            lambda opts, _env, _ctx: state_errors(opts),
+            lambda opts, _env, ctx: secret_errors(opts) if ctx["real"] and ctx["event"] in ("create", "delete") else [],
+            lambda opts, _env, ctx: [f"compute destruction is protected; set {par_name('compute-prevent-destroy')}=false to delete"] if ctx["real"] and ctx["event"] == "delete" and opts.get("compute-prevent-destroy") else [],
+        ], after_validate=after,
+    )
 
 
 async def ansible_cleanup_step(opts: dict) -> dict:
@@ -95,15 +97,9 @@ def wire_fn(step: str, run_opts: dict):
 
 
 def backend_advice(tool: str):
-    dir_fn = lambda opts: tools.tool_dir(opts, tool)
-    state_key = lambda opts: f"{opts.get('profile') or 'default'}/{tool}.tfstate"
-    return tofu.backends(
-        lambda opts: str(opts.get("provider-backend") or "local"),
-        {
-            "local": tofu.local_backend_advice(dir_fn),
-            "s3": tofu.s3_backend_advice(dir_fn, lambda opts: {"bucket": opts.get("s3-bucket"), "key": state_key(opts), "region": opts.get("s3-region")}),
-            "r2": tofu.r2_backend_advice(dir_fn, lambda opts: {"bucket": opts.get("r2-bucket"), "key": state_key(opts), "endpoint": opts.get("r2-endpoint")}),
-        },
+    return tofu.conventional_backend_advice(
+        dir=lambda opts: tools.tool_dir(opts, tool),
+        key=lambda opts: f"{opts.get('profile') or 'default'}/{tool}.tfstate",
     )
 
 

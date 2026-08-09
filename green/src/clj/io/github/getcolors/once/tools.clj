@@ -5,6 +5,8 @@
    [clojure.string :as str]
    [clojure.walk :as walk]
    [green.ansible :as ansible]
+   [green.cli :as green-cli]
+   [green.providers :as provider-ops]
    [green.scaffold :as sc]
    [green.tofu :as tofu]
    [green.workflow :as wf]
@@ -14,11 +16,7 @@
    [io.github.getcolors.once.validate :as validate]))
 
 (def ^:private template-root "io.github.getcolors.once.tools")
-(def ^:private raw-template :io.github.getcolors.once/raw)
-(def ^:private template-opts {:tag-open \<
-                              :tag-close \>
-                              :filter-open \{
-                              :filter-close \}})
+(def ^:private template-opts sc/preserve-jinja-delimiters)
 
 (defn tool-dir
   "Return the isolated working directory for `tool` in the active profile.
@@ -27,11 +25,7 @@
   the current one, so every colour shares one work directory however deep in
   the project it was invoked from."
   [opts tool]
-  (let [workdir (io/file (or (:workdir opts) ".colors"))
-        state-dir (when-not (.isAbsolute workdir)
-                    (some-> (:green/state-file opts) io/file .getAbsoluteFile .getParent))
-        root (if state-dir (io/file state-dir workdir) workdir)]
-    (str (io/file root (or (:profile opts) "default") tool))))
+  (green-cli/stage-dir opts tool {:default-profile "default"}))
 
 (defn- tool-template
   [tool provider file]
@@ -48,9 +42,8 @@
    :data data
    :opts template-opts})
 
-(defn- raw-spec
-  [target content]
-  (template-spec raw-template target {:content content}))
+(defn- raw-spec [target content]
+  (sc/content-spec target content))
 
 (defn- output-params
   [opts]
@@ -62,13 +55,8 @@
   credentials belong to all of them. Unset credentials are omitted, so build
   and dry-run stay credential-free."
   [opts & slots]
-  (not-empty
-   (into {}
-         (keep (fn [[k env-var]]
-                 (when-let [v (not-empty (str (get opts k)))]
-                   [env-var v])))
-         (apply merge (map #(validate/tofu-env opts %)
-                           (conj (vec slots) :provider-backend))))))
+  (provider-ops/tool-env validate/providers opts
+                         (conj (vec slots) :provider-backend)))
 
 (defn backend-credential-env
   "Environment additions for a process that only reads OpenTofu state, such as

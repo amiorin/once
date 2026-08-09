@@ -1,6 +1,7 @@
 import { parName } from "red/cli";
 import * as dryRun from "red/dry-run";
 import * as progress from "red/progress";
+import { preflight } from "red/lifecycle";
 import * as tofu from "red/tofu";
 import { adviceAdd, workflow, type Opts, type StepFn } from "red/workflow";
 import { readPars } from "red/cli";
@@ -51,20 +52,18 @@ export async function startStep(
   original: Opts,
   env: Record<string, string | undefined> = process.env,
 ): Promise<Opts> {
-  const opts = readPars({ "compute-prevent-destroy": true, ...original }, env);
-  const event = opts["red/event"];
-  const real = !opts["red/dry-run"];
-  const lifecycle = event === "create" || event === "delete";
-  const errors = [
-    ...stateErrors(opts),
-    ...(real && lifecycle ? secretErrors(opts) : []),
-    ...(real && event === "delete" && opts["compute-prevent-destroy"]
-      ? [`compute destruction is protected; set ${parName("compute-prevent-destroy")}=false to delete`]
-      : []),
-  ];
-  if (errors.length) return { ...opts, "red/exit": 2, "red/err": errors.join("\n") };
-  if (real && event === "delete") return { ...(await adoptExistingState(opts)), "red/exit": 0 };
-  return withDeployKeys(opts, real);
+  return preflight(original, {
+    defaults: { "compute-prevent-destroy": true }, overlay: readPars,
+    validators: [
+      (opts) => stateErrors(opts),
+      (opts, _env, ctx) => ctx.real && ["create", "delete"].includes(String(ctx.event)) ? secretErrors(opts) : [],
+      (opts, _env, ctx) => ctx.real && ctx.event === "delete" && opts["compute-prevent-destroy"]
+        ? [`compute destruction is protected; set ${parName("compute-prevent-destroy")}=false to delete`] : [],
+    ],
+    afterValidate: async (opts, _env, ctx) => ctx.real && ctx.event === "delete"
+      ? { ...(await adoptExistingState(opts)), "red/exit": 0 }
+      : withDeployKeys(opts, ctx.real),
+  }, env);
 }
 
 export async function ansibleCleanupStep(opts: Opts): Promise<Opts> {
@@ -107,16 +106,10 @@ export function wireFn(step: string, runOpts: Opts) {
 }
 
 export function backendAdvice(tool: string) {
-  const dirFn = (opts: Opts) => tools.toolDir(opts, tool);
-  const stateKey = (opts: Opts) => `${opts.profile ?? "default"}/${tool}.tfstate`;
-  return tofu.backends(
-    (opts) => String(opts["provider-backend"] ?? "local"),
-    {
-      local: tofu.localBackendAdvice(dirFn),
-      s3: tofu.s3BackendAdvice(dirFn, (opts) => ({ bucket: opts["s3-bucket"], key: stateKey(opts), region: opts["s3-region"] })),
-      r2: tofu.r2BackendAdvice(dirFn, (opts) => ({ bucket: opts["r2-bucket"], key: stateKey(opts), endpoint: opts["r2-endpoint"] })),
-    },
-  );
+  return tofu.conventionalBackendAdvice({
+    dir: (opts) => tools.toolDir(opts, tool),
+    key: (opts) => `${opts.profile ?? "default"}/${tool}.tfstate`,
+  });
 }
 
 function createWorkflow() {

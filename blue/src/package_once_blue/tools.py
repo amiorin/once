@@ -6,21 +6,22 @@ from typing import Any
 
 from blue import tofu
 from blue.ansible import ansible_step, ansible_with_spec
-from blue.scaffold import scaffold
+from blue.cli import stage_dir
+from blue.providers import tool_env
+from blue.scaffold import PRESERVE_JINJA_DELIMITERS, content_spec, scaffold
 
 from .github import public_keys
 from .utils import apps_domains, registrable_domain
-from .validate import tofu_env
+from .validate import providers
 
 _RESOURCE_ROOT = Path(__file__).parent / "resources"
-_TEMPLATE_OPTS = {"tag_open": "<", "tag_close": ">", "filter_open": "{", "filter_close": "}"}
+_TEMPLATE_OPTS = PRESERVE_JINJA_DELIMITERS
 
 
 def _template(path: str) -> dict:
     return {"name": path, "content": (_RESOURCE_ROOT / path).read_text()}
 
 
-_RAW = _template("raw")
 _COMPUTE = {name: _template(f"tools/tofu/{name}/main.tf") for name in ["azure", "aws", "digitalocean", "google", "hcloud", "yandex", "oci", "no-infra"]}
 _SMTP = {name: _template(f"tools/tofu-smtp/{name}/main.tf") for name in ["resend", "no-infra"]}
 _DNS = {name: _template(f"tools/tofu-dns/{name}/main.tf") for name in ["cloudflare", "no-infra"]}
@@ -31,10 +32,7 @@ def tool_dir(opts: dict, tool: str) -> str:
     """A relative workdir is resolved against the directory holding colors.yml,
     not the current one, so every colour shares one work directory however deep
     in the project it was invoked from."""
-    workdir = Path(str(opts.get("workdir") or ".colors"))
-    state_file = opts.get("blue/state-file")
-    root = Path(state_file).parent / workdir if not workdir.is_absolute() and state_file else workdir
-    return str(root / str(opts.get("profile") or "default") / tool)
+    return stage_dir(opts, tool, default_profile="default")
 
 
 def _spec(template: dict, target: str, data: dict) -> dict:
@@ -42,15 +40,11 @@ def _spec(template: dict, target: str, data: dict) -> dict:
 
 
 def _raw_spec(target: str, content: str) -> dict:
-    return _spec(_RAW, target, {"content": content})
+    return content_spec(target, content)
 
 
 def _credential_env(opts: dict, *slots: str) -> dict[str, str] | None:
-    mappings: dict[str, str] = {}
-    for slot in [*slots, "provider-backend"]:
-        mappings.update(tofu_env(opts, slot))
-    result = {variable: str(opts[key]) for key, variable in mappings.items() if opts.get(key) not in (None, "")}
-    return result or None
+    return tool_env(providers, opts, [*slots, "provider-backend"])
 
 
 def backend_credential_env(opts: dict) -> dict[str, str] | None:

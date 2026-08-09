@@ -169,7 +169,7 @@ Note the asymmetry: the compute step's work directory is `tofu-compute` but its 
 
 `green.scaffold` maps a qualified keyword to a classpath resource (`:io.github.getcolors.once.tools.tofu.oci/main.tf` → `io/github/getcolors/once/tools/tofu/oci/main.tf`) and renders it with Selmer. `tools/template-opts` overrides the delimiters, so templates use `<{ var }>` for values and `<% if … %>` for tags, leaving `{{ … }}` and `{% … %}` for Jinja2 in the Ansible files. Providers are selected by directory, not by conditionals in one file.
 
-Content that is computed rather than templated is written through `raw-spec`, which renders the one-line `raw` template: `apps.tf.json`, `smtp.tf.json`, `inventory.json`, and `once.yml`. `tools/render-fn` builds the two DNS files from `green.tofu/construct` and `constructs-json`, which merges and sorts them so the JSON is deterministic. `backend.tf.json` is the exception — `green.tofu` writes it directly from the backend advice, outside the scaffold.
+Content that is computed rather than templated is written exactly through Green's direct-content scaffold spec: `apps.tf.json`, `smtp.tf.json`, `inventory.json`, and `once.yml`. `tools/render-fn` builds the two DNS files from `green.tofu/construct` and `constructs-json`, which merges and sorts them so the JSON is deterministic. `backend.tf.json` is the exception — `green.tofu` writes it directly from the backend advice, outside the scaffold.
 
 A `build` of the reference `colors.yml` produces exactly:
 
