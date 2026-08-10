@@ -63,7 +63,12 @@ resource "google_compute_instance" "node1" {
       nat_ip = google_compute_address.node1.address
     }
   }
-
+<% if google-allow-stopping-for-update %>
+  # Google cannot change some attributes — the machine type among them — while
+  # the instance runs. Opt in so tofu may stop it briefly to apply such a
+  # change instead of failing the apply.
+  allow_stopping_for_update = true
+<% endif %>
   metadata = {
     ssh-keys = "ubuntu:${trimspace(file("<{ google-ssh-authorized-keys }>"))}"
   }

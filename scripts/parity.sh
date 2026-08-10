@@ -33,6 +33,10 @@ build_variant local
 build_variant azure COLORS_PAR_PROVIDER_COMPUTE=azure
 build_variant aws COLORS_PAR_PROVIDER_COMPUTE=aws
 build_variant google COLORS_PAR_PROVIDER_COMPUTE=google
+# The enabled side of the google-allow-stopping-for-update toggle; the fixture
+# carries the key as a boolean so the override is coerced to boolean true.
+build_variant google-stopping COLORS_PAR_PROVIDER_COMPUTE=google \
+  COLORS_PAR_GOOGLE_ALLOW_STOPPING_FOR_UPDATE=true
 build_variant digitalocean-vpc COLORS_PAR_DIGITALOCEAN_VPC_UUID=vpc-123
 build_variant hcloud COLORS_PAR_PROVIDER_COMPUTE=hcloud
 build_variant yandex COLORS_PAR_PROVIDER_COMPUTE=yandex

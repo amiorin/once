@@ -54,6 +54,10 @@ google-image-id: projects/ubuntu-os-cloud/global/images/ubuntu-example
 google-subnet-cidr: 10.20.1.0/24
 google-boot-disk-size-gb: 30
 google-ssh-authorized-keys: /tmp/once.pub
+# A boolean like the yandex toggles: the template engines agree on boolean
+# truthiness, not on the string "false", and the COLORS_PAR_* override is only
+# coerced to boolean when the key is present.
+google-allow-stopping-for-update: false
 digitalocean-name: once
 digitalocean-region: ams3
 digitalocean-size: s-1vcpu-1gb-35gb-intel

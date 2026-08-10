@@ -925,8 +925,10 @@ google-image-family: ubuntu-2404-lts-arm64
 google-image-id: projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-arm64-v20260723
 google-subnet-cidr: 10.20.1.0/24
 google-boot-disk-size-gb: 30
-google-ssh-authorized-keys: ~/.ssh/id_ed25519.pub</code></pre>
+google-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
+google-allow-stopping-for-update: false</code></pre>
       <p>Creates a custom VPC, subnet, firewall rule, static address, and Compute Engine instance. Authentication uses Application Default Credentials.</p>
+      <p><code>google-allow-stopping-for-update</code> lets OpenTofu stop the instance to apply a change Google cannot make in place, such as <code>google-machine-type</code>. Leave it off for a server carrying traffic — the apply then fails naming the flag rather than taking the instance down mid-deploy — and enable it for the one deploy that resizes the instance (<code>COLORS_PAR_GOOGLE_ALLOW_STOPPING_FOR_UPDATE=true</code>). It defaults to <code>false</code>, which renders exactly as before. The reserved <code>google_compute_address</code> already survives stop/start, so no address is lost either way.</p>
 
       <h3>DigitalOcean</h3>
       <pre><code class="language-yaml">provider-compute: digitalocean
