@@ -178,7 +178,8 @@ the remaining live checks are soft failures named in the report.
   `compute-pubkey` through instance metadata, and authenticates with
   `COLORS_PAR_YANDEX_TOKEN`. Set `yandex-static-ip: true` to reserve the public
   address across stop/start; `yandex-allow-stopping-for-update: true` separately
-  permits updates that require stopping the instance. `yandex-image-id`
+  permits updates that require stopping the instance, as
+  `google-allow-stopping-for-update: true` does for Google Cloud. `yandex-image-id`
   optionally pins the boot image; without it, later family releases are ignored
   to prevent surprise server replacement.
 - SMTP templates: Resend or `no-infra` SMTP settings.

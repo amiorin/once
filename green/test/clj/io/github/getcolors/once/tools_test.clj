@@ -156,6 +156,40 @@
       (finally
         (delete-tree! workdir)))))
 
+(deftest google-may-stop-the-instance-only-when-asked
+  (let [workdir (temp-dir)
+        opts {:workdir workdir
+              :profile "test"
+              :green/event :build
+              :provider-compute "google"
+              :provider-backend "local"
+              :compute-prevent-destroy true
+              :google-project "example-project"
+              :google-region "europe-west4"
+              :google-zone "europe-west4-b"
+              :google-name "once-test"
+              :google-machine-type "t2a-standard-1"
+              :google-image-project "ubuntu-os-cloud"
+              :google-image-family "ubuntu-2404-lts-arm64"
+              :google-image-id "projects/ubuntu-os-cloud/global/images/ubuntu-example"
+              :google-subnet-cidr "10.20.1.0/24"
+              :google-boot-disk-size-gb 30
+              :google-ssh-authorized-keys "/tmp/once.pub"}]
+    (try
+      (testing "off by default, so a resize apply fails instead of stopping"
+        (let [result (tools/tofu-compute-step opts)
+              main (slurp (io/file (tools/tool-dir opts "tofu-compute") "main.tf"))]
+          (is (zero? (:green/exit result)))
+          (is (not (str/includes? main "allow_stopping_for_update")))))
+      (testing "opting in renders the flag"
+        (let [result (tools/tofu-compute-step
+                      (assoc opts :google-allow-stopping-for-update true))
+              main (slurp (io/file (tools/tool-dir opts "tofu-compute") "main.tf"))]
+          (is (zero? (:green/exit result)))
+          (is (str/includes? main "allow_stopping_for_update = true"))))
+      (finally
+        (delete-tree! workdir)))))
+
 (deftest ansible-once-never-renders-the-smtp-password
   (testing "resend defers the password to a play-time env lookup"
     (let [yaml (tools/ansible-once (once-opts "resend" "re_a_real_secret"))]

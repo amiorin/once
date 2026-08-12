@@ -68,6 +68,10 @@ that require stopping the instance. Both default to `false`.
 releases are ignored so they cannot replace the server unexpectedly. Changing
 the pin plans a replacement.
 
+For Google compute, `google-allow-stopping-for-update: true` permits updates
+that require stopping the instance, such as a machine-type change. Defaults to
+`false`.
+
 Credential suffixes are `DO_TOKEN`, `HCLOUD_TOKEN`, `YANDEX_TOKEN`,
 `RESEND_API_KEY`, `RESEND_PASSWORD`, `NO_INFRA_SMTP_PASSWORD`,
 `CLOUDFLARE_API_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`. Prefix

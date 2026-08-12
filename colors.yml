@@ -155,6 +155,10 @@ google-image-id: REPLACE_ME
 google-subnet-cidr: 10.20.1.0/24
 google-boot-disk-size-gb: 30
 google-ssh-authorized-keys: ~/.ssh/id_ed25519.pub
+# Optional. Off, an apply that Google cannot perform in place (the machine
+# type among them) fails naming the flag instead of stopping the instance
+# mid-deploy. Enable it for the one deploy that resizes the instance.
+google-allow-stopping-for-update: false
 
 digitalocean-name: once
 digitalocean-region: ams3

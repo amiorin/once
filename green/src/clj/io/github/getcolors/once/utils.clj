@@ -46,8 +46,12 @@
      :yandex-allow-stopping-for-update, and :yandex-image-id. The family image
      path also stops tracking later resolved ids. A launcher pinned older
      ignores the new keys and can still lose an ephemeral address or plan an
-     unexpected replacement when an image family moves."
-  11)
+     unexpected replacement when an image family moves.
+  12: Google compute gains :google-allow-stopping-for-update, letting tofu
+     stop the instance for changes Google cannot apply in place, the machine
+     type among them. A launcher pinned older ignores the key silently and
+     the resize apply keeps failing."
+  12)
 
 (defn registrable-domain
   "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes

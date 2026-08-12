@@ -14,7 +14,8 @@ uv run python -m pytest -q
 Desired state is the `colors.yml` found by walking up from the working
 directory — the same file green and red read, so switching colours needs no
 change to it. Yandex compute supports `yandex-static-ip`,
-`yandex-allow-stopping-for-update`, and optional `yandex-image-id`. Yandex Cloud
+`yandex-allow-stopping-for-update`, and optional `yandex-image-id`; Google
+compute supports `google-allow-stopping-for-update`. Yandex Cloud
 DNS creates public zones and direct records with `provider-dns: yandex`.
 Secrets use `COLORS_PAR_*`; never put them in `colors.yml`. See
 the unified [`../index.html`](../index.html) manual and
