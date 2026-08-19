@@ -15,6 +15,7 @@
 #   google         (none — OpenTofu uses Application Default Credentials)
 #   digitalocean   COLORS_PAR_DO_TOKEN
 #   hcloud         COLORS_PAR_HCLOUD_TOKEN
+#   vultr          COLORS_PAR_VULTR_API_KEY
 #   yandex         COLORS_PAR_YANDEX_TOKEN
 #   oci            (none — uses oci-config-file-profile from ~/.oci/config)
 #   resend         COLORS_PAR_RESEND_API_KEY COLORS_PAR_RESEND_PASSWORD
@@ -143,6 +144,13 @@ hcloud-image: ubuntu-24.04
 hcloud-server-type: cx23
 hcloud-location: hel1
 hcloud-ssh-keys: REPLACE_ME
+
+vultr-name: once
+vultr-region: ams
+vultr-plan: vc2-1c-1gb
+# Vultr operating systems are numeric ids; 2284 is Ubuntu 24.04 LTS x64.
+vultr-os-id: 2284
+vultr-ssh-keys: REPLACE_ME
 
 google-project: REPLACE_ME
 google-region: europe-west4

@@ -29,6 +29,10 @@ export const providers: Record<string, Record<string, ProviderEntry>> = {
       required: ["hcloud-name", "hcloud-image", "hcloud-server-type", "hcloud-location", "hcloud-ssh-keys"],
       secrets: ["hcloud-token"], tofuEnv: { "hcloud-token": "HCLOUD_TOKEN" },
     },
+    vultr: {
+      required: ["vultr-name", "vultr-region", "vultr-plan", "vultr-os-id", "vultr-ssh-keys"],
+      secrets: ["vultr-api-key"], tofuEnv: { "vultr-api-key": "VULTR_API_KEY" },
+    },
     yandex: {
       required: ["yandex-cloud-id", "yandex-folder-id", "yandex-zone", "yandex-image-family", "yandex-name", "yandex-subnet-cidr", "yandex-platform-id", "yandex-cores", "yandex-memory-gb", "yandex-core-fraction", "yandex-disk-size-gb", "compute-pubkey"],
       secrets: ["yandex-token"], tofuEnv: { "yandex-token": "YC_TOKEN" },

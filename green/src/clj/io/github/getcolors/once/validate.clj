@@ -55,6 +55,10 @@
                          :hcloud-location :hcloud-ssh-keys]
               :secrets [:hcloud-token]
               :tofu-env {:hcloud-token "HCLOUD_TOKEN"}}
+    "vultr" {:required [:vultr-name :vultr-region :vultr-plan
+                        :vultr-os-id :vultr-ssh-keys]
+             :secrets [:vultr-api-key]
+             :tofu-env {:vultr-api-key "VULTR_API_KEY"}}
     "yandex" {:required [:yandex-cloud-id :yandex-folder-id :yandex-zone
                          :yandex-image-family :yandex-name :yandex-subnet-cidr
                          :yandex-platform-id :yandex-cores :yandex-memory-gb

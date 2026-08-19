@@ -853,6 +853,7 @@ COLORS_PAR_DIGITALOCEAN_SIZE=s-2vcpu-2gb ./green create --dry-run</code></pre>
             <tr><td>Google Cloud</td><td>None — uses Application Default Credentials</td><td>—</td></tr>
             <tr><td>DigitalOcean</td><td><code>COLORS_PAR_DO_TOKEN</code> or <code>COLORS_PAR_DO_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Hetzner Cloud</td><td><code>COLORS_PAR_HCLOUD_TOKEN</code></td><td>Create and delete</td></tr>
+            <tr><td>Vultr</td><td><code>COLORS_PAR_VULTR_API_KEY</code></td><td>Create and delete</td></tr>
             <tr><td>Yandex Cloud</td><td><code>COLORS_PAR_YANDEX_TOKEN</code></td><td>Create and delete</td></tr>
             <tr><td>Oracle Cloud</td><td>None — authenticates through the configured OCI profile</td><td>—</td></tr>
             <tr><td>Resend</td><td><code>COLORS_PAR_RESEND_API_KEY</code> and <code>COLORS_PAR_RESEND_PASSWORD</code></td><td>Create and delete</td></tr>
@@ -947,6 +948,15 @@ hcloud-server-type: cx23
 hcloud-location: hel1
 hcloud-ssh-keys: key-name-or-id-already-in-the-project</code></pre>
       <p>Creates an IPv4 server attached to the key named by <code>hcloud-ssh-keys</code>, which must already exist in the project. Credential: <code>COLORS_PAR_HCLOUD_TOKEN</code>.</p>
+
+      <h3>Vultr</h3>
+      <pre><code class="language-yaml">provider-compute: vultr
+vultr-name: once
+vultr-region: ams
+vultr-plan: vc2-1c-1gb
+vultr-os-id: 2284
+vultr-ssh-keys: key-id-already-in-the-account</code></pre>
+      <p>Creates an instance attached to the SSH key id named by <code>vultr-ssh-keys</code>, which must already exist in the account. <code>vultr-os-id</code> is Vultr's numeric operating-system id — <code>2284</code> is Ubuntu 24.04 LTS x64. Credential: <code>COLORS_PAR_VULTR_API_KEY</code>.</p>
 
       <h3>Yandex Cloud</h3>
       <pre><code class="language-yaml">provider-compute: yandex
@@ -1064,7 +1074,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
         <article class="card">
           <p class="label">Operations</p>
           <h3><code>compute-pubkey</code></h3>
-          <p>Required by Yandex Cloud, which installs it for the <code>ubuntu</code> user through instance metadata. Other providers use a key already registered with them (<code>digitalocean-ssh-keys</code>, <code>hcloud-ssh-keys</code>) or a local public-key file (<code>oci-ssh-authorized-keys</code>). The matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
+          <p>Required by Yandex Cloud, which installs it for the <code>ubuntu</code> user through instance metadata. Other providers use a key already registered with them (<code>digitalocean-ssh-keys</code>, <code>hcloud-ssh-keys</code>, <code>vultr-ssh-keys</code>) or a local public-key file (<code>oci-ssh-authorized-keys</code>). The matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
         </article>
         <article class="card">
           <p class="label">Deployment</p>
@@ -1491,7 +1501,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
             <tr><td><code>workdir</code></td><td>Yes</td><td>Shared generated root directory; recommended value is <code>.colors</code>.</td></tr>
             <tr><td><code>compute-pubkey</code></td><td>Yandex only</td><td>Administrative SSH public key installed for Yandex's <code>ubuntu</code> user.</td></tr>
             <tr><td><code>once</code></td><td>Yes</td><td>Map containing a non-empty <code>applications</code> vector. Each application takes <code>host</code>, <code>image</code>, an optional <code>github</code> repository, and an optional <code>env</code> map.</td></tr>
-            <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>azure</code>, <code>aws</code>, <code>google</code>, <code>digitalocean</code>, <code>hcloud</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
+            <tr><td><code>provider-compute</code></td><td>Yes</td><td><code>azure</code>, <code>aws</code>, <code>google</code>, <code>digitalocean</code>, <code>hcloud</code>, <code>vultr</code>, <code>yandex</code>, <code>oci</code>, or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-smtp</code></td><td>Yes</td><td><code>resend</code> or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-dns</code></td><td>Yes</td><td><code>cloudflare</code>, <code>yandex</code>, or <code>no-infra</code>.</td></tr>
             <tr><td><code>provider-backend</code></td><td>Yes</td><td><code>local</code>, <code>s3</code>, or <code>r2</code>.</td></tr>
@@ -1510,6 +1520,7 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
             <tr><td>Google</td><td><code>google-project</code>, <code>google-region</code>, <code>google-zone</code>, <code>google-name</code>, <code>google-machine-type</code>, <code>google-image-project</code>, <code>google-image-family</code>, <code>google-image-id</code>, <code>google-subnet-cidr</code>, <code>google-boot-disk-size-gb</code>, <code>google-ssh-authorized-keys</code></td></tr>
             <tr><td>DigitalOcean</td><td><code>digitalocean-name</code>, <code>digitalocean-region</code>, <code>digitalocean-size</code>, <code>digitalocean-image</code>, <code>digitalocean-ssh-keys</code>; optional <code>digitalocean-vpc-uuid</code></td></tr>
             <tr><td>Hetzner</td><td><code>hcloud-name</code>, <code>hcloud-image</code>, <code>hcloud-server-type</code>, <code>hcloud-location</code>, <code>hcloud-ssh-keys</code></td></tr>
+            <tr><td>Vultr</td><td><code>vultr-name</code>, <code>vultr-region</code>, <code>vultr-plan</code>, <code>vultr-os-id</code>, <code>vultr-ssh-keys</code></td></tr>
             <tr><td>Yandex</td><td><code>compute-pubkey</code>, <code>yandex-cloud-id</code>, <code>yandex-folder-id</code>, <code>yandex-zone</code>, <code>yandex-image-family</code>, <code>yandex-name</code>, <code>yandex-subnet-cidr</code>, <code>yandex-platform-id</code>, <code>yandex-cores</code>, <code>yandex-memory-gb</code>, <code>yandex-core-fraction</code>, <code>yandex-disk-size-gb</code></td></tr>
             <tr><td>OCI</td><td><code>oci-config-file-profile</code>, <code>oci-subnet-id</code>, <code>oci-compartment-id</code>, <code>oci-availability-domain</code>, <code>oci-display-name</code>, <code>oci-shape</code>, <code>oci-ocpus</code>, <code>oci-memory-in-gbs</code>, <code>oci-boot-volume-size-in-gbs</code>, <code>oci-boot-volume-vpus-per-gb</code>, <code>oci-ssh-authorized-keys</code></td></tr>
             <tr><td>Existing compute</td><td><code>no-infra-compute-ip</code>, <code>no-infra-compute-user</code>, <code>no-infra-compute-sudoer</code>, <code>no-infra-compute-uid</code></td></tr>

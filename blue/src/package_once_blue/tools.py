@@ -22,7 +22,7 @@ def _template(path: str) -> dict:
     return {"name": path, "content": (_RESOURCE_ROOT / path).read_text()}
 
 
-_COMPUTE = {name: _template(f"tools/tofu/{name}/main.tf") for name in ["azure", "aws", "digitalocean", "google", "hcloud", "yandex", "oci", "no-infra"]}
+_COMPUTE = {name: _template(f"tools/tofu/{name}/main.tf") for name in ["azure", "aws", "digitalocean", "google", "hcloud", "vultr", "yandex", "oci", "no-infra"]}
 _SMTP = {name: _template(f"tools/tofu-smtp/{name}/main.tf") for name in ["resend", "no-infra"]}
 _DNS = {name: _template(f"tools/tofu-dns/{name}/main.tf") for name in ["cloudflare", "yandex", "no-infra"]}
 _SMTP_POST = {name: _template(f"tools/tofu-smtp-post/{name}/main.tf") for name in ["resend", "no-infra"]}

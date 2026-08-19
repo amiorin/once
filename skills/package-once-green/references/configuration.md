@@ -57,7 +57,7 @@ Publishing is only half of it: nothing reads those values until a workflow in
 that repository does. [github-deploy.md](github-deploy.md) is the example
 workflow and the contract it consumes.
 
-`:compute-pubkey` is required by Yandex Cloud, which installs it for the `ubuntu` user through instance metadata. It is optional and unused by the other compute providers: DigitalOcean and Hetzner reference keys already registered with them, while OCI reads a local public-key file named by `:oci-ssh-authorized-keys`. If present it must look like a public key.
+`:compute-pubkey` is required by Yandex Cloud, which installs it for the `ubuntu` user through instance metadata. It is optional and unused by the other compute providers: DigitalOcean, Hetzner, and Vultr reference keys already registered with them, while OCI reads a local public-key file named by `:oci-ssh-authorized-keys`. If present it must look like a public key.
 
 ## Compute providers
 
@@ -145,6 +145,19 @@ hcloud-ssh-keys: key-name-or-id-already-in-the-project
 ```
 
 Required credential: `COLORS_PAR_HCLOUD_TOKEN`.
+
+### Vultr
+
+```yaml
+provider-compute: vultr
+vultr-name: once
+vultr-region: ams
+vultr-plan: vc2-1c-1gb
+vultr-os-id: 2284
+vultr-ssh-keys: key-id-already-in-the-account
+```
+
+Creates an instance attached to the SSH key id named by `vultr-ssh-keys`, which must already exist in the account. `vultr-os-id` is Vultr's numeric operating-system id (2284 is Ubuntu 24.04 LTS x64). Required credential: `COLORS_PAR_VULTR_API_KEY`.
 
 ### Yandex Cloud
 

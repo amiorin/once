@@ -39,7 +39,10 @@
     (let [errors (sut/state-errors (assoc valid :provider-compute "yandex"))]
       (is (some #(str/includes? % ":yandex-cloud-id") errors))
       (is (some #(str/includes? % ":compute-pubkey") errors))
-      (is (not-any? #(str/includes? % ":oci-") errors))))
+      (is (not-any? #(str/includes? % ":oci-") errors)))
+    (let [errors (sut/state-errors (assoc valid :provider-compute "vultr"))]
+      (is (some #(str/includes? % ":vultr-plan") errors))
+      (is (not-any? #(str/includes? % ":hcloud-") errors))))
 
   (testing "resend needs no non-secret keys — its relay is hard-coded"
     (is (= [] (sut/state-errors (assoc valid :provider-smtp "resend")))))
@@ -126,6 +129,12 @@
                                           :provider-smtp "resend"
                                           :resend-api-key "re_x"
                                           :resend-password "pw")))))
+
+  (testing "Vultr requires its API key"
+    (is (= ["required credential is not set: COLORS_PAR_VULTR_API_KEY"]
+           (sut/secret-errors (assoc valid
+                                     :provider-compute "vultr"
+                                     :no-infra-smtp-password "pw")))))
 
   (testing "Yandex requires its API token"
     (is (= ["required credential is not set: COLORS_PAR_YANDEX_TOKEN"]

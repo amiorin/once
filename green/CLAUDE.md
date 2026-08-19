@@ -40,7 +40,7 @@ green/
 │   └── resources/io/github/getcolors/once/
 │       ├── raw              # `<{ content|safe }>` — the template used for generated content
 │       └── tools/
-│           ├── tofu/{digitalocean,hcloud,yandex,oci,no-infra}/main.tf
+│           ├── tofu/{azure,aws,google,digitalocean,hcloud,vultr,yandex,oci,no-infra}/main.tf
 │           ├── tofu-smtp/{resend,no-infra}/main.tf
 │           ├── tofu-dns/{cloudflare,yandex,no-infra}/main.tf
 │           ├── tofu-smtp-post/{resend,no-infra}/main.tf
@@ -98,7 +98,7 @@ once:
       github: acme/site
       env:
         DATABASE_URL: app-database-url
-provider-compute: digitalocean  # digitalocean | hcloud | oci | no-infra
+provider-compute: digitalocean  # azure | aws | google | digitalocean | hcloud | vultr | yandex | oci | no-infra
 provider-smtp: resend           # resend | no-infra
 provider-dns: cloudflare        # cloudflare | yandex | no-infra
 provider-backend: r2            # local | s3 | r2

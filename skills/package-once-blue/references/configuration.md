@@ -56,7 +56,7 @@ YAML.
 
 Providers:
 
-- compute: `azure`, `aws`, `google`, `digitalocean`, `hcloud`, `yandex`, `oci`, `no-infra`
+- compute: `azure`, `aws`, `google`, `digitalocean`, `hcloud`, `vultr`, `yandex`, `oci`, `no-infra`
 - SMTP: `resend`, `no-infra`
 - DNS: `cloudflare`, `yandex`, `no-infra`
 - backend: `local`, `s3`, `r2`
@@ -68,8 +68,8 @@ that require stopping the instance. Both default to `false`.
 releases are ignored so they cannot replace the server unexpectedly. Changing
 the pin plans a replacement.
 
-Credential suffixes are `DO_TOKEN`, `HCLOUD_TOKEN`, `YANDEX_TOKEN`,
-`RESEND_API_KEY`, `RESEND_PASSWORD`, `NO_INFRA_SMTP_PASSWORD`,
+Credential suffixes are `DO_TOKEN`, `HCLOUD_TOKEN`, `VULTR_API_KEY`,
+`YANDEX_TOKEN`, `RESEND_API_KEY`, `RESEND_PASSWORD`, `NO_INFRA_SMTP_PASSWORD`,
 `CLOUDFLARE_API_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`. Prefix
 with `COLORS_PAR_`. OCI uses its profile, Azure uses the ambient Azure CLI session, Google uses Application Default Credentials, and AWS compute and S3 use the AWS
 credential chain, and SSH uses `ssh-agent`.

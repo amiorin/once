@@ -53,7 +53,7 @@ Do not add that key's value to YAML. Supply it as `COLORS_PAR_APP_DATABASE_URL` 
 
 Provider choices and required fields match the unified repository manual:
 
-- compute: `azure`, `aws`, `google`, `digitalocean`, `hcloud`, `yandex`, `oci`, `no-infra`
+- compute: `azure`, `aws`, `google`, `digitalocean`, `hcloud`, `vultr`, `yandex`, `oci`, `no-infra`
 - SMTP: `resend`, `no-infra`
 - DNS: `cloudflare`, `yandex`, `no-infra`
 - backend: `local`, `s3`, `r2`
@@ -66,7 +66,7 @@ releases are ignored so they cannot replace the server unexpectedly. Changing
 the pin plans a replacement.
 
 Credentials use `COLORS_PAR_*`, the one namespace every colour shares:
-`DO_TOKEN`, `HCLOUD_TOKEN`, `YANDEX_TOKEN`, `RESEND_API_KEY`,
+`DO_TOKEN`, `HCLOUD_TOKEN`, `VULTR_API_KEY`, `YANDEX_TOKEN`, `RESEND_API_KEY`,
 `RESEND_PASSWORD`, `NO_INFRA_SMTP_PASSWORD`, `CLOUDFLARE_API_TOKEN`,
 `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`. OCI uses its configured profile;
 Azure uses the ambient Azure CLI session; Google uses Application Default Credentials; AWS compute and S3 use OpenTofu's ambient AWS chain; SSH uses `ssh-agent`.

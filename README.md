@@ -45,7 +45,7 @@ Delete reverses the graph. It withdraws the published credentials first — a
 withdrawn credential against a live host is a loud, recoverable broken deploy,
 while a live credential against a destroyed host is silent — then removes the
 managed local SSH block before infrastructure. Providers are Azure, AWS, Google Cloud, DigitalOcean,
-Hetzner Cloud, Yandex Cloud, OCI, or an existing host; Resend or existing SMTP;
+Hetzner Cloud, Vultr, Yandex Cloud, OCI, or an existing host; Resend or existing SMTP;
 Cloudflare or unmanaged DNS; and local, S3, or R2 state.
 
 ## Secrets

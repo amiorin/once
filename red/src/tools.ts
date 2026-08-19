@@ -27,6 +27,7 @@ import computeGoogle from "../resources/tools/tofu/google/main.tf" with { type: 
 import computeHcloud from "../resources/tools/tofu/hcloud/main.tf" with { type: "text" };
 import computeNoInfra from "../resources/tools/tofu/no-infra/main.tf" with { type: "text" };
 import computeOci from "../resources/tools/tofu/oci/main.tf" with { type: "text" };
+import computeVultr from "../resources/tools/tofu/vultr/main.tf" with { type: "text" };
 import computeYandex from "../resources/tools/tofu/yandex/main.tf" with { type: "text" };
 import { appsDomains, registrableDomain } from "./utils.ts";
 import { providers } from "./validate.ts";
@@ -39,6 +40,7 @@ const computeTemplates: Record<string, Template> = {
   google: { name: "tools/tofu/google/main.tf", content: computeGoogle },
   digitalocean: { name: "tools/tofu/digitalocean/main.tf", content: computeDigitalocean },
   hcloud: { name: "tools/tofu/hcloud/main.tf", content: computeHcloud },
+  vultr: { name: "tools/tofu/vultr/main.tf", content: computeVultr },
   yandex: { name: "tools/tofu/yandex/main.tf", content: computeYandex },
   oci: { name: "tools/tofu/oci/main.tf", content: computeOci },
   "no-infra": { name: "tools/tofu/no-infra/main.tf", content: computeNoInfra },

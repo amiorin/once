@@ -35,6 +35,7 @@ build_variant aws COLORS_PAR_PROVIDER_COMPUTE=aws
 build_variant google COLORS_PAR_PROVIDER_COMPUTE=google
 build_variant digitalocean-vpc COLORS_PAR_DIGITALOCEAN_VPC_UUID=vpc-123
 build_variant hcloud COLORS_PAR_PROVIDER_COMPUTE=hcloud
+build_variant vultr COLORS_PAR_PROVIDER_COMPUTE=vultr
 build_variant yandex COLORS_PAR_PROVIDER_COMPUTE=yandex
 # Both toggles of the reserved-address branch. The fixture carries the keys as
 # booleans so these overrides are coerced to boolean true — the three template
