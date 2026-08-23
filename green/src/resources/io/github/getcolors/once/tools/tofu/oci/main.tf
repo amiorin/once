@@ -65,7 +65,8 @@ resource "oci_core_instance" "ampere_vm" {
     type = "ssh"
     user = "ubuntu"
     host = self.public_ip
-  }
+<% if ssh-keygen %>    private_key = file("<{ ssh-private-key-path }>")
+<% endif %>  }
   provisioner "remote-exec" {
     inline = ["ls"]
   }

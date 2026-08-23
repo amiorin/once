@@ -231,7 +231,10 @@ def _pretty_json(value: Any, indent: int = 0) -> str:
 def inventory(data: dict) -> str:
     users = [{**user, "host": host} for user in data.get("users", []) if not user.get("remove") for host in data.get("hosts", [])]
     user_hosts = {f"{user['name']}@{user['host']}": {"ansible_host": user["host"], "ansible_user": user["name"], "uid": user.get("uid")} for user in users}
-    admin_hosts = {f"root@{host}": {"ansible_host": host, "ansible_user": data.get("sudoer") or "root"} for host in data.get("hosts", [])}
+    # In keygen mode nothing guarantees an agent holds the machine key, so the
+    # inventory names it — a path, never key material.
+    key_file = {"ansible_ssh_private_key_file": data.get("ssh-private-key-path")} if data.get("ssh-keygen") else {}
+    admin_hosts = {f"root@{host}": {"ansible_host": host, "ansible_user": data.get("sudoer") or "root", **key_file} for host in data.get("hosts", [])}
     return _pretty_json({"all": {"children": {"admin": {"hosts": admin_hosts}, "users": {"hosts": user_hosts}}}})
 
 
@@ -343,4 +346,9 @@ async def ansible_local_step(opts: dict) -> dict:
         _spec(_template("tools/ansible-local/inventory.ini"), f"{dir}/inventory.ini", data),
         _spec(_template("tools/ansible-local/main.yml"), f"{dir}/main.yml", data),
     ]
-    return await ansible_with_spec(opts, specs, dir=dir, inventory="inventory.ini", playbooks={"create": "main.yml", "delete": "main.yml"}, extra_vars={"host_alias": str(data.get("name") or data.get("profile") or "once"), "ip": data.get("ip"), "user": data.get("user"), "block_state": "absent" if opts.get("blue/event") == "delete" else "present"})
+    # identity_block appends IdentityFile lines to the managed ~/.ssh/config
+    # block in keygen mode, so `ssh <profile>` works without an agent. Empty
+    # otherwise — the rendered block stays byte-identical to the pre-standard
+    # one.
+    identity_block = f"\n    IdentityFile {data.get('ssh-private-key-path')}\n    IdentitiesOnly yes" if data.get("ssh-keygen") else ""
+    return await ansible_with_spec(opts, specs, dir=dir, inventory="inventory.ini", playbooks={"create": "main.yml", "delete": "main.yml"}, extra_vars={"host_alias": str(data.get("name") or data.get("profile") or "once"), "ip": data.get("ip"), "user": data.get("user"), "block_state": "absent" if opts.get("blue/event") == "delete" else "present", "identity_block": identity_block})

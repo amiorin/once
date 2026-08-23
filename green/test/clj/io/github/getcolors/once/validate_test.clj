@@ -38,7 +38,8 @@
       (is (not-any? #(str/includes? % ":hcloud-") errors)))
     (let [errors (sut/state-errors (assoc valid :provider-compute "yandex"))]
       (is (some #(str/includes? % ":yandex-cloud-id") errors))
-      (is (some #(str/includes? % ":compute-pubkey") errors))
+      (is (not-any? #(str/includes? % ":compute-pubkey") errors)
+          "an absent machine key selects keygen mode, it is not an error")
       (is (not-any? #(str/includes? % ":oci-") errors)))
     (let [errors (sut/state-errors (assoc valid :provider-compute "vultr"))]
       (is (some #(str/includes? % ":vultr-plan") errors))

@@ -32,6 +32,7 @@ import { join } from "node:path";
 import { runtime, type ExecResult } from "red/runtime";
 import type { Opts } from "red/workflow";
 import { runPlan } from "red/process";
+import { identityArgs } from "./ssh.ts";
 import { deployGroups } from "./validate.ts";
 
 const runTimeoutMs = 30000;
@@ -136,6 +137,7 @@ export function hostKeyArgs(opts: Opts): string[] {
   return [
     "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
     "-o", "StrictHostKeyChecking=accept-new",
+    ...identityArgs(opts),
     `${opts.user ?? "root"}@${opts.ip}`,
     "cat /etc/ssh/ssh_host_ed25519_key.pub",
   ];

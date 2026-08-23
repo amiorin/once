@@ -7,6 +7,7 @@ import { adviceAdd, workflow, type Opts, type StepFn } from "red/workflow";
 import { readPars } from "red/cli";
 import { dirname } from "node:path";
 import * as github from "./github.ts";
+import * as ssh from "./ssh.ts";
 import * as tools from "./tools.ts";
 import { secretErrors, stateErrors } from "./validate.ts";
 
@@ -60,9 +61,24 @@ export async function startStep(
       (opts, _env, ctx) => ctx.real && ctx.event === "delete" && opts["compute-prevent-destroy"]
         ? [`compute destruction is protected; set ${parName("compute-prevent-destroy")}=false to delete`] : [],
     ],
-    afterValidate: async (opts, _env, ctx) => ctx.real && ctx.event === "delete"
-      ? { ...(await adoptExistingState(opts)), "red/exit": 0 }
-      : withDeployKeys(opts, ctx.real),
+    // The machine key's create matrix and provider preflight run before any
+    // template is rendered: an unowned key on disk or at the provider stops
+    // the run while stopping is still free. Delete fills the same template
+    // values (destroy renders before it destroys) but checks nothing — its
+    // cleanup step runs after the compute destroy instead.
+    afterValidate: async (opts, _env, ctx) => {
+      if (ctx.real && ctx.event === "delete") {
+        return { ...(await adoptExistingState(ssh.withMachineKey(opts, true))), "red/exit": 0 };
+      }
+      if (ctx.real && ctx.event === "create") {
+        const ensured = await ssh.ensureKey(opts, (o) => stateOutput(o, "tofu-compute"));
+        if ((ensured["red/exit"] ?? 0) > 0) return ensured;
+        const checked = await ssh.preflight(ssh.withMachineKey(ensured, true));
+        if ((checked["red/exit"] ?? 0) > 0) return checked;
+        return withDeployKeys(checked, ctx.real);
+      }
+      return withDeployKeys(ssh.withMachineKey(opts, ctx.real), ctx.real);
+    },
   }, env);
 }
 
@@ -71,7 +87,7 @@ export async function ansibleCleanupStep(opts: Opts): Promise<Opts> {
 }
 
 export const tofuSteps = ["once/tofu-compute", "once/tofu-smtp", "once/tofu-dns", "once/tofu-smtp-post"];
-export const sideEffectingSteps = [...tofuSteps, "once/ansible-local", "once/ansible-remote", "once/ansible-cleanup", "once/github"];
+export const sideEffectingSteps = [...tofuSteps, "once/ansible-local", "once/ansible-remote", "once/ansible-cleanup", "once/github", "once/ssh-cleanup"];
 
 export function wireFn(step: string, runOpts: Opts) {
   if (runOpts["red/event"] === "delete") {
@@ -86,7 +102,11 @@ export function wireFn(step: string, runOpts: Opts) {
       case "once/tofu-smtp-post": return [tools.tofuSmtpPostStep, "once/tofu-dns"] as const;
       case "once/tofu-dns": return [tools.tofuDnsStep, "once/tofu-smtp", "once/tofu-compute"] as const;
       case "once/tofu-smtp": return [tools.tofuSmtpStep] as const;
-      case "once/tofu-compute": return [tools.tofuComputeStep] as const;
+      // The local keypair goes last, strictly after a successful compute
+      // destroy: a failed delete leaves the key, which is still the only
+      // credential to whatever survived.
+      case "once/tofu-compute": return [tools.tofuComputeStep, "once/ssh-cleanup"] as const;
+      case "once/ssh-cleanup": return [ssh.cleanupStep] as const;
     }
   } else {
     switch (step) {

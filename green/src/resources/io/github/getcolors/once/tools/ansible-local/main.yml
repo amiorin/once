@@ -13,4 +13,4 @@
           Host {{ host_alias }}
               HostName {{ ip }}
               User {{ user }}
-              Port 22
+              Port 22{{ identity_block | default('') }}

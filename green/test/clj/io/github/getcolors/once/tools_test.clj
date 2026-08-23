@@ -408,7 +408,8 @@
               (is (= {:host_alias "once-test"
                       :ip "203.0.113.10"
                       :user "root"
-                      :block_state "present"}
+                      :block_state "present"
+                      :identity_block ""}
                      extra-vars))))))
 
       (testing "delete drops the managed block, then removes the rendered files"

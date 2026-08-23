@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { runtime, type ExecResult } from "red/runtime";
 import type { Opts } from "red/workflow";
 import { readPars } from "red/cli";
+import { identityArgs, withMachineKey } from "./ssh.ts";
 import { backendCredentialEnv, toolDir } from "./tools.ts";
 
 const runTimeoutMs = 30_000;
@@ -28,17 +29,22 @@ function resultDetail(label: string, result: ExecResult): string {
   return `${label} failed (exit ${result.exit ?? -1})${detail ? ` — ${detail}` : ""}`;
 }
 
-function sshTarget(params: Opts): { ip?: string; user: string } {
+// The keygen identity travels with the target so every probe names the
+// machine key explicitly; in opt-out mode the target is unchanged.
+function sshTarget(params: Opts): { ip?: string; user: string } & Opts {
   let ip = params.ip as string | undefined;
   if (params["provider-compute"] === "no-infra" && (!ip || ip === placeholderIp)) ip = params["no-infra-compute-ip"] as string;
   return {
     ip,
     user: String(params.user || params.sudoer || params["no-infra-compute-user"] || params["no-infra-compute-sudoer"] || "root"),
+    ...(params["ssh-keygen"]
+      ? { "ssh-keygen": params["ssh-keygen"], "ssh-private-key-path": params["ssh-private-key-path"] }
+      : {}),
   };
 }
 
-function sshArgs(compute: { ip?: string; user: string }, remote: string[]): string[] {
-  return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", `${compute.user}@${compute.ip}`, ...remote];
+function sshArgs(compute: { ip?: string; user: string } & Opts, remote: string[]): string[] {
+  return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", ...identityArgs(compute), `${compute.user}@${compute.ip}`, ...remote];
 }
 
 async function computeStatus(runner: Runner, params: Opts, computeDetail?: string) {
@@ -228,10 +234,12 @@ export async function describe(opts: Opts): Promise<Opts> {
 export async function describeFile(path: string): Promise<Opts> {
   try {
     if (!existsSync(path)) return { "red/exit": 2, "red/err": `desired state file not found: ${path}` };
-    return describe(readPars({
+    // Describe reads the live host, so it needs the keygen identity the way
+    // create does — real event semantics, opt-out untouched.
+    return describe(withMachineKey(readPars({
       ...((Bun.YAML.parse(readFileSync(path, "utf8")) ?? {}) as Opts),
       "red/state-file": resolve(path),
-    }));
+    }), true));
   } catch (error) {
     return { "red/exit": 2, "red/err": error instanceof Error ? error.message : String(error) };
   }

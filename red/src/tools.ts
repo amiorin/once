@@ -281,7 +281,13 @@ export function inventory(data: any): string {
   const users = (data.users ?? []).filter((user: any) => !user.remove)
     .flatMap((user: any) => (data.hosts ?? []).map((host: string) => ({ ...user, host })));
   const usersHosts = Object.fromEntries(users.map((user: any) => [`${user.name}@${user.host}`, { ansible_host: user.host, ansible_user: user.name, uid: user.uid }]));
-  const adminsHosts = Object.fromEntries((data.hosts ?? []).map((host: string) => [`root@${host}`, { ansible_host: host, ansible_user: data.sudoer ?? "root" }]));
+  // In keygen mode nothing guarantees an agent holds the machine key, so the
+  // inventory names it — a path, never key material.
+  const adminsHosts = Object.fromEntries((data.hosts ?? []).map((host: string) => [`root@${host}`, {
+    ansible_host: host,
+    ansible_user: data.sudoer ?? "root",
+    ...(data["ssh-keygen"] ? { ansible_ssh_private_key_file: data["ssh-private-key-path"] } : {}),
+  }]));
   return prettyJson({ all: { children: { admin: { hosts: adminsHosts }, users: { hosts: usersHosts } } } });
 }
 
@@ -391,8 +397,18 @@ export function ansibleLocalStep(opts: Opts): Promise<Opts> {
     templateSpec({ name: "tools/ansible-local/inventory.ini", content: ansibleLocalInventory }, `${dir}/inventory.ini`, data),
     templateSpec({ name: "tools/ansible-local/main.yml", content: ansibleLocalMain }, `${dir}/main.yml`, data),
   ];
+  // identity_block appends IdentityFile lines to the managed ~/.ssh/config
+  // block in keygen mode, so `ssh <profile>` works without an agent. Empty
+  // otherwise — the rendered block stays byte-identical to the pre-standard
+  // one.
   return ansibleWithSpec(opts, {
     dir, inventory: "inventory.ini", playbooks: { create: "main.yml", delete: "main.yml" },
-    extraVars: { host_alias: localHostAlias(data), ip: data.ip, user: data.user, block_state: opts["red/event"] === "delete" ? "absent" : "present" },
+    extraVars: {
+      host_alias: localHostAlias(data), ip: data.ip, user: data.user,
+      block_state: opts["red/event"] === "delete" ? "absent" : "present",
+      identity_block: data["ssh-keygen"]
+        ? `\n    IdentityFile ${data["ssh-private-key-path"]}\n    IdentitiesOnly yes`
+        : "",
+    },
   }, specs);
 }

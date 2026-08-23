@@ -62,7 +62,10 @@ Generated files and isolated OpenTofu state directories live under
 - Babashka
 - OpenTofu
 - Ansible
-- OpenSSH, with the compute key loaded into `ssh-agent`
+- OpenSSH. By default the machine keypair is generated on the first real
+  create, profile-named in `.ssh/` next to `colors.yml` (SSH Keypair Standard,
+  `workspace/standards/ssh-keypair.md`); only a desired state that names its
+  own machine key needs that key loaded into `ssh-agent`
 - `skopeo` for registry comparisons in `describe`
 
 Cloud-provider credentials are needed only for the providers selected in

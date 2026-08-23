@@ -10,7 +10,7 @@ from blue.workflow import advice_add, workflow
 
 from blue.cli import read_pars
 
-from . import github, tools
+from . import github, ssh, tools
 from .validate import secret_errors, state_errors
 
 
@@ -45,9 +45,22 @@ async def _adopt_existing_state(opts: dict) -> dict:
 
 async def start_step(original: dict, env: dict[str, str] | None = None) -> dict:
     async def after(opts, _env, context):
+        # The machine key's create matrix and provider preflight run before
+        # any template is rendered: an unowned key on disk or at the provider
+        # stops the run while stopping is still free. Delete fills the same
+        # template values (destroy renders before it destroys) but checks
+        # nothing — its cleanup step runs after the compute destroy instead.
         if context["real"] and context["event"] == "delete":
-            return {**(await _adopt_existing_state(opts)), "blue/exit": 0}
-        return await _with_deploy_keys(opts, context["real"])
+            return {**(await _adopt_existing_state(ssh.with_machine_key(opts, True))), "blue/exit": 0}
+        if context["real"] and context["event"] == "create":
+            ensured = await ssh.ensure_key(opts, lambda o: _state_output(o, "tofu-compute"))
+            if (ensured.get("blue/exit") or 0) > 0:
+                return ensured
+            checked = ssh.preflight(ssh.with_machine_key(ensured, True))
+            if (checked.get("blue/exit") or 0) > 0:
+                return checked
+            return await _with_deploy_keys(checked, context["real"])
+        return await _with_deploy_keys(ssh.with_machine_key(opts, context["real"]), context["real"])
     return await preflight(
         original, defaults={"compute-prevent-destroy": True}, overlay=read_pars, env=env,
         validators=[
@@ -63,7 +76,7 @@ async def ansible_cleanup_step(opts: dict) -> dict:
 
 
 tofu_steps = ["once/tofu-compute", "once/tofu-smtp", "once/tofu-dns", "once/tofu-smtp-post"]
-side_effecting_steps = [*tofu_steps, "once/ansible-local", "once/ansible-remote", "once/ansible-cleanup", "once/github"]
+side_effecting_steps = [*tofu_steps, "once/ansible-local", "once/ansible-remote", "once/ansible-cleanup", "once/github", "once/ssh-cleanup"]
 
 
 def wire_fn(step: str, run_opts: dict):
@@ -79,7 +92,11 @@ def wire_fn(step: str, run_opts: dict):
             "once/tofu-smtp-post": (tools.tofu_smtp_post_step, "once/tofu-dns"),
             "once/tofu-dns": (tools.tofu_dns_step, "once/tofu-smtp", "once/tofu-compute"),
             "once/tofu-smtp": (tools.tofu_smtp_step,),
-            "once/tofu-compute": (tools.tofu_compute_step,),
+            # The local keypair goes last, strictly after a successful compute
+            # destroy: a failed delete leaves the key, which is still the only
+            # credential to whatever survived.
+            "once/tofu-compute": (tools.tofu_compute_step, "once/ssh-cleanup"),
+            "once/ssh-cleanup": (ssh.cleanup_step,),
         }.get(step)
     return {
         "once/start": (start_step, "once/tofu-compute", "once/tofu-smtp"),

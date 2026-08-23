@@ -127,8 +127,9 @@ resource "azurerm_linux_virtual_machine" "node1" {
   connection {
     type  = "ssh"
     user  = "ubuntu"
-    agent = true
-    host  = azurerm_public_ip.node1.ip_address
+<% if ssh-keygen %>    private_key = file("<{ ssh-private-key-path }>")
+<% else %>    agent = true
+<% endif %>    host  = azurerm_public_ip.node1.ip_address
   }
   provisioner "remote-exec" {
     inline = ["ls"]

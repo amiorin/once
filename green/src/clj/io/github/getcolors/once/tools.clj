@@ -316,7 +316,7 @@
                   :users []}))))
 
 (defn inventory
-  [{:keys [sudoer hosts users]}]
+  [{:keys [sudoer hosts users ssh-keygen ssh-private-key-path]}]
   (let [users (->> users
                    (filter (complement :remove))
                    (mapcat (fn [user]
@@ -331,10 +331,15 @@
                                       :uid uid}))
                             {}
                             users)
+        ;; In keygen mode nothing guarantees an agent holds the machine key,
+        ;; so the inventory names it — a path, never key material.
         admins-hosts (reduce (fn [result {:keys [name host]}]
                                (assoc result (format "root@%s" host)
-                                      {:ansible_host host
-                                       :ansible_user name}))
+                                      (cond-> {:ansible_host host
+                                               :ansible_user name}
+                                        ssh-keygen
+                                        (assoc :ansible_ssh_private_key_file
+                                               ssh-private-key-path))))
                              {}
                              admins)
         result {:all {:children {:admin {:hosts admins-hosts}
@@ -479,10 +484,20 @@
         config {:dir dir
                 :inventory "inventory.ini"
                 :playbooks {:create "main.yml" :delete "main.yml"}
+                ;; identity_block appends IdentityFile lines to the managed
+                ;; ~/.ssh/config block in keygen mode, so `ssh <profile>`
+                ;; works without an agent. Empty otherwise — the rendered
+                ;; block stays byte-identical to the pre-standard one.
                 :extra-vars {:host_alias (local-host-alias data)
                              :ip (:ip data)
                              :user (:user data)
-                             :block_state (if delete? "absent" "present")}}]
+                             :block_state (if delete? "absent" "present")
+                             :identity_block
+                             (if (:ssh-keygen data)
+                               (str "\n    IdentityFile "
+                                    (:ssh-private-key-path data)
+                                    "\n    IdentitiesOnly yes")
+                               "")}}]
     ;; Delete renders the playbook so it can run, removes the managed block
     ;; from ~/.ssh/config, and only then deletes the rendered tree.
     (ansible/ansible-with-spec opts config specs)))

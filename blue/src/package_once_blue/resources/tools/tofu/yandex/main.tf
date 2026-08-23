@@ -89,7 +89,8 @@ resource "yandex_compute_instance" "node1" {
     type = "ssh"
     user = "ubuntu"
     host = self.network_interface.0.nat_ip_address
-  }
+<% if ssh-keygen %>    private_key = file("<{ ssh-private-key-path }>")
+<% endif %>  }
   provisioner "remote-exec" {
     inline = ["ls"]
   }

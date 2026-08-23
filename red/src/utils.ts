@@ -7,7 +7,14 @@ import type { Opts } from "red/workflow";
 //    whose environment receives the connection details. A launcher pinned older
 //    still expects deploy-pubkey in desired state and would ignore github
 //    silently, publishing nothing.
-export const contract = 3;
+// 4: the SSH Keypair Standard (workspace standards/ssh-keypair.md). The
+//    machine-key keys leave required: their absence now selects keygen mode,
+//    where ssh.ts generates a profile-named ed25519 keypair in .ssh/, the
+//    compute templates create the provider key resource themselves, and the
+//    delete DAG gains once/ssh-cleanup. A launcher pinned older still demands
+//    the machine key in desired state, refusing a colors.yml written for
+//    keygen mode, and renders templates without the keygen branches.
+export const contract = 4;
 
 export function registrableDomain(host: unknown): string | undefined {
   const labels = String(host ?? "").split(".");

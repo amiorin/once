@@ -52,6 +52,28 @@ build_variant oci COLORS_PAR_PROVIDER_COMPUTE=oci
 # handles <% else %> differently diverges here rather than in production.
 build_variant oci-pinned COLORS_PAR_PROVIDER_COMPUTE=oci \
   COLORS_PAR_OCI_IMAGE_ID=ocid1.image.oc1.eu-frankfurt-1.aaaaaaaaexample
+# Keygen mode (workspace standards/ssh-keypair.md): an absent machine key
+# makes the package generate and own the profile-named keypair. An empty
+# override reads as a placeholder — exactly how a colors.yml without the key
+# reads — so each variant renders its template's keygen branch: the provider
+# key resource on digitalocean/hcloud/vultr, the profile-named key_name on
+# aws, the filled pubkey path on oci/azure/google, and the deterministic
+# content placeholder on yandex.
+build_variant digitalocean-keygen COLORS_PAR_DIGITALOCEAN_SSH_KEYS=
+build_variant hcloud-keygen COLORS_PAR_PROVIDER_COMPUTE=hcloud \
+  COLORS_PAR_HCLOUD_SSH_KEYS=
+build_variant vultr-keygen COLORS_PAR_PROVIDER_COMPUTE=vultr \
+  COLORS_PAR_VULTR_SSH_KEYS=
+build_variant aws-keygen COLORS_PAR_PROVIDER_COMPUTE=aws \
+  COLORS_PAR_AWS_SSH_AUTHORIZED_KEYS=
+build_variant azure-keygen COLORS_PAR_PROVIDER_COMPUTE=azure \
+  COLORS_PAR_AZURE_SSH_AUTHORIZED_KEYS=
+build_variant google-keygen COLORS_PAR_PROVIDER_COMPUTE=google \
+  COLORS_PAR_GOOGLE_SSH_AUTHORIZED_KEYS=
+build_variant oci-keygen COLORS_PAR_PROVIDER_COMPUTE=oci \
+  COLORS_PAR_OCI_SSH_AUTHORIZED_KEYS=
+build_variant yandex-keygen COLORS_PAR_PROVIDER_COMPUTE=yandex \
+  COLORS_PAR_COMPUTE_PUBKEY=
 build_variant no-infra-compute COLORS_PAR_PROVIDER_COMPUTE=no-infra
 build_variant no-infra-smtp COLORS_PAR_PROVIDER_SMTP=no-infra
 build_variant no-infra-dns COLORS_PAR_PROVIDER_DNS=no-infra
@@ -87,6 +109,18 @@ containers="$root/test/parity/containers.json"
 diff "$tmp/containers-green" "$tmp/containers-red"
 diff "$tmp/containers-green" "$tmp/containers-blue"
 
+# The SSH Keypair Standard's create matrix, provider preflight, and delete
+# cleanup never reach a build artifact — they run only on real events — and
+# their refusal messages are user-facing contract. Each colour drives the same
+# scenarios with injected state, keygen, and account-key functions and prints
+# normalized outcome lines.
+(cd "$root/green" && bb ../scripts/ssh-green.clj) >"$tmp/ssh-green"
+(cd "$root/red" && bun ../scripts/ssh-red.ts) >"$tmp/ssh-red"
+(cd "$root/blue" && uv run python ../scripts/ssh-blue.py) >"$tmp/ssh-blue"
+diff "$tmp/ssh-green" "$tmp/ssh-red"
+diff "$tmp/ssh-green" "$tmp/ssh-blue"
+
 echo "green, red, and blue build artifacts are byte-identical"
 echo "green, red, and blue agree on every scalar in the parity corpus"
 echo "green, red, and blue resolve every container in the parity corpus alike"
+echo "green, red, and blue run the machine-key matrix and preflight alike"

@@ -71,8 +71,9 @@ resource "google_compute_instance" "node1" {
   connection {
     type  = "ssh"
     user  = "ubuntu"
-    agent = true
-    host  = google_compute_address.node1.address
+<% if ssh-keygen %>    private_key = file("<{ ssh-private-key-path }>")
+<% else %>    agent = true
+<% endif %>    host  = google_compute_address.node1.address
   }
   provisioner "remote-exec" {
     inline = ["ls"]

@@ -1074,8 +1074,13 @@ r2-endpoint: https://ACCOUNT_ID.r2.cloudflarestorage.com</code></pre>
       <div class="cards">
         <article class="card">
           <p class="label">Operations</p>
-          <h3><code>compute-pubkey</code></h3>
-          <p>Required by Yandex Cloud, which installs it for the <code>ubuntu</code> user through instance metadata. Other providers use a key already registered with them (<code>digitalocean-ssh-keys</code>, <code>hcloud-ssh-keys</code>, <code>vultr-ssh-keys</code>) or a local public-key file (<code>oci-ssh-authorized-keys</code>). The matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
+          <h3>Machine keypair</h3>
+          <p><strong>By default ONCE generates and owns the machine key.</strong> When desired state carries no machine-key setting, the first real <code>create</code> generates an ed25519 keypair named after the <code>profile</code> in <code>.ssh/</code> next to <code>colors.yml</code>, registers the public half with the provider (as a key resource named after the profile where the provider has one), and <code>delete</code> removes it after a successful destroy. An existing <code>.ssh/&lt;profile&gt;</code> without deployment state, or a provider key named after the profile outside the deployment's state, stops the create instead of being overwritten or adopted — see the SSH Keypair Standard (<code>workspace/standards/ssh-keypair.md</code>).</p>
+        </article>
+        <article class="card">
+          <p class="label">Operations</p>
+          <h3>Bring your own key</h3>
+          <p>Setting the provider's machine-key value switches generation off and behaves exactly as before: <code>compute-pubkey</code> installs a public key through Yandex instance metadata, <code>digitalocean-ssh-keys</code>, <code>hcloud-ssh-keys</code>, and <code>vultr-ssh-keys</code> reference keys already registered with the provider, and <code>oci-ssh-authorized-keys</code> (with the aws/azure/google equivalents) is a local public-key file. In that mode the matching private half should be loaded into <code>ssh-agent</code> before create so Ansible can reach the new server.</p>
         </article>
         <article class="card">
           <p class="label">Deployment</p>

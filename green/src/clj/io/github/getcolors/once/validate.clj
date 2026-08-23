@@ -24,46 +24,46 @@
   them out of the rendered .tf files, which sit in the work directory in
   plaintext. A secret that is not in `:tofu-env` reaches its tool some other
   way: the SMTP passwords are looked up by Ansible at play time."
+  ;; The machine-key keys (:*-ssh-authorized-keys, :*-ssh-keys,
+  ;; :compute-pubkey) are deliberately not in :required: their absence selects
+  ;; keygen mode, where once.ssh generates and manages a profile-named keypair
+  ;; per the SSH Keypair Standard (workspace standards/ssh-keypair.md). A
+  ;; value that is present is opt-out mode and is used exactly as before.
   {:provider-compute
    {"azure" {:required [:azure-subscription-id :azure-location
                           :azure-resource-group :azure-name :azure-vm-size
                           :azure-image-publisher :azure-image-offer
                           :azure-image-sku :azure-image-version :azure-vnet-cidr
-                          :azure-subnet-cidr :azure-boot-disk-size-gb
-                          :azure-ssh-authorized-keys]
+                          :azure-subnet-cidr :azure-boot-disk-size-gb]
               :secrets []
               :tofu-env {}}
     "aws" {:required [:aws-region :aws-availability-zone :aws-name
                        :aws-instance-type :aws-image-id :aws-vpc-cidr
-                       :aws-subnet-cidr :aws-root-volume-size-gb
-                       :aws-ssh-authorized-keys]
+                       :aws-subnet-cidr :aws-root-volume-size-gb]
            :secrets []
            :tofu-env {}}
     "google" {:required [:google-project :google-region :google-zone
                           :google-name :google-machine-type
                           :google-image-project :google-image-family
-                          :google-image-id :google-subnet-cidr :google-boot-disk-size-gb
-                          :google-ssh-authorized-keys]
+                          :google-image-id :google-subnet-cidr :google-boot-disk-size-gb]
               :secrets []
               :tofu-env {}}
     "digitalocean" {:required [:digitalocean-name :digitalocean-region
-                               :digitalocean-size :digitalocean-image
-                               :digitalocean-ssh-keys]
+                               :digitalocean-size :digitalocean-image]
                     :secrets [:do-token]
                     :tofu-env {:do-token "DIGITALOCEAN_TOKEN"}}
     "hcloud" {:required [:hcloud-name :hcloud-image :hcloud-server-type
-                         :hcloud-location :hcloud-ssh-keys]
+                         :hcloud-location]
               :secrets [:hcloud-token]
               :tofu-env {:hcloud-token "HCLOUD_TOKEN"}}
     "vultr" {:required [:vultr-name :vultr-region :vultr-plan
-                        :vultr-os-id :vultr-ssh-keys]
+                        :vultr-os-id]
              :secrets [:vultr-api-key]
              :tofu-env {:vultr-api-key "VULTR_API_KEY"}}
     "yandex" {:required [:yandex-cloud-id :yandex-folder-id :yandex-zone
                          :yandex-image-family :yandex-name :yandex-subnet-cidr
                          :yandex-platform-id :yandex-cores :yandex-memory-gb
-                         :yandex-core-fraction :yandex-disk-size-gb
-                         :compute-pubkey]
+                         :yandex-core-fraction :yandex-disk-size-gb]
               :secrets [:yandex-token]
               :tofu-env {:yandex-token "YC_TOKEN"}}
     ;; OCI authenticates from ~/.oci/config, selected by :oci-config-file-profile,
@@ -71,7 +71,7 @@
     "oci" {:required [:oci-config-file-profile :oci-subnet-id :oci-compartment-id
                       :oci-availability-domain :oci-display-name :oci-shape
                       :oci-ocpus :oci-memory-in-gbs :oci-boot-volume-size-in-gbs
-                      :oci-boot-volume-vpus-per-gb :oci-ssh-authorized-keys]
+                      :oci-boot-volume-vpus-per-gb]
            :secrets []
            :tofu-env {}}
     "no-infra" {:required [:no-infra-compute-ip :no-infra-compute-user
@@ -197,8 +197,8 @@
         (app-errors applications))
       (when-not (boolean? (:compute-prevent-destroy opts))
         [":compute-prevent-destroy must be true or false"])
-      ;; Yandex requires :compute-pubkey; for other providers it is optional.
-      ;; Either way, a value that is present must look like a public key.
+      ;; :compute-pubkey is optional everywhere — absent on Yandex it selects
+      ;; keygen mode. A value that is present must look like a public key.
       (when-not (or (nil? (:compute-pubkey opts))
                     (placeholder? (:compute-pubkey opts))
                     (str/starts-with? (str (:compute-pubkey opts)) "ssh-"))

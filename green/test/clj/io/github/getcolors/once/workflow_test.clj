@@ -136,7 +136,9 @@
     (is (= [:once/tofu-smtp :once/tofu-compute] (:once/tofu-dns g))
         "DNS must go before the records' targets")
     (is (= [] (:once/tofu-smtp g)))
-    (is (= [] (:once/tofu-compute g)))))
+    (is (= [:once/ssh-cleanup] (:once/tofu-compute g))
+        "the local machine key goes only after the compute destroy succeeded")
+    (is (= [] (:once/ssh-cleanup g)))))
 
 (deftest build-follows-the-create-graph
   (is (= (graph :create) (graph :build))))

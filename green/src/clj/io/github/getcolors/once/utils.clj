@@ -46,8 +46,15 @@
      :yandex-allow-stopping-for-update, and :yandex-image-id. The family image
      path also stops tracking later resolved ids. A launcher pinned older
      ignores the new keys and can still lose an ephemeral address or plan an
-     unexpected replacement when an image family moves."
-  11)
+     unexpected replacement when an image family moves.
+  12: the SSH Keypair Standard (workspace standards/ssh-keypair.md). The
+     machine-key keys leave :required: their absence now selects keygen mode,
+     where once.ssh generates a profile-named ed25519 keypair in .ssh/, the
+     compute templates create the provider key resource themselves, and the
+     delete DAG gains :once/ssh-cleanup. A launcher pinned older still
+     demands the machine key in desired state, refusing a colors.yml written
+     for keygen mode, and renders templates without the keygen branches."
+  12)
 
 (defn registrable-domain
   "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes

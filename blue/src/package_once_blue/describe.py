@@ -10,6 +10,7 @@ from blue.runtime import ExecResult, runtime
 
 from blue.cli import read_pars
 
+from .ssh import identity_args, with_machine_key
 from .tools import backend_credential_env, tool_dir
 
 Runner = Callable[..., Awaitable[ExecResult]]
@@ -33,11 +34,14 @@ def _target(params: dict) -> dict:
     ip = params.get("ip")
     if params.get("provider-compute") == "no-infra" and (not ip or ip == _PLACEHOLDER_IP):
         ip = params.get("no-infra-compute-ip")
-    return {"ip": ip, "user": params.get("user") or params.get("sudoer") or params.get("no-infra-compute-user") or params.get("no-infra-compute-sudoer") or "root"}
+    # The keygen identity travels with the target so every probe names the
+    # machine key explicitly; in opt-out mode the target is unchanged.
+    identity = {"ssh-keygen": params.get("ssh-keygen"), "ssh-private-key-path": params.get("ssh-private-key-path")} if params.get("ssh-keygen") else {}
+    return {"ip": ip, "user": params.get("user") or params.get("sudoer") or params.get("no-infra-compute-user") or params.get("no-infra-compute-sudoer") or "root", **identity}
 
 
 def _ssh(target: dict, remote: list[str]) -> list[str]:
-    return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", f"{target['user']}@{target['ip']}", *remote]
+    return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", *identity_args(target), f"{target['user']}@{target['ip']}", *remote]
 
 
 async def _compute_status(runner: Runner, params: dict, state_detail: str | None = None) -> dict:
@@ -226,9 +230,11 @@ async def describe_file(path: str) -> dict:
         file = Path(path)
         if not file.exists():
             return {"blue/exit": 2, "blue/err": f"desired state file not found: {path}"}
-        return await describe(read_pars({
+        # Describe reads the live host, so it needs the keygen identity the
+        # way create does — real event semantics, opt-out untouched.
+        return await describe(with_machine_key(read_pars({
             **load_yaml(file.read_text()),
             "blue/state-file": str(file.resolve()),
-        }))
+        }), True))
     except Exception as error:
         return {"blue/exit": 2, "blue/err": str(error) or type(error).__name__}

@@ -37,6 +37,7 @@ from typing import Awaitable, Callable
 from blue.process import run_plan
 from blue.runtime import ExecResult, runtime
 
+from .ssh import identity_args
 from .validate import deploy_groups
 
 _RUN_TIMEOUT_MS = 30_000
@@ -139,6 +140,7 @@ def host_key_args(opts: dict) -> list[str]:
     return [
         "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
         "-o", "StrictHostKeyChecking=accept-new",
+        *identity_args(opts),
         f"{opts.get('user') or 'root'}@{opts.get('ip')}",
         "cat /etc/ssh/ssh_host_ed25519_key.pub",
     ]

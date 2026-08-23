@@ -75,8 +75,12 @@ resource "aws_security_group" "node1" {
 }
 
 resource "aws_key_pair" "operator" {
-  key_name   = "<{ aws-name }>"
-  public_key = file("<{ aws-ssh-authorized-keys }>")
+  # In keygen mode the pair is named after the profile (SSH Keypair Standard);
+  # key_name is unique per region and the instance depends on this resource,
+  # so a colliding name fails the apply before any instance exists.
+<% if ssh-keygen %>  key_name   = "<{ profile }>"
+<% else %>  key_name   = "<{ aws-name }>"
+<% endif %>  public_key = file("<{ aws-ssh-authorized-keys }>")
 }
 
 resource "aws_instance" "node1" {
@@ -95,8 +99,9 @@ resource "aws_instance" "node1" {
   connection {
     type  = "ssh"
     user  = "ubuntu"
-    agent = true
-    host  = self.public_ip
+<% if ssh-keygen %>    private_key = file("<{ ssh-private-key-path }>")
+<% else %>    agent = true
+<% endif %>    host  = self.public_ip
   }
   provisioner "remote-exec" {
     inline = ["ls"]

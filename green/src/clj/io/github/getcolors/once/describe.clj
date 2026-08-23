@@ -11,6 +11,7 @@
    [clojure.string :as str]
    [green.cli :as green-cli]
    [green.process :as process]
+   [io.github.getcolors.once.ssh :as ssh]
    [io.github.getcolors.once.tools :as tools]))
 
 ;;; -------------------------------------------------------------- command helpers
@@ -48,12 +49,13 @@
         (str/includes? text "command not found: once"))))
 
 (defn- ssh-base-args
-  [{:keys [ip user]}]
-  ["ssh"
-   "-o" "BatchMode=yes"
-   "-o" "ConnectTimeout=5"
-   "-o" "StrictHostKeyChecking=accept-new"
-   (str user "@" ip)])
+  [{:keys [ip user] :as compute}]
+  (-> ["ssh"
+       "-o" "BatchMode=yes"
+       "-o" "ConnectTimeout=5"
+       "-o" "StrictHostKeyChecking=accept-new"]
+      (into (ssh/identity-args compute))
+      (conj (str user "@" ip))))
 
 (defn- ssh-run
   ([run-fn compute remote-args]
@@ -83,19 +85,24 @@
 
 (defn- compute-target
   [{:keys [provider-compute ip user sudoer no-infra-compute-ip
-           no-infra-compute-user no-infra-compute-sudoer]}]
+           no-infra-compute-user no-infra-compute-sudoer
+           ssh-keygen ssh-private-key-path]}]
   (let [ip (if (and (= provider-compute "no-infra")
                     (or (str/blank? ip) (= placeholder-ip ip))
                     (not (str/blank? no-infra-compute-ip)))
              no-infra-compute-ip
              ip)]
-    {:ip ip
-     :user (or (not-empty user)
-               (not-empty sudoer)
-               (when (= provider-compute "no-infra")
-                 (or (not-empty no-infra-compute-user)
-                     (not-empty no-infra-compute-sudoer)))
-               "root")}))
+    ;; The keygen identity travels with the target so every probe names the
+    ;; machine key explicitly; in opt-out mode the target is unchanged.
+    (cond-> {:ip ip
+             :user (or (not-empty user)
+                       (not-empty sudoer)
+                       (when (= provider-compute "no-infra")
+                         (or (not-empty no-infra-compute-user)
+                             (not-empty no-infra-compute-sudoer)))
+                       "root")}
+      ssh-keygen (assoc :ssh-keygen ssh-keygen
+                        :ssh-private-key-path ssh-private-key-path))))
 
 (defn- compute-status
   "Classify compute as :running, :unreachable, or :absent.
@@ -539,6 +546,9 @@
         (-> (green-cli/read-state file (slurp file))
             (assoc :green/state-file (.getAbsolutePath file))
             green-cli/read-pars
+            ;; Describe reads the live host, so it needs the keygen identity
+            ;; the way create does — real event semantics, opt-out untouched.
+            (ssh/with-machine-key true)
             describe)))
     (catch Throwable t
       {:green/exit 2 :green/err (or (ex-message t) (str (class t)))})))

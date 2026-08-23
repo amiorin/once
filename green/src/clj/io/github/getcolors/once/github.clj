@@ -30,6 +30,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [green.process :as process]
+   [io.github.getcolors.once.ssh :as ssh]
    [io.github.getcolors.once.validate :as validate]))
 
 (def ^:private run-timeout-ms 30000)
@@ -126,10 +127,11 @@
   Reading the file over an authenticated session rather than scanning for it
   keeps the answer to one round trip and gets the key type without guessing."
   [opts]
-  ["ssh" "-o" "BatchMode=yes" "-o" "ConnectTimeout=10"
-   "-o" "StrictHostKeyChecking=accept-new"
-   (str (or (:user opts) "root") "@" (:ip opts))
-   "cat /etc/ssh/ssh_host_ed25519_key.pub"])
+  (-> ["ssh" "-o" "BatchMode=yes" "-o" "ConnectTimeout=10"
+       "-o" "StrictHostKeyChecking=accept-new"]
+      (into (ssh/identity-args opts))
+      (conj (str (or (:user opts) "root") "@" (:ip opts))
+            "cat /etc/ssh/ssh_host_ed25519_key.pub")))
 
 (defn known-hosts-line
   "A known_hosts entry for `ip` from an `ssh_host_*.pub` file's contents. The

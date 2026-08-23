@@ -5,16 +5,21 @@ from typing import Any
 
 from blue.cli import par_name
 
+# The machine-key keys (*-ssh-authorized-keys, *-ssh-keys, compute-pubkey)
+# are deliberately not in required: their absence selects keygen mode, where
+# ssh.py generates and manages a profile-named keypair per the SSH Keypair
+# Standard (workspace standards/ssh-keypair.md). A value that is present is
+# opt-out mode and is used exactly as before.
 providers: dict[str, dict[str, dict[str, Any]]] = {
     "provider-compute": {
-        "azure": {"required": ["azure-subscription-id", "azure-location", "azure-resource-group", "azure-name", "azure-vm-size", "azure-image-publisher", "azure-image-offer", "azure-image-sku", "azure-image-version", "azure-vnet-cidr", "azure-subnet-cidr", "azure-boot-disk-size-gb", "azure-ssh-authorized-keys"], "secrets": [], "tofu-env": {}},
-        "aws": {"required": ["aws-region", "aws-availability-zone", "aws-name", "aws-instance-type", "aws-image-id", "aws-vpc-cidr", "aws-subnet-cidr", "aws-root-volume-size-gb", "aws-ssh-authorized-keys"], "secrets": [], "tofu-env": {}},
-        "google": {"required": ["google-project", "google-region", "google-zone", "google-name", "google-machine-type", "google-image-project", "google-image-family", "google-image-id", "google-subnet-cidr", "google-boot-disk-size-gb", "google-ssh-authorized-keys"], "secrets": [], "tofu-env": {}},
-        "digitalocean": {"required": ["digitalocean-name", "digitalocean-region", "digitalocean-size", "digitalocean-image", "digitalocean-ssh-keys"], "secrets": ["do-token"], "tofu-env": {"do-token": "DIGITALOCEAN_TOKEN"}},
-        "hcloud": {"required": ["hcloud-name", "hcloud-image", "hcloud-server-type", "hcloud-location", "hcloud-ssh-keys"], "secrets": ["hcloud-token"], "tofu-env": {"hcloud-token": "HCLOUD_TOKEN"}},
-        "vultr": {"required": ["vultr-name", "vultr-region", "vultr-plan", "vultr-os-id", "vultr-ssh-keys"], "secrets": ["vultr-api-key"], "tofu-env": {"vultr-api-key": "VULTR_API_KEY"}},
-        "yandex": {"required": ["yandex-cloud-id", "yandex-folder-id", "yandex-zone", "yandex-image-family", "yandex-name", "yandex-subnet-cidr", "yandex-platform-id", "yandex-cores", "yandex-memory-gb", "yandex-core-fraction", "yandex-disk-size-gb", "compute-pubkey"], "secrets": ["yandex-token"], "tofu-env": {"yandex-token": "YC_TOKEN"}},
-        "oci": {"required": ["oci-config-file-profile", "oci-subnet-id", "oci-compartment-id", "oci-availability-domain", "oci-display-name", "oci-shape", "oci-ocpus", "oci-memory-in-gbs", "oci-boot-volume-size-in-gbs", "oci-boot-volume-vpus-per-gb", "oci-ssh-authorized-keys"], "secrets": [], "tofu-env": {}},
+        "azure": {"required": ["azure-subscription-id", "azure-location", "azure-resource-group", "azure-name", "azure-vm-size", "azure-image-publisher", "azure-image-offer", "azure-image-sku", "azure-image-version", "azure-vnet-cidr", "azure-subnet-cidr", "azure-boot-disk-size-gb"], "secrets": [], "tofu-env": {}},
+        "aws": {"required": ["aws-region", "aws-availability-zone", "aws-name", "aws-instance-type", "aws-image-id", "aws-vpc-cidr", "aws-subnet-cidr", "aws-root-volume-size-gb"], "secrets": [], "tofu-env": {}},
+        "google": {"required": ["google-project", "google-region", "google-zone", "google-name", "google-machine-type", "google-image-project", "google-image-family", "google-image-id", "google-subnet-cidr", "google-boot-disk-size-gb"], "secrets": [], "tofu-env": {}},
+        "digitalocean": {"required": ["digitalocean-name", "digitalocean-region", "digitalocean-size", "digitalocean-image"], "secrets": ["do-token"], "tofu-env": {"do-token": "DIGITALOCEAN_TOKEN"}},
+        "hcloud": {"required": ["hcloud-name", "hcloud-image", "hcloud-server-type", "hcloud-location"], "secrets": ["hcloud-token"], "tofu-env": {"hcloud-token": "HCLOUD_TOKEN"}},
+        "vultr": {"required": ["vultr-name", "vultr-region", "vultr-plan", "vultr-os-id"], "secrets": ["vultr-api-key"], "tofu-env": {"vultr-api-key": "VULTR_API_KEY"}},
+        "yandex": {"required": ["yandex-cloud-id", "yandex-folder-id", "yandex-zone", "yandex-image-family", "yandex-name", "yandex-subnet-cidr", "yandex-platform-id", "yandex-cores", "yandex-memory-gb", "yandex-core-fraction", "yandex-disk-size-gb"], "secrets": ["yandex-token"], "tofu-env": {"yandex-token": "YC_TOKEN"}},
+        "oci": {"required": ["oci-config-file-profile", "oci-subnet-id", "oci-compartment-id", "oci-availability-domain", "oci-display-name", "oci-shape", "oci-ocpus", "oci-memory-in-gbs", "oci-boot-volume-size-in-gbs", "oci-boot-volume-vpus-per-gb"], "secrets": [], "tofu-env": {}},
         "no-infra": {"required": ["no-infra-compute-ip", "no-infra-compute-user", "no-infra-compute-sudoer", "no-infra-compute-uid"], "secrets": [], "tofu-env": {}},
     },
     "provider-smtp": {
