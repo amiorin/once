@@ -63,7 +63,7 @@ Generated files and isolated OpenTofu state directories live under
 - OpenTofu
 - Ansible
 - OpenSSH. By default the machine keypair is generated on the first real
-  create, profile-named in `.ssh/` next to `colors.yml` (SSH Keypair Standard,
+  create, profile-named in the operator's `~/.ssh` (SSH Keypair Standard,
   `workspace/standards/ssh-keypair.md`); only a desired state that names its
   own machine key needs that key loaded into `ssh-agent`
 - `skopeo` for registry comparisons in `describe`

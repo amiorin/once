@@ -5,6 +5,7 @@
 # none of this logic reaches a build artifact, and the error messages are
 # user-facing contract.
 import asyncio
+import os
 import tempfile
 from pathlib import Path
 
@@ -12,7 +13,11 @@ from package_once_blue import ssh
 
 
 def tmp_dir() -> str:
-    return tempfile.mkdtemp(prefix="once-ssh-parity")
+    """A fresh scenario directory, installed as $HOME so the keypair lands
+    under it — no scenario may touch the real ~/.ssh."""
+    dir = tempfile.mkdtemp(prefix="once-ssh-parity")
+    os.environ["HOME"] = dir
+    return dir
 
 
 class _Result:

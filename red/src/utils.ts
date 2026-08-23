@@ -14,7 +14,12 @@ import type { Opts } from "red/workflow";
 //    delete DAG gains once/ssh-cleanup. A launcher pinned older still demands
 //    the machine key in desired state, refusing a colors.yml written for
 //    keygen mode, and renders templates without the keygen branches.
-export const contract = 4;
+// 5: the machine keypair moves from .ssh/ next to colors.yml to the
+//    operator's ~/.ssh, still profile-named. A launcher pinned older
+//    generates and resolves the key inside the checkout, so it cannot see a
+//    keypair living in ~/.ssh and would generate a second one beside a live
+//    deployment's state.
+export const contract = 5;
 
 export function registrableDomain(host: unknown): string | undefined {
   const labels = String(host ?? "").split(".");

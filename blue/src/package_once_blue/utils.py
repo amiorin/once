@@ -7,7 +7,12 @@ from __future__ import annotations
 #    whose environment receives the connection details. A launcher pinned older
 #    still expects deploy-pubkey in desired state and would ignore github
 #    silently, publishing nothing.
-CONTRACT = 3
+# 4: the machine keypair moves from .ssh/ next to colors.yml to the operator's
+#    ~/.ssh, still profile-named. A launcher pinned older generates and
+#    resolves the key inside the checkout, so it cannot see a keypair living
+#    in ~/.ssh and would generate a second one beside a live deployment's
+#    state.
+CONTRACT = 4
 
 
 def registrable_domain(host: object) -> str | None:

@@ -10,8 +10,12 @@ import { join } from "node:path";
 import type { Opts } from "red/workflow";
 import * as ssh from "../red/src/ssh.ts";
 
+// A fresh scenario directory, installed as $HOME so the keypair lands under
+// it — no scenario may touch the real ~/.ssh.
 function tmpDir(): string {
-  return mkdtempSync(join(tmpdir(), "once-ssh-parity"));
+  const dir = mkdtempSync(join(tmpdir(), "once-ssh-parity"));
+  process.env.HOME = dir;
+  return dir;
 }
 
 const fakeKeygen = async (args: string[]) => {

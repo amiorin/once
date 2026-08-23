@@ -3,22 +3,25 @@
 // Implements the SSH Keypair Standard (workspace `standards/ssh-keypair.md`):
 // when the selected compute provider's machine-key configuration key is absent
 // from desired state, the package generates and manages an ed25519 keypair
-// named after the profile, in `.ssh/` next to colors.yml. When the key is
+// named after the profile, in the operator's `~/.ssh`. When the key is
 // present, everything here steps aside and the value is used exactly as
 // before the standard — presence is the only switch.
 //
 // Key material is like state: losing it loses access to the machine. So the
-// keypair lives outside the regenerable workdir, an existing key without
-// state is an error rather than something to overwrite, a provider-side key
-// named after the profile but absent from our state is an error rather than
-// something to import, and delete removes the local key only after the
-// compute destroy succeeded.
+// keypair lives in `~/.ssh` outside any checkout or workdir (the profile is
+// globally unique — it already keys remote state — which is what makes the
+// shared flat directory safe), an existing key without state is an error
+// rather than something to overwrite, a provider-side key named after the
+// profile but absent from our state is an error rather than something to
+// import, and delete removes the local key only after the compute destroy
+// succeeded.
 //
 // Generation shells `ssh-keygen` like `github`: three languages agreeing on
 // OpenSSH private-key encoding is a parity problem, one subprocess is not.
 // The private key never enters the opts map — templates receive only paths.
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmdirSync, unlinkSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { runtime } from "red/runtime";
 import type { Opts } from "red/workflow";
@@ -32,7 +35,7 @@ const defaultRunner: Runner = (cmd, opts = {}) => runtime.exec(cmd, { ...opts, t
 
 // The public key a build or dry-run renders where content (not a path) is
 // interpolated. Fixed, so the artifact stays deterministic and byte-identical
-// across colours whether or not `.ssh/` exists.
+// across colours whether or not the keypair exists.
 export const placeholderPublic = "ssh-ed25519 PLACEHOLDER managed-by-colors";
 
 // Compute provider -> the desired-state key that carries the machine key.
@@ -69,16 +72,15 @@ export function profile(opts: Opts): string {
   return String(opts.profile ?? "default");
 }
 
-// The directory holding colors.yml — where `.ssh/` lives. `.ssh/` sits
-// outside the workdir on purpose: the workdir is regenerable output and the
-// key is not.
-function projectDir(opts: Opts): string {
-  const stateFile = opts["red/state-file"];
-  return stateFile ? dirname(String(stateFile)) : ".";
+// The operator's home directory — `~/.ssh` is where the keypair lives, per
+// the standard. Reads $HOME at call time so tests and the parity driver can
+// redirect it away from the real `~/.ssh`.
+function homeDir(): string {
+  return process.env.HOME ?? homedir();
 }
 
-export function sshDir(opts: Opts): string {
-  return join(projectDir(opts), ".ssh");
+export function sshDir(_opts: Opts): string {
+  return join(homeDir(), ".ssh");
 }
 
 export function privateKeyPath(opts: Opts): string {
@@ -95,10 +97,9 @@ function fail(opts: Opts, message: string): Opts {
 
 // Fill the template values keygen mode owns, for every event, and leave
 // opt-out opts untouched. Path providers get the absolute public-key path
-// (OpenTofu resolves relative paths against the stage directory, and the
-// workdir is relocatable while `.ssh/` is not); the content provider gets the
-// key content on real events and the fixed placeholder otherwise, so builds
-// never read `.ssh/`.
+// ($HOME expanded here, because tofu's `file()` does not expand `~`); the
+// content provider gets the key content on real events and the fixed
+// placeholder otherwise, so builds never read `~/.ssh`.
 export function withMachineKey(opts: Opts, real: boolean): Opts {
   if (!keygen(opts)) return opts;
   const key = machineKeyKeys[String(opts["provider-compute"])]!;
@@ -126,8 +127,8 @@ export function identityArgs(opts: Opts): string[] {
 
 // ------------------------------------------------------------- permissions
 
-// 700 on `.ssh/`, 600 on the private key — on every real run, not only at
-// generation, so a checkout restored with wrong permissions fails early.
+// 700 on `~/.ssh`, 600 on the private key — on every real run, not only at
+// generation, so a key restored with wrong permissions fails early.
 function enforcePerms(opts: Opts): string | undefined {
   try {
     chmodSync(sshDir(opts), 0o700);
@@ -165,10 +166,10 @@ export async function ensureKey(opts: Opts, stateFn: StateFn, runFn: Runner = de
   const threaded: Opts = { ...opts, "once/ssh-state-params": state };
 
   if (state && !hasPrv && !hasPub) {
-    return fail(threaded, `compute state exists but ${prv} is missing: this checkout has lost the machine key. Restore .ssh/ from where the deployment was created, or rebuild; a regenerated key cannot reach the existing host.`);
+    return fail(threaded, `compute state exists but ${prv} is missing: this workstation does not hold the machine key. Copy it from where the deployment was created, or rebuild; a regenerated key cannot reach the existing host.`);
   }
   if ((hasPrv || hasPub) && !(hasPrv && hasPub)) {
-    return fail(threaded, `.ssh/ holds half a keypair for ${profile(opts)} (private ${hasPrv ? "present" : "missing"}, public ${hasPub ? "present" : "missing"}): restore the missing half, or — after verifying no host for ${profile(opts)} survives — remove both and retry.`);
+    return fail(threaded, `~/.ssh holds half a keypair for ${profile(opts)} (private ${hasPrv ? "present" : "missing"}, public ${hasPub ? "present" : "missing"}): restore the missing half, or — after verifying no host for ${profile(opts)} survives — remove both and retry.`);
   }
   if (!state && hasPrv) {
     return fail(threaded, `${prv} exists but no compute state is readable: the previous delete may be incomplete, or a first create was interrupted. Verify at the provider that no host for ${profile(opts)} survives; if it is confirmed gone (or the interrupted create never made one), remove ${prv} and ${pub} and retry.`);
@@ -290,14 +291,12 @@ export async function preflight(opts: Opts, fetchFn: FetchFn = fetchAccountKeys)
 // Remove the generated keypair — the delete DAG wires this after the compute
 // destroy, so reaching it means the destroy succeeded and the invariant `key
 // present ⇔ deployment exists` holds. A failed or interrupted delete leaves
-// the key, correctly: it is still needed. Removes `.ssh/` itself only when
-// nothing else lives there.
+// the key, correctly: it is still needed. Only the profile-named files are
+// touched: `~/.ssh` is the operator's directory and is never removed.
 export function cleanupStep(opts: Opts): Opts {
   if (opts["red/event"] !== "delete" || !keygen(opts)) return { ...opts, "red/exit": 0 };
   for (const path of [privateKeyPath(opts), publicKeyPath(opts)]) {
     if (existsSync(path)) unlinkSync(path);
   }
-  const dir = sshDir(opts);
-  if (existsSync(dir) && readdirSync(dir).length === 0) rmdirSync(dir);
   return { ...opts, "red/exit": 0 };
 }

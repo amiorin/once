@@ -3,16 +3,17 @@
 Implements the SSH Keypair Standard (workspace ``standards/ssh-keypair.md``):
 when the selected compute provider's machine-key configuration key is absent
 from desired state, the package generates and manages an ed25519 keypair named
-after the profile, in ``.ssh/`` next to colors.yml. When the key is present,
+after the profile, in the operator's ``~/.ssh``. When the key is present,
 everything here steps aside and the value is used exactly as before the
 standard — presence is the only switch.
 
 Key material is like state: losing it loses access to the machine. So the
-keypair lives outside the regenerable workdir, an existing key without state
-is an error rather than something to overwrite, a provider-side key named
-after the profile but absent from our state is an error rather than something
-to import, and delete removes the local key only after the compute destroy
-succeeded.
+keypair lives in ``~/.ssh`` outside any checkout or workdir (the profile is
+globally unique — it already keys remote state — which is what makes the
+shared flat directory safe), an existing key without state is an error rather
+than something to overwrite, a provider-side key named after the profile but
+absent from our state is an error rather than something to import, and delete
+removes the local key only after the compute destroy succeeded.
 
 Generation shells ``ssh-keygen`` like ``github``: three languages agreeing on
 OpenSSH private-key encoding is a parity problem, one subprocess is not. The
@@ -22,6 +23,7 @@ private key never enters the opts map — templates receive only paths.
 from __future__ import annotations
 
 import json
+import os
 import urllib.request
 from pathlib import Path
 from typing import Awaitable, Callable
@@ -42,7 +44,7 @@ async def _default_runner(args: list[str], *, env: dict | None = None) -> ExecRe
 
 # The public key a build or dry-run renders where content (not a path) is
 # interpolated. Fixed, so the artifact stays deterministic and byte-identical
-# across colours whether or not .ssh/ exists.
+# across colours whether or not the keypair exists.
 placeholder_public = "ssh-ed25519 PLACEHOLDER managed-by-colors"
 
 # Compute provider -> the desired-state key that carries the machine key.
@@ -83,22 +85,21 @@ def profile(opts: dict) -> str:
     return str(opts.get("profile") or "default")
 
 
-def _project_dir(opts: dict) -> Path:
-    """The directory holding colors.yml — where .ssh/ lives.
-
-    .ssh/ sits outside the workdir on purpose: the workdir is regenerable
-    output and the key is not.
+def _home_dir() -> Path:
+    """The operator's home directory — ``~/.ssh`` is where the keypair lives,
+    per the standard. Reads ``$HOME`` at call time so tests and the parity
+    driver can redirect it away from the real ``~/.ssh``.
     """
-    state_file = opts.get("blue/state-file")
-    return Path(str(state_file)).parent if state_file else Path(".")
+    home = os.environ.get("HOME")
+    return Path(home) if home else Path.home()
 
 
 def ssh_dir(opts: dict) -> str:
-    return str(_project_dir(opts) / ".ssh")
+    return str(_home_dir() / ".ssh")
 
 
 def private_key_path(opts: dict) -> str:
-    return str(_project_dir(opts) / ".ssh" / profile(opts))
+    return str(_home_dir() / ".ssh" / profile(opts))
 
 
 def public_key_path(opts: dict) -> str:
@@ -113,10 +114,9 @@ def with_machine_key(opts: dict, real: bool) -> dict:
     """Fill the template values keygen mode owns, for every event.
 
     Opt-out opts pass through untouched. Path providers get the absolute
-    public-key path (OpenTofu resolves relative paths against the stage
-    directory, and the workdir is relocatable while .ssh/ is not); the content
-    provider gets the key content on real events and the fixed placeholder
-    otherwise, so builds never read .ssh/.
+    public-key path ($HOME expanded here, because tofu's ``file()`` does not
+    expand ``~``); the content provider gets the key content on real events
+    and the fixed placeholder otherwise, so builds never read ``~/.ssh``.
     """
     if not keygen(opts):
         return opts
@@ -152,10 +152,10 @@ def identity_args(opts: dict) -> list[str]:
 
 
 def _enforce_perms(opts: dict) -> str | None:
-    """700 on .ssh/, 600 on the private key — on every real run.
+    """700 on ~/.ssh, 600 on the private key — on every real run.
 
-    Not only at generation, so a checkout restored with wrong permissions
-    fails early.
+    Not only at generation, so a key restored with wrong permissions fails
+    early.
     """
     try:
         Path(ssh_dir(opts)).chmod(0o700)
@@ -197,9 +197,9 @@ async def ensure_key(opts: dict, state_fn, run_fn: Runner = _default_runner) -> 
     threaded = {**opts, "once/ssh-state-params": state}
 
     if state and not (has_prv or has_pub):
-        return _fail(threaded, f"compute state exists but {prv} is missing: this checkout has lost the machine key. Restore .ssh/ from where the deployment was created, or rebuild; a regenerated key cannot reach the existing host.")
+        return _fail(threaded, f"compute state exists but {prv} is missing: this workstation does not hold the machine key. Copy it from where the deployment was created, or rebuild; a regenerated key cannot reach the existing host.")
     if (has_prv or has_pub) and not (has_prv and has_pub):
-        return _fail(threaded, f".ssh/ holds half a keypair for {profile(opts)} (private {'present' if has_prv else 'missing'}, public {'present' if has_pub else 'missing'}): restore the missing half, or — after verifying no host for {profile(opts)} survives — remove both and retry.")
+        return _fail(threaded, f"~/.ssh holds half a keypair for {profile(opts)} (private {'present' if has_prv else 'missing'}, public {'present' if has_pub else 'missing'}): restore the missing half, or — after verifying no host for {profile(opts)} survives — remove both and retry.")
     if not state and has_prv:
         return _fail(threaded, f"{prv} exists but no compute state is readable: the previous delete may be incomplete, or a first create was interrupted. Verify at the provider that no host for {profile(opts)} survives; if it is confirmed gone (or the interrupted create never made one), remove {prv} and {pub} and retry.")
     if has_prv:
@@ -313,7 +313,8 @@ def cleanup_step(opts: dict) -> dict:
     The delete DAG wires this after the compute destroy, so reaching it means
     the destroy succeeded and the invariant "key present ⇔ deployment exists"
     holds. A failed or interrupted delete leaves the key, correctly: it is
-    still needed. Removes .ssh/ itself only when nothing else lives there.
+    still needed. Only the profile-named files are touched: ~/.ssh is the
+    operator's directory and is never removed.
     """
     if opts.get("blue/event") != "delete" or not keygen(opts):
         return {**opts, "blue/exit": 0}
@@ -321,7 +322,4 @@ def cleanup_step(opts: dict) -> dict:
         file = Path(path)
         if file.exists():
             file.unlink()
-    directory = Path(ssh_dir(opts))
-    if directory.exists() and not any(directory.iterdir()):
-        directory.rmdir()
     return {**opts, "blue/exit": 0}

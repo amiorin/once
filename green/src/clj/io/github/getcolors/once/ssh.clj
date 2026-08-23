@@ -4,16 +4,18 @@
   Implements the SSH Keypair Standard (workspace `standards/ssh-keypair.md`):
   when the selected compute provider's machine-key configuration key is absent
   from desired state, the package generates and manages an ed25519 keypair
-  named after the profile, in `.ssh/` next to colors.yml. When the key is
+  named after the profile, in the operator's `~/.ssh`. When the key is
   present, everything here steps aside and the value is used exactly as
   before the standard — presence is the only switch.
 
   Key material is like state: losing it loses access to the machine. So the
-  keypair lives outside the regenerable workdir, an existing key without
-  state is an error rather than something to overwrite, a provider-side key
-  named after the profile but absent from our state is an error rather than
-  something to import, and delete removes the local key only after the
-  compute destroy succeeded.
+  keypair lives in `~/.ssh` outside any checkout or workdir (the profile is
+  globally unique — it already keys remote state — which is what makes the
+  shared flat directory safe), an existing key without state is an error
+  rather than something to overwrite, a provider-side key named after the
+  profile but absent from our state is an error rather than something to
+  import, and delete removes the local key only after the compute destroy
+  succeeded.
 
   Generation shells `ssh-keygen` like `github`: three languages agreeing on
   OpenSSH private-key encoding is a parity problem, one subprocess is not.
@@ -36,7 +38,7 @@
 (def placeholder-public
   "The public key a build or dry-run renders where content (not a path) is
   interpolated. Fixed, so the artifact stays deterministic and byte-identical
-  across colours whether or not `.ssh/` exists."
+  across colours whether or not the keypair exists."
   "ssh-ed25519 PLACEHOLDER managed-by-colors")
 
 (def machine-key-keys
@@ -72,14 +74,14 @@
 
 (defn profile [opts] (or (:profile opts) "default"))
 
-(defn- project-dir
-  "The directory holding colors.yml — where `.ssh/` lives. `.ssh/` sits
-  outside the workdir on purpose: the workdir is regenerable output and the
-  key is not."
-  [opts]
-  (or (some-> (:green/state-file opts) io/file .getParent) "."))
+(defn home-dir
+  "The operator's home directory — `~/.ssh` is where the keypair lives, per
+  the standard. A function rather than a constant so tests and the parity
+  driver can redirect it away from the real `~/.ssh`."
+  []
+  (or (System/getenv "HOME") (System/getProperty "user.home")))
 
-(defn ssh-dir [opts] (str (io/file (project-dir opts) ".ssh")))
+(defn ssh-dir [_opts] (str (io/file (home-dir) ".ssh")))
 (defn private-key-path [opts] (str (io/file (ssh-dir opts) (profile opts))))
 (defn public-key-path [opts] (str (private-key-path opts) ".pub"))
 
@@ -89,10 +91,9 @@
 (defn with-machine-key
   "Fill the template values keygen mode owns, for every event, and leave
   opt-out opts untouched. Path providers get the absolute public-key path
-  (OpenTofu resolves relative paths against the stage directory, and the
-  workdir is relocatable while `.ssh/` is not); the content provider gets the
-  key content on real events and the fixed placeholder otherwise, so builds
-  never read `.ssh/`."
+  ($HOME expanded here, because tofu's `file()` does not expand `~`); the
+  content provider gets the key content on real events and the fixed
+  placeholder otherwise, so builds never read `~/.ssh`."
   [opts real?]
   (if-not (keygen? opts)
     opts
@@ -128,8 +129,8 @@
    (PosixFilePermissions/fromString perms)))
 
 (defn- enforce-perms!
-  "700 on `.ssh/`, 600 on the private key — on every real run, not only at
-  generation, so a checkout restored with wrong permissions fails early."
+  "700 on `~/.ssh`, 600 on the private key — on every real run, not only at
+  generation, so a key restored with wrong permissions fails early."
   [opts]
   (try
     (set-perms! (ssh-dir opts) "rwx------")
@@ -169,12 +170,12 @@
        (cond
          (and state (not (or prv? pub?)))
          (fail opts (str "compute state exists but " prv " is missing: this "
-                         "checkout has lost the machine key. Restore .ssh/ "
+                         "workstation does not hold the machine key. Copy it "
                          "from where the deployment was created, or rebuild; "
                          "a regenerated key cannot reach the existing host."))
 
          (and (or prv? pub?) (not (and prv? pub?)))
-         (fail opts (str ".ssh/ holds half a keypair for " (profile opts)
+         (fail opts (str "~/.ssh holds half a keypair for " (profile opts)
                          " (private " (if prv? "present" "missing")
                          ", public " (if pub? "present" "missing")
                          "): restore the missing half, or — after verifying "
@@ -325,15 +326,12 @@
   "Remove the generated keypair — the delete DAG wires this after the compute
   destroy, so reaching it means the destroy succeeded and the invariant `key
   present ⇔ deployment exists` holds. A failed or interrupted delete leaves
-  the key, correctly: it is still needed. Removes `.ssh/` itself only when
-  nothing else lives there."
+  the key, correctly: it is still needed. Only the profile-named files are
+  touched: `~/.ssh` is the operator's directory and is never removed."
   [opts]
   (if-not (and (= :delete (:green/event opts)) (keygen? opts))
     (assoc opts :green/exit 0)
     (do
       (doseq [path [(private-key-path opts) (public-key-path opts)]]
         (let [f (io/file path)] (when (.exists f) (.delete f))))
-      (let [dir (io/file (ssh-dir opts))]
-        (when (and (.exists dir) (empty? (.listFiles dir)))
-          (.delete dir)))
       (assoc opts :green/exit 0))))

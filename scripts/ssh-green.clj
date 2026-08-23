@@ -7,10 +7,15 @@
 (require '[clojure.string :as str]
          '[io.github.getcolors.once.ssh :as ssh])
 
-(defn tmp-dir []
-  (str (java.nio.file.Files/createTempDirectory
-        "once-ssh-parity"
-        (into-array java.nio.file.attribute.FileAttribute []))))
+(defn tmp-dir
+  "A fresh scenario directory, installed as the module's home so the keypair
+  lands under it — no scenario may touch the real ~/.ssh."
+  []
+  (let [dir (str (java.nio.file.Files/createTempDirectory
+                  "once-ssh-parity"
+                  (into-array java.nio.file.attribute.FileAttribute [])))]
+    (alter-var-root #'ssh/home-dir (constantly (constantly dir)))
+    dir))
 
 (defn fake-keygen [args _ _]
   (let [path (last args)]

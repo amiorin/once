@@ -53,8 +53,13 @@
      compute templates create the provider key resource themselves, and the
      delete DAG gains :once/ssh-cleanup. A launcher pinned older still
      demands the machine key in desired state, refusing a colors.yml written
-     for keygen mode, and renders templates without the keygen branches."
-  12)
+     for keygen mode, and renders templates without the keygen branches.
+  13: the machine keypair moves from `.ssh/` next to colors.yml to the
+     operator's `~/.ssh`, still profile-named. A launcher pinned older
+     generates and resolves the key inside the checkout, so it cannot see a
+     keypair living in ~/.ssh and would generate a second one beside a live
+     deployment's state."
+  13)
 
 (defn registrable-domain
   "The DNS zone `host` belongs to: its last two labels. Multi-label suffixes
