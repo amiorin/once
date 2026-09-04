@@ -172,7 +172,7 @@
             :when (present? k)
             entry (cidrs opts k)
             :when (not (cidr? entry))]
-        (str k " entry " (pr-str entry) " is not an IPv4 or IPv6 CIDR"))))))
+        (str k " entry \"" entry "\" is not an IPv4 or IPv6 CIDR"))))))
 
 ;;; ------------------------------------------------------------ provider
 

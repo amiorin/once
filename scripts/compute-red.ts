@@ -96,7 +96,7 @@ errs("source-overlay-string", compute.sourceErrors(spec, vultr({ "vultr-ssh-sour
 errs("source-absent-skipped", compute.sourceErrors(spec, vultr()));
 errs("source-blank-skipped", compute.sourceErrors(spec, vultr({ "vultr-ssh-sources": "  " })));
 errs("source-v4-grammar", compute.sourceErrors(spec, vultr({ "vultr-ssh-sources":
-  ["10.0.0.0/8", "0.0.0.0/0", "203.0.113.7/32", "10.0.0.0/33", "256.0.0.1/8", "example.com/32", "10.0.0.0", "10.0.0.0/", "10.0.0.0/8/8"] })));
+  ["10.0.0.0/8", "0.0.0.0/0", "203.0.113.7/32", "10.0.0.0/33", "256.0.0.1/8", "example.com/32", "10.0.0.0", "10.0.0.0/", "é/32", "a\"b/32", "a\\b/32", "10.0.0.0/8/8"] })));
 errs("source-v6-grammar", compute.sourceErrors(spec, vultr({ "vultr-ssh-sources":
   ["2001:db8::/32", "::/0", "::1/128", "1:2:3:4:5:6:7:8/128", "2001:db8:::1/64", "1:2:3:4:5:6:7:8:9/64", "2001:db8::/129", "2001:db8::g/64"] })));
 errs("source-v4-tail", compute.sourceErrors(spec, vultr({ "vultr-ssh-sources":

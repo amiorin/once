@@ -94,7 +94,7 @@
 (errs "source-v4-grammar"
       (compute/source-errors spec (vultr :vultr-ssh-sources
                                          ["10.0.0.0/8" "0.0.0.0/0" "203.0.113.7/32" "10.0.0.0/33"
-                                          "256.0.0.1/8" "example.com/32" "10.0.0.0" "10.0.0.0/"
+                                          "256.0.0.1/8" "example.com/32" "10.0.0.0" "10.0.0.0/" "é/32" "a\"b/32" "a\\b/32"
                                           "10.0.0.0/8/8"])))
 (errs "source-v6-grammar"
       (compute/source-errors spec (vultr :vultr-ssh-sources

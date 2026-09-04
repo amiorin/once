@@ -208,7 +208,7 @@ export function sourceErrors(spec: ComputeSpec, opts: Opts): string[] {
   for (const key of allKeys) {
     if (!present(key)) continue;
     for (const entry of cidrs(opts, key)) {
-      if (!cidr(entry)) errors.push(`:${key} entry ${JSON.stringify(entry)} is not an IPv4 or IPv6 CIDR`);
+      if (!cidr(entry)) errors.push(`:${key} entry "${entry}" is not an IPv4 or IPv6 CIDR`);
     }
   }
   return errors;
