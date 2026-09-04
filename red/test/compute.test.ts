@@ -231,6 +231,9 @@ test("read state catches only the step error", async () => {
   expect(await sut.readState({}, async () => { throw foreign; }))
     .toEqual({ error: "tofu output failed: other copy" });
   // undefined from the reader is a readable state holding nothing
+  // A launch failure (no stage directory yet) reaches red as a failed exit and so as a StepError.
+  expect(await sut.readState({}, async () => { throw new StepError("tofu output failed: spawn tofu ENOENT"); }))
+    .toEqual({ error: "tofu output failed: spawn tofu ENOENT" });
   expect(await sut.readState({}, async () => undefined)).toEqual({ params: undefined });
   // params pass through, and the reader sees opts
   expect(await sut.readState({ profile: "prod" }, async (o) => ({ ip: "1.2.3.4", seen: o.profile })))

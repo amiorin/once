@@ -180,6 +180,7 @@
 (rs "read-state-empty-message" (fn [_] (throw (step-error ""))))
 (rs "read-state-nil" (fn [_] nil))
 (rs "read-state-params" (fn [o] {:ip "1.2.3.4" :seen (:profile o)}))
+(rs "read-state-launch-failure" (fn [_] (throw (java.io.IOException. "tofu could not start: no stage directory"))))
 (rs "read-state-other-propagates" (fn [_] (throw (RuntimeException. "defect"))))
 (rs "read-state-untyped-propagates" (fn [_] (throw (ex-info "defect" {}))))
 

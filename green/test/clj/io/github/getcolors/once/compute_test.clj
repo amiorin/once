@@ -233,6 +233,11 @@
            (sut/read-state {} (fn [_] (throw (ex-info "" {:dir "/x"})))))))
   (testing "nil from the reader is a readable state holding nothing"
     (is (= {:params nil} (sut/read-state {} (constantly nil)))))
+  (testing "the green SDK's launch failure — sh throws IOException when the stage directory is absent — is unreadable, not a defect"
+    (is (= {:error "Cannot run program \"tofu\" (in directory \"/nope\"): error=2, No such file or directory"}
+           (sut/read-state {} (fn [_] (throw (java.io.IOException. "Cannot run program \"tofu\" (in directory \"/nope\"): error=2, No such file or directory"))))))
+    (is (= {:error "state read failed without a message"}
+           (sut/read-state {} (fn [_] (throw (java.io.IOException.)))))))
   (testing "params pass through, and the reader sees opts"
     (is (= {:params {:ip "1.2.3.4" :seen "prod"}}
            (sut/read-state {:profile "prod"} (fn [o] {:ip "1.2.3.4" :seen (:profile o)})))))

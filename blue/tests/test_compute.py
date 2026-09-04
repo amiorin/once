@@ -249,6 +249,11 @@ async def test_read_state_catches_only_the_step_error():
     # a step error without a message reads as the fixed fallback string
     assert await sut.read_state({}, step_error_without_message) == {"error": "state read failed without a message"}
     # None from the reader is a readable state holding nothing
+    async def launch_failure(_opts):
+        # A launch failure (no stage directory yet) reaches blue as a failed exit and so as a StepError.
+        raise StepError("tofu output failed: [Errno 2] No such file or directory")
+
+    assert await sut.read_state({}, launch_failure) == {"error": "tofu output failed: [Errno 2] No such file or directory"}
     assert await sut.read_state({}, nothing) == {"params": None}
     # params pass through, and the reader sees opts
     assert await sut.read_state({"profile": "prod"}, params) == {"params": {"ip": "1.2.3.4", "seen": "prod"}}

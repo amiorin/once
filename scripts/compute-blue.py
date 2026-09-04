@@ -214,6 +214,11 @@ rs("read-state-no-message", step_error_no_message)
 rs("read-state-empty-message", step_error_no_message)
 rs("read-state-nil", nothing)
 rs("read-state-params", params_reader)
+async def launch_failure(_opts):
+    raise StepError("tofu could not start: no stage directory")
+
+
+rs("read-state-launch-failure", launch_failure)
 rs("read-state-other-propagates", other)
 rs("read-state-untyped-propagates", untyped)
 

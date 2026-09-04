@@ -180,6 +180,7 @@ await rs("read-state-no-message", async () => { throw new StepError(""); });
 await rs("read-state-empty-message", async () => { throw new StepError(""); });
 await rs("read-state-nil", async () => undefined);
 await rs("read-state-params", async (o) => ({ ip: "1.2.3.4", seen: o.profile }));
+await rs("read-state-launch-failure", async () => { throw new StepError("tofu could not start: no stage directory"); });
 await rs("read-state-other-propagates", async () => { throw new Error("defect"); });
 await rs("read-state-untyped-propagates", async () => { throw new TypeError("defect"); });
 
