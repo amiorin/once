@@ -1,3 +1,3 @@
 {:deps {io.github.getcolors/green      {:git/url "https://github.com/getcolors/green.git"
-                                      :git/sha "ceb4159a19ec281d60f10d11295c05c5de5f1c42"}
+                                      :git/sha "3f33f5d4dcce1f8d97a11b6972e13eb3f0b37654"}
         io.github.getcolors/once {:local/root "."}}}

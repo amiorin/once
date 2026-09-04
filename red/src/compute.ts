@@ -325,11 +325,10 @@ export function resolvedCompute(result: Opts, fallback: Params, outputs: Params 
 
 const noMessage = "state read failed without a message";
 
-// The SDK's step error, by class — and by name, because a downstream package
-// whose `red` pin differs from this package's would hold two copies of the
-// class, and `red/tofu` throws whichever one it imported.
+// The SDK's step error, by class: `red/tofu` throws the one `StepError` that
+// `red/workflow` exports, and a package pins one `red`, so there is one copy.
 function stepError(error: unknown): error is Error {
-  return error instanceof StepError || (error instanceof Error && error.name === "StepError");
+  return error instanceof StepError;
 }
 
 // One read of the compute state per run, shaped so a caller can tell nothing

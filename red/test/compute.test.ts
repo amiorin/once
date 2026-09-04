@@ -225,11 +225,10 @@ test("read state catches only the step error", async () => {
   // a step error without a message reads as the fixed fallback string
   expect(await sut.readState({}, async () => { throw new StepError(""); }))
     .toEqual({ error: "state read failed without a message" });
-  // a StepError from another copy of the SDK is recognised by name
-  const foreign = new Error("tofu output failed: other copy");
-  foreign.name = "StepError";
-  expect(await sut.readState({}, async () => { throw foreign; }))
-    .toEqual({ error: "tofu output failed: other copy" });
+  // an Error merely named "StepError" is not the SDK's class and propagates
+  const impostor = new Error("tofu output failed: not the SDK's class");
+  impostor.name = "StepError";
+  await expect(sut.readState({}, async () => { throw impostor; })).rejects.toThrow("not the SDK's class");
   // undefined from the reader is a readable state holding nothing
   // A launch failure (no stage directory yet) reaches red as a failed exit and so as a StepError.
   expect(await sut.readState({}, async () => { throw new StepError("tofu output failed: spawn tofu ENOENT"); }))

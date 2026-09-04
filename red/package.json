@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "red": "github:getcolors/red#48076768e8954030904b7d966fe636c4c01592ce"
+    "red": "github:getcolors/red#db9bfe61282e2093f4098bf5a6ee0cd10added6e"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",

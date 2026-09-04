@@ -5,7 +5,7 @@
 #
 # [tool.uv.sources]
 # package-once-blue = { git = "https://github.com/getcolors/once.git", rev = "bc06f2f2b4ad331c59cc551d9870a776b42b3fda", subdirectory = "blue" }
-# blue = { git = "https://github.com/getcolors/blue.git", rev = "369c5aafea790a03b649b3513003651e672f3f57" }
+# blue = { git = "https://github.com/getcolors/blue.git", rev = "290f313ead5ca162875c33a049c880da017eae09" }
 # ///
 """Thin launcher for package-once-blue."""
 from package_once_blue import exec, run

@@ -14,7 +14,7 @@ wheels = [
 [[package]]
 name = "blue"
 version = "0.1.0"
-source = { git = "https://github.com/getcolors/blue.git?rev=369c5aafea790a03b649b3513003651e672f3f57#369c5aafea790a03b649b3513003651e672f3f57" }
+source = { git = "https://github.com/getcolors/blue.git?rev=290f313ead5ca162875c33a049c880da017eae09#290f313ead5ca162875c33a049c880da017eae09" }
 dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
@@ -53,7 +53,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "blue", git = "https://github.com/getcolors/blue.git?rev=369c5aafea790a03b649b3513003651e672f3f57" }]
+requires-dist = [{ name = "blue", git = "https://github.com/getcolors/blue.git?rev=290f313ead5ca162875c33a049c880da017eae09" }]
 
 [package.metadata.requires-dev]
 dev = [

@@ -291,33 +291,24 @@
   that function local so `with-redefs` in its tests keeps working — and it
   throws when the backend is unreadable.
 
-  Only the SDK's failures are caught: an `ExceptionInfo` whose `ex-data`
-  carries `:dir`, which is exactly what `green.tofu/outputs` throws, and the
-  `java.io.IOException` that `clojure.java.shell/sh` throws underneath it
-  when tofu cannot be started at all (a stage directory that does not exist
-  yet, as on a fresh clone's first create; red and blue turn that launch
-  failure into their StepError). The ex-info is the shape
+  Only the SDK's step error is caught: an `ExceptionInfo` whose `ex-data`
+  carries `:dir`, which is exactly what `green.tofu/outputs` throws
   (`(ex-info (str \"tofu output failed: \" err) {:dir dir})`) and nothing
-  else in the SDK does — this function depends on that shape, as its red and
-  blue twins depend on `red/tofu` and `blue.tofu` throwing `StepError`. A
-  message-less step error reads as the fixed string `state read failed
-  without a message`. Any other exception propagates: a programmer defect in
-  the reader must not read as \"no state\" and skip the switch guard."
+  else in the SDK does. A launch failure — the stage directory does not
+  exist yet, as on a fresh clone's first create, or tofu is not on PATH — is
+  reported by green's tofu runner as a failed exit (127) and so reaches here
+  in that same shape, the way red and blue turn theirs into `StepError`.
+  This function depends on that shape, as its red and blue twins depend on
+  `red/tofu` and `blue.tofu` throwing `StepError`. A message-less step error
+  reads as the fixed string `state read failed without a message`. Anything
+  else propagates: a programmer defect in the reader must not read as \"no
+  state\" and skip the switch guard."
   [opts reader]
   (try {:params (reader opts)}
        (catch clojure.lang.ExceptionInfo e
          (if (contains? (ex-data e) :dir)
            {:error (or (not-empty (ex-message e)) no-message)}
-           (throw e)))
-       ;; The green SDK runs tofu through clojure.java.shell/sh, which throws
-       ;; a raw IOException when the process cannot start at all — the stage
-       ;; directory does not exist yet, which is every fresh clone's first
-       ;; real create, or tofu is not on PATH. red/tofu and blue.tofu report
-       ;; the same launch failure as a failed exit and so as their StepError;
-       ;; this is green's shape of the same "unreadable", not a defect in the
-       ;; reader.
-       (catch java.io.IOException e
-         {:error (or (not-empty (ex-message e)) no-message)})))
+           (throw e)))))
 
 (defn lifecycle-event?
   "A real create or delete: the two events that touch a provider."
