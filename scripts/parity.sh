@@ -120,7 +120,20 @@ diff "$tmp/containers-green" "$tmp/containers-blue"
 diff "$tmp/ssh-green" "$tmp/ssh-red"
 diff "$tmp/ssh-green" "$tmp/ssh-blue"
 
+# The Compute Provider Standard's operations — selection, the network
+# contract, the name rules, the switch and legacy refusals, the state read and
+# adoption — are library surface every delegating package calls, and none of
+# them reach a build artifact. Each colour drives the same scenarios over one
+# two-provider stub spec and prints normalized outcome lines, so a message or
+# a rule that drifts in one colour shows up here rather than in a package.
+(cd "$root/green" && bb ../scripts/compute-green.clj) >"$tmp/compute-green"
+(cd "$root/red" && bun ../scripts/compute-red.ts) >"$tmp/compute-red"
+(cd "$root/blue" && uv run python ../scripts/compute-blue.py) >"$tmp/compute-blue"
+diff "$tmp/compute-green" "$tmp/compute-red"
+diff "$tmp/compute-green" "$tmp/compute-blue"
+
 echo "green, red, and blue build artifacts are byte-identical"
 echo "green, red, and blue agree on every scalar in the parity corpus"
 echo "green, red, and blue resolve every container in the parity corpus alike"
 echo "green, red, and blue run the machine-key matrix and preflight alike"
+echo "green, red, and blue run the compute provider operations alike"

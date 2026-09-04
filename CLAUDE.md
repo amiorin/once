@@ -123,6 +123,26 @@ every colour — there is no per-colour prefix and no portable alias; never
 render secret values. The generated Ansible lookup expression must remain
 identical in all three implementations.
 
+## What ONCE lends to downstream packages
+
+Two modules are library surface for the other Package Skills, not only parts
+of this workflow. `ssh` (`io.github.getcolors.once.ssh`, `red/src/ssh.ts`,
+`package_once_blue.ssh`) implements the SSH Keypair Standard. `compute`
+(`io.github.getcolors.once.compute`, the `compute` export of
+`package-once-red`, `package_once_blue.compute`) implements the operations of
+the Compute Provider Standard — selection, the network contract, the name
+rules, the switch and legacy refusals, the state read and adoption — over a
+registry the calling package passes in as a spec value; ONCE's own workflow
+does not call it. clickstack, signoz, agent-network, posthog and redis pin ONCE
+by SHA and delegate to them, so a change here reaches those packages when
+their pins move, and a message that differs per colour is a bug none of their
+goldens can show. Their net is the parity driver trios `scripts/ssh-*` and
+`scripts/compute-*`, which `parity.sh` diffs across the three colours;
+`compute` also carries the same unit matrix in all three suites. Changing
+either module's behaviour or wording is a contract change for every
+downstream package: land it in all three colours, extend the driver, and prove
+the driver fails before trusting it.
+
 ## Documentation and skills
 
 The skill names are `package-once-green`, `package-once-red`, and

@@ -36,6 +36,8 @@ green/
 │   │   ├── validate.clj     # the provider registry and desired-state validation
 │   │   ├── github.clj       # deploy-key generation and publication to the Actions environment
 │   │   ├── describe.clj     # post-provisioning report (providers, compute status, apps)
+│   │   ├── ssh.clj          # the machine keypair (SSH Keypair Standard); lent to downstream packages
+│   │   ├── compute.clj      # the Compute Provider Standard's operations; lent to downstream packages
 │   │   └── utils.clj        # contract number and DNS zone derivation
 │   └── resources/io/github/getcolors/once/
 │       ├── raw              # `<{ content|safe }>` — the template used for generated content
@@ -54,6 +56,8 @@ green/
 │   ├── describe_test.clj    # report parsing and assembly
 │   ├── deploy_test.clj      # the deploy ForceCommand script
 │   ├── once_module_test.clj # the `once` Ansible module
+│   ├── ssh_test.clj         # the machine-key create matrix, preflight, cleanup
+│   ├── compute_test.clj     # the Compute Provider Standard matrix (same cases in red and blue)
 │   └── utils_test.clj       # zone derivation
 ├── test/resources/          # classpath fixtures the tests read
 ├── deps.edn / bb.edn        # git-pinned green; bb.edn overrides with local roots
@@ -226,7 +230,7 @@ Keys are per repository and ephemeral: `validate/deploy-groups` groups applicati
 
 ## Code Conventions
 
-- **Namespaces**: `io.github.getcolors.once.*`. Six of them, mapping to distinct concerns — `tools` (the steps), `workflow` (the graph), `validate` (the provider registry and its rules), `describe` (the report), `github` (deploy keys and the environment they are published to), `utils` (the contract and zone derivation). Adding a seventh needs a genuinely new concern.
+- **Namespaces**: `io.github.getcolors.once.*`. Eight of them, mapping to distinct concerns — `tools` (the steps), `workflow` (the graph), `validate` (the provider registry and its rules), `describe` (the report), `github` (deploy keys and the environment they are published to), `utils` (the contract and zone derivation), `ssh` (the machine keypair a deployment owns: the SSH Keypair Standard's reference implementation, also called by downstream packages), `compute` (the operations of the Compute Provider Standard over a registry a downstream package passes in as a spec value — selection, the network contract, the name rules, the switch and legacy refusals, the state read and adoption; ONCE's own workflow does not call it). Adding a ninth needs a genuinely new concern.
 - **Keys**: plain kebab-case keywords for desired state (they match template variable names); namespaced keywords for engine state (`:green/…`, `:once/…`).
 - **Steps** take `opts` and return `opts`, and report failure through `:green/exit` / `:green/err`.
 - **`^:private`** for everything not called from the launcher or the tests. The launcher's own helpers are `defn-`; the workflow steps it exposes are not.

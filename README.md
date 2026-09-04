@@ -136,4 +136,6 @@ verifies that packaged resource copies match Green's reference resources, and
 checks that the three YAML readers type every scalar in
 `test/parity/scalars.yml` identically.
 
+ONCE also lends downstream Package Skills two library modules in every colour — `ssh` (the SSH Keypair Standard) and `compute` (the Compute Provider Standard's operations over a package-owned registry) — whose behaviour and messages `parity.sh` diffs across the three through `scripts/ssh-*` and `scripts/compute-*`.
+
 Generated `.colors/` directories are artifacts and must not be edited as source.
