@@ -132,6 +132,19 @@ diff "$tmp/ssh-green" "$tmp/ssh-blue"
 diff "$tmp/compute-green" "$tmp/compute-red"
 diff "$tmp/compute-green" "$tmp/compute-blue"
 
+# The launcher contract numbers are one fact in three files: green counts
+# from 2, red and blue from 1, so green is always the other two plus 8. A
+# bump that lands in two colours and not the third is exactly the drift this
+# script exists to catch — blue missed one once and carried the wrong number
+# for two releases.
+green_contract=$(sed -n 's/^  \([0-9][0-9]*\))$/\1/p' "$root/green/src/clj/io/github/getcolors/once/utils.clj" | tail -1)
+red_contract=$(sed -n 's/^export const contract = \([0-9]*\);$/\1/p' "$root/red/src/utils.ts")
+blue_contract=$(sed -n 's/^CONTRACT = \([0-9]*\)$/\1/p' "$root/blue/src/package_once_blue/utils.py")
+if [ "$green_contract" != "$((red_contract + 8))" ] || [ "$green_contract" != "$((blue_contract + 8))" ]; then
+  echo "contract numbers disagree: green $green_contract, red $red_contract (+8 = $((red_contract + 8))), blue $blue_contract (+8 = $((blue_contract + 8)))" >&2
+  exit 1
+fi
+
 echo "green, red, and blue build artifacts are byte-identical"
 echo "green, red, and blue agree on every scalar in the parity corpus"
 echo "green, red, and blue resolve every container in the parity corpus alike"

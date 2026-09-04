@@ -7,12 +7,22 @@ from __future__ import annotations
 #    whose environment receives the connection details. A launcher pinned older
 #    still expects deploy-pubkey in desired state and would ignore github
 #    silently, publishing nothing.
-# 4: the machine keypair moves from .ssh/ next to colors.yml to the operator's
+# 4: the SSH Keypair Standard (workspace standards/ssh-keypair.md). The
+#    machine-key keys leave required: their absence now selects keygen mode,
+#    where ssh.py generates a profile-named ed25519 keypair in .ssh/, the
+#    compute templates create the provider key resource themselves, and the
+#    delete DAG gains once/ssh-cleanup. A launcher pinned older still demands
+#    the machine key in desired state, refusing a colors.yml written for
+#    keygen mode, and renders templates without the keygen branches.
+#    (Shipped in the same commit as green's 12 and red's 4; this entry and
+#    the bump were missed then and added later. Nothing reads this number
+#    yet: only the green launcher checks a contract.)
+# 5: the machine keypair moves from .ssh/ next to colors.yml to the operator's
 #    ~/.ssh, still profile-named. A launcher pinned older generates and
 #    resolves the key inside the checkout, so it cannot see a keypair living
 #    in ~/.ssh and would generate a second one beside a live deployment's
 #    state.
-CONTRACT = 4
+CONTRACT = 5
 
 
 def registrable_domain(host: object) -> str | None:
