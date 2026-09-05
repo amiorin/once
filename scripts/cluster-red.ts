@@ -120,7 +120,14 @@ thrown("spec-offset-not-integer",
 thrown("spec-entry-incomplete", () => cluster.specErrors(spec({ ...homog, entry: { index: 0 } })));
 thrown("spec-entry-unresolved", () => cluster.specErrors(spec({ ...roles, entry: { role: "web", index: 0 } })));
 thrown("spec-entry-bad-index", () => cluster.specErrors(spec({ ...roles, entry: { role: "app", index: -1 } })));
-thrown("spec-entry-index-beyond-count-is-topology", () => cluster.specErrors(spec({ ...homog, entry: { role: null, index: 7 } })));
+thrown("spec-entry-index-beyond-static-count", () => cluster.specErrors(spec({ ...roles, entry: { role: "app", index: 9 } })));
+// the static count (3) admits index 2; the count-key override (2) does not:
+// specErrors passes and the refusal is topologyErrors'
+thrown("spec-entry-index-beyond-count-is-topology", () => {
+  const s = spec({ ...homog, entry: { role: null, index: 2 } });
+  cluster.specErrors(s);
+  return cluster.topologyErrors(s, vultr({ "node-count": 2 }));
+});
 thrown("spec-fallback-subnet-non-canonical", () => cluster.specErrors(spec({ ...homog, fallbackSubnet: "10.110.0.1/20" })));
 thrown("spec-fallback-subnet-not-permitted",
   () => cluster.specErrors(spec({ ...homog, registry: without(registry, "digitalocean") })));
@@ -182,6 +189,9 @@ errs("network-created-slash-28-broadcast",
 errs("network-created-slash-24-crossing-refused", cluster.networkErrors(high, vultr()));
 errs("network-created-slash-20-crossing-holds", cluster.networkErrors(high, vultr({ "vultr-vpc-subnet": "10.40.0.0/20" })));
 errs("network-created-invalid-count-skipped", cluster.networkErrors(homog, vultr({ "node-count": "3" })));
+errs("network-created-slash-0", cluster.networkErrors(homog, vultr({ "vultr-vpc-subnet": "0.0.0.0/0" })));
+errs("network-created-slash-31", cluster.networkErrors(homog, vultr({ "vultr-vpc-subnet": "10.0.0.0/31" })));
+errs("network-created-slash-32", cluster.networkErrors(homog, vultr({ "vultr-vpc-subnet": "10.0.0.1/32" })));
 errs("network-fallback-subnet-non-canonical",
   cluster.networkErrors(spec({ ...homog, fallbackSubnet: "10.110.0.1/20" }), digitalocean()));
 
@@ -221,6 +231,8 @@ ne("node-errors-nodes-absent", homog, vultr(), { provider: "vultr" });
 ne("node-errors-missing-id", homog, vultr(), { nodes: [node(null, 0), node(null, 2)] });
 ne("node-errors-extra-id", homog, vultr(), { nodes: [node(null, 0), node(null, 1), node(null, 2), node(null, 3)] });
 ne("node-errors-duplicate-id", homog, vultr(), { nodes: [node(null, 0), node(null, 1), node(null, 2), node(null, 1)] });
+ne("node-errors-undeclared-duplicate", homog, vultr(),
+  { nodes: [node(null, 0), node(null, 1), node(null, 2), node(null, 9), node(null, 9)] });
 ne("node-errors-without-name", homog, vultr(), { nodes: [node(null, 0), without(node(null, 1), "name") as cluster.Node, node(null, 2)] });
 {
   const withoutVpc = homogParams.nodes!.map((n) => without(n, "vpc_ip") as cluster.Node);

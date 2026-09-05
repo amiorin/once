@@ -83,8 +83,13 @@
     (is (= ":entry must carry :role and :index" (spec-message (assoc homog :entry {:index 0}))))
     (is (= ":entry :role must name a declared role" (spec-message (assoc roles :entry {:role "web" :index 0}))))
     (is (= ":entry :index must be a non-negative integer" (spec-message (assoc roles :entry {:role "app" :index -1}))))
-    (is (= [] (sut/spec-errors (assoc homog :entry {:role nil :index 7})))
-        "the index against the count is topology-errors' job"))
+    (is (= ":entry :index must be below :count of role \"app\""
+           (spec-message (assoc roles :entry {:role "app" :index 9})))
+        "a fixed role's static count bounds the index here")
+    (is (= ":entry :index must be below :count of the nil role"
+           (spec-message (assoc homog :entry {:role nil :index 3}))))
+    (is (= [] (sut/spec-errors (assoc homog :entry {:role nil :index 2})))
+        "the static count admits it; the index against a count-key override is topology-errors' job"))
   (testing "fallback-subnet"
     (is (= ":fallback-subnet must be a canonical IPv4 network such as 10.40.0.0/24"
            (spec-message (assoc homog :fallback-subnet "10.110.0.1/20"))))
@@ -245,6 +250,12 @@
          (sut/node-errors homog (vultr) {:nodes [(node nil 0) (node nil 1) (node nil 2) (node nil 3)]})))
   (is (= ["the compute stage reported 1 more than once"]
          (sut/node-errors homog (vultr) {:nodes [(node nil 0) (node nil 1) (node nil 2) (node nil 1)]})))
+  (testing "duplicates are counted whether or not the id is declared, in first-reported order"
+    (is (= ["the compute stage reported nodes this package does not declare: 9"
+            "the compute stage reported 9 more than once"]
+           (sut/node-errors homog (vultr) {:nodes [(node nil 0) (node nil 1) (node nil 2) (node nil 9) (node nil 9)]})))
+    (is (= ["the compute stage reported 2, 0 more than once"]
+           (sut/node-errors homog (vultr) {:nodes [(node nil 2) (node nil 2) (node nil 0) (node nil 0) (node nil 1)]}))))
   (is (= [(str complete-message "1; refusing to render a partial cluster")]
          (sut/node-errors homog (vultr) {:nodes [(node nil 0) (dissoc (node nil 1) :name) (node nil 2)]})))
   (testing "blank, null, whitespace and non-strings count as missing"

@@ -248,7 +248,8 @@
 (defn node-errors
   "Nil when `params` is nil (a build); else, in this order: ids declared
   but not reported; ids reported but not declared; ids reported more than
-  once; and ids whose node lacks a non-blank string for any of `ip`,
+  once (declared or not, in first-reported order); and ids whose node
+  lacks a non-blank string for any of `ip`,
   `name`, `user`, `sudoer` — and `vpc_ip` unless the network mode is
   `:none`. Absent, null, blank and non-string values all count as missing.
   Ids are matched exactly, so a legacy `index: null` (or a string index)
@@ -269,7 +270,7 @@
           complete? (fn [n] (every? #(non-blank-string? (get n %)) fields))
           missing (remove reported? declared)
           undeclared (distinct (remove declared? reported))
-          duplicated (filter #(> (get freq % 0) 1) declared)
+          duplicated (filter #(> (get freq %) 1) (distinct reported))
           incomplete (filter #(and (contains? by-id %) (not (complete? (by-id %)))) declared)]
       (vec
        (concat
@@ -326,7 +327,9 @@
   nil role is the only entry; role names match `role-re`, are unique, and
   none equals another followed by `-<digits>`; every `:count` is a positive
   integer and every `:fallback-offset` a non-negative one; `:entry` names a
-  declared role with a non-negative index; `:fallback-subnet`, when
+  declared role with a non-negative index below that role's static `:count`
+  (the count-key override is `topology-errors`' to check); `:fallback-subnet`,
+  when
   present, is a canonical IPv4 network and is permitted only when some
   advertised entry's network is `:discovered`."
   [spec]
@@ -355,7 +358,11 @@
       (when-not (some #(= (:role entry) %) names)
         (spec-error ":entry :role must name a declared role"))
       (when-not (nat-int? (:index entry))
-        (spec-error ":entry :index must be a non-negative integer")))
+        (spec-error ":entry :index must be a non-negative integer"))
+      (let [{:keys [role]} entry
+            label (if (nil? role) "the nil role" (str "role \"" role "\""))]
+        (when-not (< (:index entry) (:count (role-entry spec role)))
+          (spec-error (str ":entry :index must be below :count of " label)))))
     (when (contains? spec :fallback-subnet)
       (when-not (ipv4-network (:fallback-subnet spec))
         (spec-error (str ":fallback-subnet" canonical-message)))

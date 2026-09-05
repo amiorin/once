@@ -360,7 +360,8 @@ function nodesById(params: ClusterParams): Map<string, Node> {
 
 // Undefined when `params` is nil (a build); else, in this order: ids
 // declared but not reported; ids reported but not declared; ids reported
-// more than once; and ids whose node lacks a non-blank string for any of
+// more than once (declared or not, in first-reported order); and ids whose
+// node lacks a non-blank string for any of
 // `ip`, `name`, `user`, `sudoer` — and `vpc_ip` unless the network mode is
 // none. Absent, null, blank and non-string values all count as missing. Ids
 // are matched exactly, so a legacy `index: null` (or a string index) is an
@@ -391,7 +392,13 @@ export function nodeErrors(spec: ClusterSpec, opts: Opts, params: ClusterParams 
     seen.add(key);
     return true;
   });
-  const duplicated = declared.filter((id) => (freq.get(idKey(id)) ?? 0) > 1);
+  const duplicatedSeen = new Set<string>();
+  const duplicated = reported.filter((id) => {
+    const key = idKey(id);
+    if ((freq.get(key) ?? 0) < 2 || duplicatedSeen.has(key)) return false;
+    duplicatedSeen.add(key);
+    return true;
+  });
   const incomplete = declared.filter((id) => byId.has(idKey(id)) && !complete(byId.get(idKey(id))!));
   const errors: string[] = [];
   if (missing.length > 0) {
@@ -455,7 +462,9 @@ function duplicateErrors(what: string, values: string[]): string[] {
 // the only entry; role names match `roleRe`, are unique, and none equals
 // another followed by `-<digits>`; every `count` is a positive integer and
 // every `fallbackOffset` a non-negative one; `entry` names a declared role
-// with a non-negative index; `fallbackSubnet`, when present, is a canonical
+// with a non-negative index below that role's static `count` (the count-key
+// override is `topologyErrors`' to check); `fallbackSubnet`, when present,
+// is a canonical
 // IPv4 network and is permitted only when some advertised entry's network
 // is discovered.
 export function specErrors(spec: ClusterSpec): string[] {
@@ -498,6 +507,10 @@ export function specErrors(spec: ClusterSpec): string[] {
     const { role, index } = entry as { role: unknown; index: unknown };
     if (!names.some((r) => sameRole(r, role))) specError(":entry :role must name a declared role");
     if (!natInt(index)) specError(":entry :index must be a non-negative integer");
+    const label = role == null ? "the nil role" : `role "${role}"`;
+    if (!((index as number) < roleEntry(spec, (role ?? null) as string | null)!.count)) {
+      specError(`:entry :index must be below :count of ${label}`);
+    }
   }
   if ("fallbackSubnet" in spec) {
     if (!ipv4Network(spec.fallbackSubnet)) specError(`:fallback-subnet${canonicalMessage}`);

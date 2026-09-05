@@ -428,7 +428,8 @@ def _lookup(by_id: list[tuple[dict, Any]], id: dict) -> tuple[bool, Any]:
 def node_errors(spec: ClusterSpec, opts: dict, params: Params | None) -> list[str] | None:
     """None when ``params`` is None (a build); else, in this order: ids
     declared but not reported; ids reported but not declared; ids reported
-    more than once; and ids whose node lacks a non-blank string for any of
+    more than once (declared or not, in first-reported order); and ids whose
+    node lacks a non-blank string for any of
     ``ip``, ``name``, ``user``, ``sudoer`` — and ``vpc_ip`` unless the
     network mode is none. Absent, null, blank and non-string values all count
     as missing. Ids are matched exactly, so a legacy ``index: null`` (or a
@@ -457,7 +458,7 @@ def node_errors(spec: ClusterSpec, opts: dict, params: Params | None) -> list[st
 
     missing = [d for d in declared if not is_reported(d)]
     undeclared = _distinct_ids(r for r in reported if not is_declared(r))
-    duplicated = [d for d in declared if freq(d) > 1]
+    duplicated = _distinct_ids(r for r in reported if freq(r) > 1)
     incomplete = []
     for d in declared:
         present, n = _lookup(by_id, d)
@@ -525,7 +526,9 @@ def spec_errors(spec: ClusterSpec) -> list[str]:
     ``ROLE_RE``, are unique, and none equals another followed by
     ``-<digits>``; every ``count`` is a positive integer and every
     ``fallback_offset`` a non-negative one; ``entry`` names a declared role
-    with a non-negative index; ``fallback_subnet``, when present, is a
+    with a non-negative index below that role's static ``count`` (the
+    count-key override is ``topology_errors``' to check); ``fallback_subnet``,
+    when present, is a
     canonical IPv4 network and is permitted only when some advertised entry's
     network is discovered."""
     rs = roles(spec)
@@ -559,6 +562,11 @@ def spec_errors(spec: ClusterSpec) -> list[str]:
             _spec_error(":entry :role must name a declared role")
         if not _nat_int(entry.get("index")):
             _spec_error(":entry :index must be a non-negative integer")
+        role = entry.get("role")
+        label = "the nil role" if role is None else f'role "{_s(role)}"'
+        declared = _role_entry(spec, role)
+        if not (declared is not None and entry.get("index") < declared.get("count", 0)):
+            _spec_error(f":entry :index must be below :count of {label}")
     if "fallback_subnet" in spec:
         if ipv4_network(spec.get("fallback_subnet")) is None:
             _spec_error(":fallback-subnet" + _CANONICAL_MESSAGE)

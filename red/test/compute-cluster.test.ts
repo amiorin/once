@@ -98,8 +98,11 @@ test("spec errors throw on the first static problem and pass both shapes", () =>
   expect(specMessage(spec({ ...homog, entry: { index: 0 } }))).toBe(":entry must carry :role and :index");
   expect(specMessage(spec({ ...roles, entry: { role: "web", index: 0 } }))).toBe(":entry :role must name a declared role");
   expect(specMessage(spec({ ...roles, entry: { role: "app", index: -1 } }))).toBe(":entry :index must be a non-negative integer");
-  // the index against the count is topologyErrors' job
-  expect(sut.specErrors(spec({ ...homog, entry: { role: null, index: 7 } }))).toEqual([]);
+  // a fixed role's static count bounds the index here
+  expect(specMessage(spec({ ...roles, entry: { role: "app", index: 9 } }))).toBe(":entry :index must be below :count of role \"app\"");
+  expect(specMessage(spec({ ...homog, entry: { role: null, index: 3 } }))).toBe(":entry :index must be below :count of the nil role");
+  // the static count admits it; the index against a count-key override is topologyErrors' job
+  expect(sut.specErrors(spec({ ...homog, entry: { role: null, index: 2 } }))).toEqual([]);
   // fallback-subnet
   expect(specMessage(spec({ ...homog, fallbackSubnet: "10.110.0.1/20" })))
     .toBe(":fallback-subnet must be a canonical IPv4 network such as 10.40.0.0/24");
@@ -270,6 +273,14 @@ test("node errors report the four classes in order", () => {
     .toEqual(["the compute stage reported nodes this package does not declare: 3"]);
   expect(sut.nodeErrors(homog, vultr(), { nodes: [node(null, 0), node(null, 1), node(null, 2), node(null, 1)] }))
     .toEqual(["the compute stage reported 1 more than once"]);
+  // duplicates are counted whether or not the id is declared, in first-reported order
+  expect(sut.nodeErrors(homog, vultr(), { nodes: [node(null, 0), node(null, 1), node(null, 2), node(null, 9), node(null, 9)] }))
+    .toEqual([
+      "the compute stage reported nodes this package does not declare: 9",
+      "the compute stage reported 9 more than once",
+    ]);
+  expect(sut.nodeErrors(homog, vultr(), { nodes: [node(null, 2), node(null, 2), node(null, 0), node(null, 0), node(null, 1)] }))
+    .toEqual(["the compute stage reported 2, 0 more than once"]);
   expect(sut.nodeErrors(homog, vultr(), { nodes: [node(null, 0), without(node(null, 1), "name") as sut.Node, node(null, 2)] }))
     .toEqual([`${completeMessage}1; refusing to render a partial cluster`]);
   // blank, null, whitespace and non-strings count as missing

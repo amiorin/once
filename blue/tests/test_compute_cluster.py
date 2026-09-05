@@ -100,8 +100,13 @@ def test_spec_errors_throw_on_the_first_static_problem_and_pass_both_shapes():
     assert spec_message({**homog, "entry": {"index": 0}}) == ":entry must carry :role and :index"
     assert spec_message({**roles, "entry": {"role": "web", "index": 0}}) == ":entry :role must name a declared role"
     assert spec_message({**roles, "entry": {"role": "app", "index": -1}}) == ":entry :index must be a non-negative integer"
-    # the index against the count is topology_errors' job
-    assert sut.spec_errors({**homog, "entry": {"role": None, "index": 7}}) == []
+    # a fixed role's static count bounds the index here
+    assert spec_message({**roles, "entry": {"role": "app", "index": 9}}) == \
+        ':entry :index must be below :count of role "app"'
+    assert spec_message({**homog, "entry": {"role": None, "index": 3}}) == \
+        ":entry :index must be below :count of the nil role"
+    # the static count admits it; the index against a count-key override is topology_errors' job
+    assert sut.spec_errors({**homog, "entry": {"role": None, "index": 2}}) == []
     # fallback-subnet
     assert spec_message({**homog, "fallback_subnet": "10.110.0.1/20"}) == \
         ":fallback-subnet must be a canonical IPv4 network such as 10.40.0.0/24"
@@ -268,6 +273,12 @@ def test_node_errors_report_the_four_classes_in_order():
         ["the compute stage reported nodes this package does not declare: 3"]
     assert sut.node_errors(homog, vultr(), {"nodes": [node(None, 0), node(None, 1), node(None, 2), node(None, 1)]}) == \
         ["the compute stage reported 1 more than once"]
+    # duplicates are counted whether or not the id is declared, in first-reported order
+    assert sut.node_errors(homog, vultr(), {"nodes": [node(None, 0), node(None, 1), node(None, 2), node(None, 9), node(None, 9)]}) == [
+        "the compute stage reported nodes this package does not declare: 9",
+        "the compute stage reported 9 more than once"]
+    assert sut.node_errors(homog, vultr(), {"nodes": [node(None, 2), node(None, 2), node(None, 0), node(None, 0), node(None, 1)]}) == \
+        ["the compute stage reported 2, 0 more than once"]
     assert sut.node_errors(homog, vultr(), {"nodes": [node(None, 0), without(node(None, 1), "name"), node(None, 2)]}) == \
         [complete_message + "1; refusing to render a partial cluster"]
     # blank, null, whitespace and non-strings count as missing

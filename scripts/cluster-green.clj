@@ -105,7 +105,13 @@
 (thrown "spec-entry-incomplete" #(cluster/spec-errors (assoc homog :entry {:index 0})))
 (thrown "spec-entry-unresolved" #(cluster/spec-errors (assoc roles :entry {:role "web" :index 0})))
 (thrown "spec-entry-bad-index" #(cluster/spec-errors (assoc roles :entry {:role "app" :index -1})))
-(thrown "spec-entry-index-beyond-count-is-topology" #(cluster/spec-errors (assoc homog :entry {:role nil :index 7})))
+(thrown "spec-entry-index-beyond-static-count" #(cluster/spec-errors (assoc roles :entry {:role "app" :index 9})))
+;; the static count (3) admits index 2; the count-key override (2) does not:
+;; spec-errors passes and the refusal is topology-errors'
+(thrown "spec-entry-index-beyond-count-is-topology"
+        #(let [s (assoc homog :entry {:role nil :index 2})]
+           (cluster/spec-errors s)
+           (cluster/topology-errors s (vultr :node-count 2))))
 (thrown "spec-fallback-subnet-non-canonical" #(cluster/spec-errors (assoc homog :fallback-subnet "10.110.0.1/20")))
 (thrown "spec-fallback-subnet-not-permitted"
         #(cluster/spec-errors (assoc homog :registry (dissoc registry "digitalocean"))))
@@ -165,6 +171,9 @@
 (errs "network-created-slash-24-crossing-refused" (cluster/network-errors high (vultr)))
 (errs "network-created-slash-20-crossing-holds" (cluster/network-errors high (vultr :vultr-vpc-subnet "10.40.0.0/20")))
 (errs "network-created-invalid-count-skipped" (cluster/network-errors homog (vultr :node-count "3")))
+(errs "network-created-slash-0" (cluster/network-errors homog (vultr :vultr-vpc-subnet "0.0.0.0/0")))
+(errs "network-created-slash-31" (cluster/network-errors homog (vultr :vultr-vpc-subnet "10.0.0.0/31")))
+(errs "network-created-slash-32" (cluster/network-errors homog (vultr :vultr-vpc-subnet "10.0.0.1/32")))
 (errs "network-fallback-subnet-non-canonical"
       (cluster/network-errors (assoc homog :fallback-subnet "10.110.0.1/20") (digitalocean)))
 
@@ -202,6 +211,8 @@
 (ne "node-errors-missing-id" homog (vultr) {:nodes [(node nil 0) (node nil 2)]})
 (ne "node-errors-extra-id" homog (vultr) {:nodes [(node nil 0) (node nil 1) (node nil 2) (node nil 3)]})
 (ne "node-errors-duplicate-id" homog (vultr) {:nodes [(node nil 0) (node nil 1) (node nil 2) (node nil 1)]})
+(ne "node-errors-undeclared-duplicate" homog (vultr)
+    {:nodes [(node nil 0) (node nil 1) (node nil 2) (node nil 9) (node nil 9)]})
 (ne "node-errors-without-name" homog (vultr) {:nodes [(node nil 0) (dissoc (node nil 1) :name) (node nil 2)]})
 (let [without (mapv #(dissoc % :vpc_ip) (:nodes homog-params))]
   (ne "node-errors-without-vpc-ip-none" homog (none) {:nodes without})

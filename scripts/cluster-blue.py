@@ -149,7 +149,18 @@ thrown("spec-offset-not-integer",
 thrown("spec-entry-incomplete", lambda: cluster.spec_errors({**homog, "entry": {"index": 0}}))
 thrown("spec-entry-unresolved", lambda: cluster.spec_errors({**roles, "entry": {"role": "web", "index": 0}}))
 thrown("spec-entry-bad-index", lambda: cluster.spec_errors({**roles, "entry": {"role": "app", "index": -1}}))
-thrown("spec-entry-index-beyond-count-is-topology", lambda: cluster.spec_errors({**homog, "entry": {"role": None, "index": 7}}))
+thrown("spec-entry-index-beyond-static-count", lambda: cluster.spec_errors({**roles, "entry": {"role": "app", "index": 9}}))
+
+
+# the static count (3) admits index 2; the count-key override (2) does not:
+# spec_errors passes and the refusal is topology_errors'
+def entry_beyond_count_is_topology():
+    s = {**homog, "entry": {"role": None, "index": 2}}
+    cluster.spec_errors(s)
+    return cluster.topology_errors(s, vultr(**{"node-count": 2}))
+
+
+thrown("spec-entry-index-beyond-count-is-topology", entry_beyond_count_is_topology)
 thrown("spec-fallback-subnet-non-canonical", lambda: cluster.spec_errors({**homog, "fallback_subnet": "10.110.0.1/20"}))
 thrown("spec-fallback-subnet-not-permitted",
        lambda: cluster.spec_errors({**homog, "registry": without(registry, "digitalocean")}))
@@ -209,6 +220,9 @@ errs("network-created-slash-28-broadcast",
 errs("network-created-slash-24-crossing-refused", cluster.network_errors(high, vultr()))
 errs("network-created-slash-20-crossing-holds", cluster.network_errors(high, vultr(**{"vultr-vpc-subnet": "10.40.0.0/20"})))
 errs("network-created-invalid-count-skipped", cluster.network_errors(homog, vultr(**{"node-count": "3"})))
+errs("network-created-slash-0", cluster.network_errors(homog, vultr(**{"vultr-vpc-subnet": "0.0.0.0/0"})))
+errs("network-created-slash-31", cluster.network_errors(homog, vultr(**{"vultr-vpc-subnet": "10.0.0.0/31"})))
+errs("network-created-slash-32", cluster.network_errors(homog, vultr(**{"vultr-vpc-subnet": "10.0.0.1/32"})))
 errs("network-fallback-subnet-non-canonical",
      cluster.network_errors({**homog, "fallback_subnet": "10.110.0.1/20"}, digitalocean()))
 
@@ -249,6 +263,8 @@ ne("node-errors-nodes-absent", homog, vultr(), {"provider": "vultr"})
 ne("node-errors-missing-id", homog, vultr(), {"nodes": [node(None, 0), node(None, 2)]})
 ne("node-errors-extra-id", homog, vultr(), {"nodes": [node(None, 0), node(None, 1), node(None, 2), node(None, 3)]})
 ne("node-errors-duplicate-id", homog, vultr(), {"nodes": [node(None, 0), node(None, 1), node(None, 2), node(None, 1)]})
+ne("node-errors-undeclared-duplicate", homog, vultr(),
+   {"nodes": [node(None, 0), node(None, 1), node(None, 2), node(None, 9), node(None, 9)]})
 ne("node-errors-without-name", homog, vultr(), {"nodes": [node(None, 0), without(node(None, 1), "name"), node(None, 2)]})
 without_vpc = [without(n, "vpc_ip") for n in homog_params["nodes"]]
 ne("node-errors-without-vpc-ip-none", homog, none(), {"nodes": without_vpc})
