@@ -132,6 +132,16 @@ diff "$tmp/ssh-green" "$tmp/ssh-blue"
 diff "$tmp/compute-green" "$tmp/compute-red"
 diff "$tmp/compute-green" "$tmp/compute-blue"
 
+# The Compute Cluster Standard's operations — the node set, the fallbacks,
+# the four node-error classes, the network modes, the topology checks, the
+# cluster adoption and the per-node aliases — are the same kind of library
+# surface, driven the same way over one three-provider stub spec.
+(cd "$root/green" && bb ../scripts/cluster-green.clj) >"$tmp/cluster-green"
+(cd "$root/red" && bun ../scripts/cluster-red.ts) >"$tmp/cluster-red"
+(cd "$root/blue" && uv run python ../scripts/cluster-blue.py) >"$tmp/cluster-blue"
+diff "$tmp/cluster-green" "$tmp/cluster-red"
+diff "$tmp/cluster-green" "$tmp/cluster-blue"
+
 # The launcher contract numbers are one fact in three files: green counts
 # from 2, red and blue from 1, so green is always the other two plus 8. A
 # bump that lands in two colours and not the third is exactly the drift this
@@ -150,3 +160,4 @@ echo "green, red, and blue agree on every scalar in the parity corpus"
 echo "green, red, and blue resolve every container in the parity corpus alike"
 echo "green, red, and blue run the machine-key matrix and preflight alike"
 echo "green, red, and blue run the compute provider operations alike"
+echo "green, red, and blue run the compute cluster operations alike"
