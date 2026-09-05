@@ -89,4 +89,13 @@
     (seed! dir)
     (let [out (ssh/cleanup-step (assoc (base dir) :green/event :delete))]
       (println (str "cleanup exit=" (or (:green/exit out) 0)
-                    " removed=" (not (.exists (clojure.java.io/file dir ".ssh" "parity"))))))))
+                    " removed=" (not (.exists (clojure.java.io/file dir ".ssh" "parity")))))))
+
+  ;; A key that survives the removal (read-only ~/.ssh) fails the delete with
+  ;; one message in every colour.
+  (let [dir (tmp-dir)
+        ssh-dir (clojure.java.io/file dir ".ssh")]
+    (seed! dir)
+    (.setWritable ssh-dir false false)
+    (line "cleanup-readonly" dir (ssh/cleanup-step (assoc (base dir) :green/event :delete)))
+    (.setWritable ssh-dir true false)))

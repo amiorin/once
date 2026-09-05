@@ -319,7 +319,25 @@ def cleanup_step(opts: dict) -> dict:
     if opts.get("blue/event") != "delete" or not keygen(opts):
         return {**opts, "blue/exit": 0}
     for path in (private_key_path(opts), public_key_path(opts)):
-        file = Path(path)
-        if file.exists():
-            file.unlink()
+        err = _remove_file(path)
+        if err:
+            return _fail(opts, err)
     return {**opts, "blue/exit": 0}
+
+
+def _remove_file(path: str) -> str | None:
+    """Delete ``path`` when it exists, and answer the failure message when it
+    is still there afterwards. Presence is the check, not whether ``unlink``
+    raised: a file in a read-only directory survives, and a delete that
+    reported success over a surviving key would break the invariant the
+    standard exists for."""
+    file = Path(path)
+    if file.exists():
+        try:
+            file.unlink()
+        except OSError:
+            pass  # presence decides below
+    if file.exists():
+        return (f"cannot remove {path} after the compute destroy; remove it by "
+                "hand and retry the delete")
+    return None

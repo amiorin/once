@@ -199,6 +199,24 @@
         (sut/cleanup-step (opts-in dir :green/event :create))
         (is (.exists (io/file dir ".ssh" "prod")))))))
 
+(deftest cleanup-fails-when-a-key-survives
+  (let [dir (tmp-home)
+        ssh-dir (io/file dir ".ssh")]
+    (with-home dir
+      (seed-keypair! dir)
+      ;; A read-only ~/.ssh makes the unlink fail without an exception on the
+      ;; JVM; the step must notice the survivor rather than report success.
+      (.setWritable ssh-dir false false)
+      (try
+        (let [out (sut/cleanup-step (opts-in dir :green/event :delete))]
+          (is (= 1 (:green/exit out)))
+          (is (= (str "cannot remove " (io/file ssh-dir "prod")
+                      " after the compute destroy; remove it by hand and retry the delete")
+                 (:green/err out)))
+          (is (.exists (io/file ssh-dir "prod"))
+              "the key is left in place: the delete is not done"))
+        (finally (.setWritable ssh-dir true false))))))
+
 (deftest identity-args-select-the-machine-key
   (is (= [] (sut/identity-args {:ip "1.2.3.4"})))
   (is (= ["-o" "IdentitiesOnly=yes" "-i" "/x/.ssh/prod"]

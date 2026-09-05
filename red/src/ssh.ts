@@ -293,10 +293,31 @@ export async function preflight(opts: Opts, fetchFn: FetchFn = fetchAccountKeys)
 // present ⇔ deployment exists` holds. A failed or interrupted delete leaves
 // the key, correctly: it is still needed. Only the profile-named files are
 // touched: `~/.ssh` is the operator's directory and is never removed.
+// Delete `path` when it exists, and answer the failure message when it is
+// still there afterwards. Presence is the check, not whether `unlinkSync`
+// threw: a file in a read-only directory survives, and a delete that reported
+// success over a surviving key would break the invariant the standard exists
+// for.
+function removeFile(path: string): string | undefined {
+  if (existsSync(path)) {
+    try {
+      unlinkSync(path);
+    } catch {
+      // presence decides below
+    }
+  }
+  return existsSync(path)
+    ? `cannot remove ${path} after the compute destroy; remove it by hand and retry the delete`
+    : undefined;
+}
+
+// A key file that survives the removal fails the step: the operator is told
+// which file, and the delete is not done until it is gone.
 export function cleanupStep(opts: Opts): Opts {
   if (opts["red/event"] !== "delete" || !keygen(opts)) return { ...opts, "red/exit": 0 };
   for (const path of [privateKeyPath(opts), publicKeyPath(opts)]) {
-    if (existsSync(path)) unlinkSync(path);
+    const err = removeFile(path);
+    if (err) return fail(opts, err);
   }
   return { ...opts, "red/exit": 0 };
 }

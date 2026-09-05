@@ -322,16 +322,30 @@
 
 ;;; ----------------------------------------------------------------- delete
 
+(defn- remove-file!
+  "Delete `path` when it exists, and answer the failure message when it is
+  still there afterwards. Presence is the check, not `.delete`'s boolean: a
+  file in a read-only directory survives without an exception, and a delete
+  that reported success over a surviving key would break the invariant the
+  standard exists for."
+  [path]
+  (let [f (io/file path)]
+    (when (.exists f) (.delete f))
+    (when (.exists f)
+      (str "cannot remove " path " after the compute destroy; remove it by "
+           "hand and retry the delete"))))
+
 (defn cleanup-step
   "Remove the generated keypair — the delete DAG wires this after the compute
   destroy, so reaching it means the destroy succeeded and the invariant `key
   present ⇔ deployment exists` holds. A failed or interrupted delete leaves
   the key, correctly: it is still needed. Only the profile-named files are
-  touched: `~/.ssh` is the operator's directory and is never removed."
+  touched: `~/.ssh` is the operator's directory and is never removed. A key
+  file that survives the removal fails the step: the operator is told which
+  file, and the delete is not done until it is gone."
   [opts]
   (if-not (and (= :delete (:green/event opts)) (keygen? opts))
     (assoc opts :green/exit 0)
-    (do
-      (doseq [path [(private-key-path opts) (public-key-path opts)]]
-        (let [f (io/file path)] (when (.exists f) (.delete f))))
+    (if-let [err (some remove-file! [(private-key-path opts) (public-key-path opts)])]
+      (fail opts err)
       (assoc opts :green/exit 0))))

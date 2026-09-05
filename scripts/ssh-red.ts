@@ -4,7 +4,7 @@
 // scenario. Green and blue print the same shape, so parity.sh can diff them:
 // none of this logic reaches a build artifact, and the error messages are
 // user-facing contract.
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Opts } from "red/workflow";
@@ -109,4 +109,14 @@ async function pre(dir: string, state: () => Promise<any>, fetch: ssh.FetchFn): 
   seed(dir);
   const out = ssh.cleanupStep({ ...base(dir), "red/event": "delete" });
   console.log(`cleanup exit=${out["red/exit"] ?? 0} removed=${!existsSync(join(dir, ".ssh", "parity"))}`);
+}
+
+// A key that survives the removal (read-only ~/.ssh) fails the delete with
+// one message in every colour.
+{
+  const dir = tmpDir();
+  seed(dir);
+  chmodSync(join(dir, ".ssh"), 0o500);
+  line("cleanup-readonly", dir, ssh.cleanupStep({ ...base(dir), "red/event": "delete" }));
+  chmodSync(join(dir, ".ssh"), 0o700);
 }

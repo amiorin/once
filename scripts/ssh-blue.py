@@ -121,3 +121,11 @@ seed(dir)
 out = ssh.cleanup_step({**base(dir), "blue/event": "delete"})
 removed = not (Path(dir) / ".ssh" / "parity").exists()
 print(f"cleanup exit={out.get('blue/exit') or 0} removed={'true' if removed else 'false'}")
+
+# A key that survives the removal (read-only ~/.ssh) fails the delete with
+# one message in every colour.
+dir = tmp_dir()
+seed(dir)
+os.chmod(Path(dir) / ".ssh", 0o500)
+line("cleanup-readonly", dir, ssh.cleanup_step({**base(dir), "blue/event": "delete"}))
+os.chmod(Path(dir) / ".ssh", 0o700)
