@@ -14,7 +14,7 @@ import { homedir } from "node:os";
 // directory, which would halt Bun's upward resolution of `package-once-red` and
 // break the development symlink at red/red.
 const PINS = {
-  "package-once-red": "github:getcolors/once#f8815a446daf8b4c1f6231754d0940a1489c3fc7",
+  "package-once-red": "github:getcolors/once#c6f05a37000dd57329c41777ff32d90a093c7309",
   "red": "github:getcolors/red#db9bfe61282e2093f4098bf5a6ee0cd10added6e",
 };
 

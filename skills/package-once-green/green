@@ -38,7 +38,7 @@
   13)
 
 ;; Managed by `bb pin` — do not edit by hand.
-(def ^:private once-sha "f8815a446daf8b4c1f6231754d0940a1489c3fc7")
+(def ^:private once-sha "c6f05a37000dd57329c41777ff32d90a093c7309")
 (def ^:private green-sha "3f33f5d4dcce1f8d97a11b6972e13eb3f0b37654")
 
 (def ^:private once-git-url "https://github.com/getcolors/once.git")
